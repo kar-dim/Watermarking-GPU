@@ -5,13 +5,12 @@
 Part 2 / Χρήση GPU για υπολογισμούς.
 
 Χρησιμοποιήθηκαν οι παρακάτω βιβλιοθήκες:
-- Eigen
 - CImg
 - LibPNG + zlib
     
 Για να γίνει το build, απαιτείται η περαιτέρω εγκατάσταση των παρακάτω:
-- OpenCL 2.0 headers (TODO, θα δουλέψει με nvidia sdk? ή να βάλω του AMD?)
-- ArrayFire
-- OpenCV (για εφαρμογή σε video)
+- AMD APP SDK 3.0 (ή Nvidia CUDA Toolkit για NVIDIA GPU). Πρέπει να μπει το "cl2.hpp" που έχουμε τροποποιήσει στο default include path τους.
+- ArrayFire και να οριστεί το "AF_PATH" (στη default τιμή) Environment Variable.
+- OpenCV (αν χρειάζεται να γίνει εφαρμογή σε video) και να οριστεί το "OPENCV_DIR" (στη default τιμή) Environment Variable.
 
 
