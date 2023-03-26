@@ -243,12 +243,12 @@ int main(void)
 			timer::start();
 			float correlation_nvf = mask_detector(watermark_NVF, w, p, psnr, queue, context, program_nvf, program_me, true);
 			timer::end();
-			cout << "Time to calculate correlation of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
+			cout << "Time to calculate correlation (NVF) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 			timer::start();
 			float correlation_me = mask_detector(watermark_ΜΕ, w, p, psnr, queue, context, program_nvf, program_me, false);
 			timer::end();
-			cout << "Time to calculate correlation of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
+			cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 			cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
 			cout << "Correlation [ME]: " << std::fixed << std::setprecision(16) << correlation_me << "\n";
