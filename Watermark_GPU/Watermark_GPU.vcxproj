@@ -49,7 +49,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(AF_PATH)\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include;$(SolutionDir)Watermark_GPU\libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(SolutionDir)Watermark_GPU/libs/zlib/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AF_PATH)\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
@@ -57,9 +57,12 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(AF_PATH)\lib;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64;$(OPENCV_DIR)\lib;$(SolutionDir)/Watermark_GPU/libs/zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(AF_PATH)\lib\afopencl.lib;OpenCL.lib;$(OPENCV_DIR)\lib\opencv_world452d.lib;$(SolutionDir)/Watermark_GPU/libs/zlib/lib/zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AF_PATH)\lib;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(AF_PATH)\lib\afopencl.lib;OpenCL.lib;$(OPENCV_DIR)\lib\opencv_world452d.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452d.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -71,16 +74,19 @@
       <ConformanceMode>true</ConformanceMode>
       <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalIncludeDirectories>$(AF_PATH)\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include;$(SolutionDir)Watermark_GPU\libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(SolutionDir)Watermark_GPU/libs/zlib/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AF_PATH)\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(AF_PATH)\lib\afopencl.lib;OpenCL.lib;$(OPENCV_DIR)\lib\opencv_world452.lib;$(SolutionDir)/Watermark_GPU/libs/zlib/lib/zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(AF_PATH)\lib;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64;$(OPENCV_DIR)\lib;$(SolutionDir)/Watermark_GPU/libs/zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(AF_PATH)\lib\afopencl.lib;OpenCL.lib;$(OPENCV_DIR)\lib\opencv_world452.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AF_PATH)\lib;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="UtilityFunctions.cpp" />
