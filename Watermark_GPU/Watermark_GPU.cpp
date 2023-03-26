@@ -203,7 +203,6 @@ int main(void)
 			const int cols = rgb_image_cimg.width();
 			//διάβασμα του W πίνακα
 			w = load_W(w_file, rows, cols);
-			cout << w.dims(0) << " " << w.dims(1) << "\n";
 			//αντιγράφουμε την εικόνα από τη RAM (CImg object) στη GPU. Για εικόνα μπορούσαμε απευθείας από δίσκο<->gpu
 			//απλώς ήθελα να δείξω το κόστος της μεταφοράς στη gpu από τον δίσκο σε σχέση με τη ram.
 			timer::start();
