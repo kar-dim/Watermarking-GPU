@@ -143,8 +143,10 @@ int main(void)
 	catch (cl::Error& e) {
 		cout << "Could not build a kernel, Reason:\n\n";
 		cout << e.what();
-		cout << program_nvf.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
-		cout << program_me.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
+		if (program_nvf.get() != NULL)
+			cout << program_nvf.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
+		if (program_me.get() != NULL)
+			cout << program_me.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
 		return -1;
 	}
 	//ο πίνακας που θα εμπεριέχει το υδατογράφημα
