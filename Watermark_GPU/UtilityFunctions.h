@@ -7,21 +7,27 @@
 #endif
 
 #include <string>
-#include <random>
 #include <arrayfire.h>
 #include <chrono>
+#include "INIReader.h"
 
+/*!
+ *  \brief  Helper methods for testing the watermark algorithms
+ *  \author Dimitris Karatzas
+ */
 class UtilityFunctions {
 public:
 	static size_t max_workgroup_size;
-	// normalize στο[0, 1] διάστημα
 	static af::array normalize_to_f32(af::array& a);
-	//εμφάνιση πληροφοριών σχετικά με το OpenCL
-	static void print_opencl_info(cl::Platform& plat, cl::Device& device);
-	//χρησιμοποιείται για τη φόρτωση kernel
+	static int test_for_image(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
+	static int test_for_video(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
 	static std::string loadProgram(std::string input);
 };
 
+/*!
+ *  \brief  simple methods to calculate execution times
+ *  \author Dimitris Karatzas
+ */
 namespace timer {
 	static std::chrono::time_point<std::chrono::steady_clock> start_timex, cur_timex;
 	void start();
