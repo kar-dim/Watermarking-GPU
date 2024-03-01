@@ -26,8 +26,6 @@
 using namespace cimg_library;
 using std::cout;
 
-size_t UtilityFunctions::max_workgroup_size = -1;
-
 af::array UtilityFunctions::normalize_to_f32(af::array& a)
 {
 	float mx = af::max<float>(a);
@@ -69,14 +67,13 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 		cout << "Image dimensions too low\n";
 		return -1;
 	}
-	if (rgb_image_cimg.width() > device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>() || rgb_image_cimg.width() > 3840 || rgb_image_cimg.height() > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || rgb_image_cimg.height() > 2160) {
+	if (rgb_image_cimg.width() > device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>() || rgb_image_cimg.width() > 7680 || rgb_image_cimg.height() > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || rgb_image_cimg.height() > 4320) {
 		cout << "Image dimensions too high for this GPU\n";
 		return -1;
 	}
 	const int rows = rgb_image_cimg.height();
 	const int cols = rgb_image_cimg.width();
-	//random noise array
-	const af::array w = load_W(inir.Get("paths", "w_path", "w.txt"), rows, cols);
+
 	timer::start();
 	af::array rgb_image(cols, rows, 3, rgb_img_vals);
 	af::sync();
@@ -85,41 +82,45 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 	rgb_image = af::transpose(rgb_image);
 
 	//grayscale
-	af::array image = af::round(0.299 * rgb_image(af::span, af::span, 0)) + af::round(0.587 * rgb_image(af::span, af::span, 1)) + af::round(0.114 * rgb_image(af::span, af::span, 2));
+	const af::array image = af::round(0.299 * rgb_image(af::span, af::span, 0)) + af::round(0.587 * rgb_image(af::span, af::span, 1)) + af::round(0.114 * rgb_image(af::span, af::span, 2));
+	
+	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
+	WatermarkFunctions watermarks(image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
 
 	float a;
 	af::array a_x;
+
 	//warmup for arrayfire
-	make_and_add_watermark_NVF(image, w, p, psnr, &a, queue, context, program_nvf);
-	make_and_add_watermark_ME(image, w, a_x, p, psnr, &a, queue, context, program_me);
+	watermarks.make_and_add_watermark_custom(image, &a);
+	watermarks.make_and_add_watermark_ME(image, a_x, &a);
 
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = make_and_add_watermark_NVF(image, w, p, psnr, &a, queue, context, program_nvf);
+	af::array watermark_NVF = watermarks.make_and_add_watermark_custom(image, &a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ΜΕ = make_and_add_watermark_ME(image, w, a_x, p, psnr, &a, queue, context, program_me);
+	af::array watermark_ΜΕ = watermarks.make_and_add_watermark_ME(image,a_x, &a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//warmup for arrayfire
-	mask_detector(watermark_NVF, w, p, psnr, queue, context, &program_nvf, program_me);
-	mask_detector(watermark_ΜΕ, w, p, psnr, queue, context, nullptr, program_me);
+	watermarks.mask_detector_custom(watermark_NVF);
+	watermarks.mask_detector_ME(watermark_ΜΕ);
 
 	//detection of NVF
 	timer::start();
-	float correlation_nvf = mask_detector(watermark_NVF, w, p, psnr, queue, context, &program_nvf, program_me);
+	float correlation_nvf = watermarks.mask_detector_custom(watermark_NVF);
 	timer::end();
 	cout << "Time to calculate correlation (NVF) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//detection of ME
 	timer::start();
-	float correlation_me = mask_detector(watermark_ΜΕ, w, p, psnr, queue, context, nullptr, program_me);
+	float correlation_me = watermarks.mask_detector_ME(watermark_ΜΕ);
 	timer::end();
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
@@ -153,7 +154,6 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	const float frame_period = 1.0f / fps;
 	float time_diff;
 
-	const af::array w = load_W(inir.Get("paths", "w_path", "w.txt"), rows, cols);
 	/*
 
 					REALTIME ΥΔΑΤΟΓΡΑΦΗΣΗ (RAW VIDEO)
@@ -177,6 +177,8 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	}
 	int counter = 0;
 	af::array dummy_a_x;
+	WatermarkFunctions watermarks(inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	watermarks.load_W(rows, cols);
 	if (!first_frame_w) {
 		//af::Window window1(1280, 720, "Watermarked Video");
 		for (unsigned int i = 0; i < frames; i++) {
@@ -187,11 +189,12 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			af::array gpu_frame(cols, rows, y_vals);
 			//af::print("ar", gpu_frame);
 			gpu_frame = af::transpose(gpu_frame).as(af::dtype::f32);
+			watermarks.load_image(gpu_frame);
 			//υπολογισμός ME watermarked frame.
 			if (i % 2 && two_frames_watermark == false)
-				frames_me.push_back(make_and_add_watermark_ME(gpu_frame, w, dummy_a_x, p, psnr, &a, queue, context, program_me));
+				frames_me.push_back(watermarks.make_and_add_watermark_ME(gpu_frame, dummy_a_x, &a));
 			else {
-				frames_me.push_back(make_and_add_watermark_ME(gpu_frame, w, a_x[counter], p, psnr, &a, queue, context, program_me));
+				frames_me.push_back(watermarks.make_and_add_watermark_ME(gpu_frame, a_x[counter], &a));
 				counter++;
 			}
 			//timer::end();
@@ -212,9 +215,9 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 		unsigned char* y_vals = temp.data();
 		af::array gpu_frame(cols, rows, y_vals);
 		gpu_frame = af::transpose(gpu_frame).as(af::dtype::f32);
-
+		watermarks.load_image(gpu_frame);
 		//frames_nvf.push_back(make_and_add_watermark_NVF(gpu_frame, w, p, psnr, queue, context, program_nvf, false));
-		frames_me.push_back(make_and_add_watermark_ME(gpu_frame, w, dummy_a_x, p, psnr, &a, queue, context, program_me));
+		frames_me.push_back(watermarks.make_and_add_watermark_ME(gpu_frame, dummy_a_x, &a));
 		//τα υπόλοιπα frames θα μπουν όπως έχουν
 		for (unsigned int i = 1; i < frames; i++) {
 			CImg<unsigned char> temp(video_cimg.at(i).get_channel(0));
@@ -289,9 +292,10 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	//μπορεί να τροποποιηθεί ώστε να βρίσκει correlation κάθε 2ο frame (τότε δε δείχνω στην οθόνη προφανώς τίποτα)
 	CImgDisplay cimgd0;
 	for (unsigned int i = 0; i < frames; i++) {
-		//frames_nvf_cor[i] = mask_detector(frames_nvf[i], w, p, psnr, queue, context, program_me);
 		timer::start();
-		frames_me_cor[i] = mask_detector(frames_me[i], w, p, psnr, queue, context, nullptr, program_me);
+		watermarks.load_image(frames_me[i]);
+		//frames_nvf_cor[i] = watermarks.mask_detector(frames_nvf[i], w, p, psnr, program_me);
+		frames_me_cor[i] = watermarks.mask_detector_ME(frames_me[i]);
 		timer::end();
 		//εφαρμόζω clamping στο 0-255 μόνο για εμφάνιση της εικόνας! (αλλιώς αλλάζουν τα raw data που είναι λάθος)
 		af::array clamped = af::clamp(frames_me[i], 0, 255);
@@ -376,8 +380,8 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	CImgDisplay cimgd;
 	for (unsigned int i = 0; i < frames; i++) {
 		timer::start();
-		//frames_nvf_cor_w[i] = mask_detector(frames_nvf[i], w, p, psnr, queue, context, program_me);
-		frames_me_cor_w[i] = mask_detector(frames_me_w[i], w, p, psnr, queue, context, nullptr, program_me);
+		//frames_nvf_cor_w[i] = watermarks.mask_detector(frames_nvf[i], w, p, psnr, program_me);
+		frames_me_cor_w[i] = watermarks.mask_detector_ME(frames_me_w[i]);
 		timer::end();
 		//εφαρμόζω clamping στο 0-255 μόνο για εμφάνιση της εικόνας! (αλλιώς αλλάζουν τα raw data που είναι λάθος)
 		clamped = af::clamp(frames_me_w[i], 0, 255);

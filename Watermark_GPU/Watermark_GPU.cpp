@@ -45,27 +45,15 @@ int main(void)
 		return -1;
 	}
 
-	//setup opencl parameters from arrayfire
-	const cl::Context context(afcl::getContext());
-	const cl::CommandQueue queue(afcl::getQueue());
-	const cl::Device device(afcl::getDeviceId());
-
 	af::info();
 	cout << "\n";
 
+	const cl::Device device({ afcl::getDeviceId() });
+	const cl::Context context({ afcl::getContext() });
+	const cl::CommandQueue queue({ afcl::getQueue() });
+
 	const int p = inir.GetInteger("parameters", "p", -1);
 	const float psnr = static_cast<float>(inir.GetReal("parameters", "psnr", -1.0f));
-	UtilityFunctions::max_workgroup_size = inir.GetInteger("opencl", "max_workgroup_size", -1);
-	size_t device_maxWorkGroupSize;
-	device.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &device_maxWorkGroupSize);
-	if (UtilityFunctions::max_workgroup_size == -1)
-		UtilityFunctions::max_workgroup_size = static_cast<int>(device_maxWorkGroupSize);
-	else {
-		if (UtilityFunctions::max_workgroup_size < 2 || (UtilityFunctions::max_workgroup_size % 2 != 0) || UtilityFunctions::max_workgroup_size > device_maxWorkGroupSize) {
-			cout << " ERROR: MAX_WORKGROUP_SIZE parameter must NOT exceed selected device's MAX_WORKGROUP_SIZE limitation and must be a positive number and power of 2\n";
-			return -1;
-		}
-	}
 
 	//TODO for p>3 we have problems with ME masking buffers
 	if (p != 3) {
