@@ -1,16 +1,6 @@
 ﻿#pragma once
-#pragma warning(disable:4996)
-
-#ifdef __APPLE__
-#include <OpenCL/cl.hpp>
-#else
-#include <CL/cl2.hpp>
-#endif
-
-#include <string>
-#include <arrayfire.h>
 #include <af/opencl.h>
-#include <functional>
+#pragma warning(disable:4996)
 
 /*!
  *  \brief  Functions for watermark computation and detection

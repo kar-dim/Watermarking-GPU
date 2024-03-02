@@ -10,14 +10,14 @@
 #include "UtilityFunctions.h"
 #include "WatermarkFunctions.h"
 #include "INIReader.h"
-#include <fstream>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <string>
 #include <cstring>
-#include <arrayfire.h>
 #include <chrono>
 #include <vector>
+#include <arrayfire.h>
 #define cimg_use_opencv
 #define cimg_use_cpp11 1
 #define cimg_use_png

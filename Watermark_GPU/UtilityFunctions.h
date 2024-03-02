@@ -6,8 +6,8 @@
 #include <CL/cl2.hpp>
 #endif
 
-#include <string>
 #include <arrayfire.h>
+#include <string>
 #include <chrono>
 #include "INIReader.h"
 

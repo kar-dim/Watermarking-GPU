@@ -7,18 +7,18 @@
 #include <CL/cl2.hpp>
 #endif
 
-#include "UtilityFunctions.h"
 #include "WatermarkFunctions.h"
 #include <fstream>
-#include <iostream>
-#include <iomanip>
-#include <string>
 #include <arrayfire.h>
+#include <iosfwd>
+#include <iostream>
+#include <string>
 #include <af/opencl.h>
 #include <cmath>
-#include <vector>
 #include <memory>
 #include <functional>
+
+using std::cout;
 
 WatermarkFunctions::WatermarkFunctions(std::string w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const std::string custom_kernel_name)
 		:program_me(prog_me), program_custom(prog_custom) {
@@ -52,6 +52,7 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 	std::ifstream w_stream(this->w_file_path.c_str(), std::ios::binary);
 	if (!w_stream.is_open()) {
 		std::string error_str("Error opening '" + this->w_file_path + "' file for Random noise W array");
+		cout << error_str;
 		throw std::exception(error_str.c_str());
 	}
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
@@ -88,6 +89,7 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, const af::a
 	}
 	catch (const std::exception & ex) {
 		std::string error_str("ERROR in compute_nvf_mask(): " + std::string(ex.what()) + "\n");
+		cout << error_str;
 		throw std::exception(error_str.c_str());
 	}
 }
@@ -144,6 +146,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, c
 		err = kernel.setArg(1, Rx_buff);
 		err = kernel.setArg(2, rx_buff);
 		err = kernel.setArg(3, neighb_buff);
+		//err = kernel.setArg(4, cl::Local(sizeof(float) * 64));
 		//err = kernel.setArg(4, p);
 		//fix for NVIDIA (OpenCL 1.2) limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (rows, selected arbitarily)
 		//there is bound check in kernel, so it is OK.
@@ -169,6 +172,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, c
 	}
 	catch (const std::exception &ex) {
 		std::string error_str("ERROR in compute_me_mask(): " + std::string(ex.what()) + "\n");
+		cout << error_str;
 		throw std::exception(error_str.c_str());
 	}
 }

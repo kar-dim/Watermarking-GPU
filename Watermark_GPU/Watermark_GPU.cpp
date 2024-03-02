@@ -10,25 +10,11 @@
 
 #include "INIReader.h"
 #include "UtilityFunctions.h"
-#include "WatermarkFunctions.h"
-#define cimg_use_opencv
-#define cimg_use_cpp11 1
-#define cimg_use_png
-#include "CImg.h"
 #include <iostream>
-#include <cstring>
-#include <chrono>
-#include <vector>
-#include <iomanip>
-#include <arrayfire.h>
 #include <af/opencl.h>
-#include <af/util.h>
-#include <thread>
-#include <omp.h>
 
 using std::cout;
 using std::string;
-using namespace cimg_library;
 
 /*!
  *  \brief  This is a project implementation of my Thesis with title: 
