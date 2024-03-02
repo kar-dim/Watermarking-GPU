@@ -43,7 +43,7 @@ WatermarkFunctions::WatermarkFunctions(const af::array& image, std::string w_fil
 }
 
 void WatermarkFunctions::load_image(const af::array& image) {
-	//this->image = image;
+	this->image = image;
 	this->rows = image.dims(0);
 	this->cols = image.dims(1);
 }
@@ -96,7 +96,7 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, const af::a
 	}
 }
 
-af::array WatermarkFunctions::make_and_add_watermark(const af::array& image, float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&, float*)>& compute_mask)
+af::array WatermarkFunctions::make_and_add_watermark(float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&, float*)>& compute_mask)
 {
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
@@ -104,8 +104,8 @@ af::array WatermarkFunctions::make_and_add_watermark(const af::array& image, flo
 	af::array padded = af::constant(0, cols + 2 * pad, rows + 2 * pad);
 	padded(af::seq(pad, static_cast<double>(cols + pad - 1)), af::seq(pad, static_cast<double>(rows + pad - 1))) = image.T();
 
-	af::array m, e_x;
-	compute_mask(image, padded, m, e_x, a);
+	af::array m, error_sequence;
+	compute_mask(image, padded, m, error_sequence, a);
 
 	af::array u = m * w;
 	float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (rows * cols));
@@ -113,23 +113,23 @@ af::array WatermarkFunctions::make_and_add_watermark(const af::array& image, flo
 	return image + (*a * u);
 }
 
-af::array WatermarkFunctions::make_and_add_watermark_custom(const af::array& image, float* a)
+af::array WatermarkFunctions::make_and_add_watermark_custom(float* a)
 {
-	return make_and_add_watermark(image, a, [&](const af::array& image, const af::array& padded, af::array& m, af::array& e_x, float* a) {
+	return make_and_add_watermark(a, [&](const af::array& image, const af::array& padded, af::array& m, af::array& error_sequence, float* a) {
 		compute_custom_mask(image, padded, m);
 	});
 }
 
-af::array WatermarkFunctions::make_and_add_watermark_ME(const af::array& image, af::array& a_x, float* a)
+af::array WatermarkFunctions::make_and_add_watermark_ME(af::array& coefficients, float* a)
 {
-	return make_and_add_watermark(image, a, [&](const af::array& image, const af::array& padded, af::array& m, af::array& e_x, float* a) {
-		compute_ME_mask(image, padded, m, e_x, a_x, true);
+	return make_and_add_watermark(a, [&](const af::array& image, const af::array& padded, af::array& m, af::array& error_sequence, float* a) {
+		compute_ME_mask(image, padded, m, error_sequence, coefficients, true);
 	});
 }
 
 //Compute ME mask. Used in both creation and detection of the watermark.
 //can also calculate error sequence and prediction error filter
-void WatermarkFunctions::compute_ME_mask(const af::array& image, const af::array& padded, af::array& m_e, af::array& e_x, af::array& a_x, const bool mask_needed)
+void WatermarkFunctions::compute_ME_mask(const af::array& image, const af::array& padded, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
 {
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
@@ -174,12 +174,12 @@ void WatermarkFunctions::compute_ME_mask(const af::array& image, const af::array
 		af::array rx = af::sum(af::moddims(rx_all, p_squared_minus_one, elems), 1);
 		af::array Rx = af::moddims(af::sum(af::moddims(Rx_all, p_squared_minus_one * p_squared_minus_one, elems), 1), p_squared_minus_one, p_squared_minus_one);
 
-		a_x = af::solve(Rx, rx);
-		e_x = af::moddims(af::flat(image).T() - af::matmul(a_x, x_, AF_MAT_TRANS), rows, cols);
+		coefficients = af::solve(Rx, rx);
+		error_sequence = af::moddims(af::flat(image).T() - af::matmul(coefficients, x_, AF_MAT_TRANS), rows, cols);
 
 		if (mask_needed) {
-			af::array e_x_abs = af::abs(e_x);
-			m_e = e_x_abs / af::max<float>(e_x_abs);
+			af::array error_sequence_abs = af::abs(error_sequence);
+			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 		}
 		padded.unlock();
 	}
@@ -189,27 +189,27 @@ void WatermarkFunctions::compute_ME_mask(const af::array& image, const af::array
 	}
 }
 
-//helper method that calculates the error sequence by using a supplied prediction filter
-af::array WatermarkFunctions::calculate_error_sequence(const af::array& u, const af::array& a_x) {
+//helper method that calculates the error sequence by using a supplied prediction filter coefficients
+af::array WatermarkFunctions::calculate_error_sequence(const af::array& u, const af::array& coefficients) {
 	const auto rows = u.dims(0);
 	const auto cols = u.dims(1);
 	af::array padded_image_all = af::moddims(af::unwrap(u, p, p, 1, 1, pad, pad, true), p_squared, rows * cols);
 	af::array x_ = af::join(0, padded_image_all.rows(0, (p_squared / 2) - 1), padded_image_all.rows((p_squared / 2) + 1, af::end));
-	return af::moddims(af::flat(u).T() - af::matmul(a_x, x_, AF_MAT_TRANS), rows, cols);
+	return af::moddims(af::flat(u).T() - af::matmul(coefficients, x_, AF_MAT_TRANS), rows, cols);
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
-void WatermarkFunctions::compute_ME_mask(const af::array& image, const af::array& a_x, af::array& m_e, af::array& e_x)
+void WatermarkFunctions::compute_ME_mask(const af::array& image, const af::array& coeficcients, af::array& m_e, af::array& error_sequence)
 {
-	e_x = calculate_error_sequence(image, a_x);
-	af::array e_x_abs = af::abs(e_x);
-	m_e = e_x_abs / af::max<float>(e_x_abs);
+	error_sequence = calculate_error_sequence(image, coeficcients);
+	af::array error_sequence_abs = af::abs(error_sequence);
+	m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 }
 
 //fast prediction error sequence calculation by using a supplied prediction filter (calls helper method)
-af::array WatermarkFunctions::compute_error_sequence(const af::array& u, const af::array& a_x)
+af::array WatermarkFunctions::compute_error_sequence(const af::array& u, const af::array& coefficients)
 {
-	return calculate_error_sequence(u, a_x);
+	return calculate_error_sequence(u, coefficients);
 }
 
 //helper method used in detectors
@@ -243,28 +243,28 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 	return calculate_correlation(e_u, e_z);
 }
 
-//fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (a_x, x_ are supplied)
-float WatermarkFunctions::mask_detector(const af::array& image, const af::array& a_x)
+//fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
+float WatermarkFunctions::mask_detector(const af::array& watermarked_image, const af::array& coefficients)
 {
 	//padding
-	const auto nopadded_region_cols = af::seq(pad, static_cast<double>(image.dims(1) + pad - 1));
-	const auto nopadded_region_rows = af::seq(pad, static_cast<double>(image.dims(0) + pad - 1));
-	af::array padded = af::constant(0.0f, image.dims(1) + 2 * pad, image.dims(0) + 2 * pad);
-	padded(nopadded_region_cols, nopadded_region_rows) = image.T();
+	const auto nopadded_region_cols = af::seq(pad, static_cast<double>(watermarked_image.dims(1) + pad - 1));
+	const auto nopadded_region_rows = af::seq(pad, static_cast<double>(watermarked_image.dims(0) + pad - 1));
+	af::array padded = af::constant(0.0f, watermarked_image.dims(1) + 2 * pad, watermarked_image.dims(0) + 2 * pad);
+	padded(nopadded_region_cols, nopadded_region_rows) = watermarked_image.T();
 	af::array m_e, e_z, m_eu, e_u, a_u;
-	compute_ME_mask(image, a_x, m_e, e_z);
+	compute_ME_mask(watermarked_image, coefficients, m_e, e_z);
 	af::array u = m_e * w;
 	padded(nopadded_region_cols, nopadded_region_rows) = u.T();
 	compute_ME_mask(u, padded, m_eu, e_u, a_u, false);
 	return calculate_correlation(e_u, e_z);
 }
 
-float WatermarkFunctions::mask_detector_custom(const af::array& image) {
-	return mask_detector(image, [&](const af::array& image, const af::array& padded, af::array& m){
-		compute_custom_mask(image, padded, m);
+float WatermarkFunctions::mask_detector_custom(const af::array& watermarked_image) {
+	return mask_detector(watermarked_image, [&](const af::array& watermarked_image, const af::array& padded, af::array& m){
+		compute_custom_mask(watermarked_image, padded, m);
 	});
 }
 
-float WatermarkFunctions::mask_detector_ME(const af::array& image) {
-	return mask_detector(image, nullptr);
+float WatermarkFunctions::mask_detector_ME(const af::array& watermarked_image) {
+	return mask_detector(watermarked_image, nullptr);
 }

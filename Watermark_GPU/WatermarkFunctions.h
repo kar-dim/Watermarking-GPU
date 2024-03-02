@@ -18,33 +18,33 @@
  */
 class WatermarkFunctions {
 private:
-	cl::Context context{ afcl::getContext() };
-	cl::Device device{ afcl::getDeviceId() };
-	cl::CommandQueue queue{ afcl::getQueue() };
+	const cl::Context context{ afcl::getContext() };
+	const cl::Device device{ afcl::getDeviceId() };
+	const cl::CommandQueue queue{ afcl::getQueue() };
+	const cl::Program program_me, program_custom;
 	af::array image, w;
 	std::string w_file_path, custom_kernel_name;
 	int p, p_squared, p_squared_minus_one, pad;
 	float psnr;
 	dim_t rows, cols;
 	size_t max_workgroup_size;
-	const cl::Program program_me, program_custom;
 
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
-	float mask_detector(const af::array& image, const std::function<void(const af::array&, const af::array&, af::array&)> &compute_custom_mask);
-	af::array calculate_error_sequence(const af::array& u, const af::array& a_x);
+	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, const af::array&, af::array&)> &compute_custom_mask);
+	float mask_detector(const af::array& watermarked_image, const af::array& coefficients);
+	void compute_custom_mask(const af::array &image, const af::array& padded, af::array& m);
+	af::array make_and_add_watermark(float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&, float*)>& compute_mask);
+	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
+	af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
 public:
-	WatermarkFunctions(const af::array &image, std::string w_file_path,const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
+	WatermarkFunctions(const af::array &image, std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
 	WatermarkFunctions(std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
-	af::array make_and_add_watermark(const af::array& image, float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&, float*)> &compute_mask);
-	af::array make_and_add_watermark_custom(const af::array& img, float* a);
-	af::array make_and_add_watermark_ME(const af::array& img, af::array& a_x, float* a);
-	void compute_ME_mask(const af::array& image, const af::array& padded, af::array& m_e, af::array& e_x, af::array& a_x, const bool mask_needed);
-	void compute_ME_mask(const af::array& image, const af::array& a_x, af::array& m_e, af::array& e_x);
-	af::array compute_error_sequence(const af::array& u, const af::array& a_x);
-	void compute_custom_mask(const af::array& image, const af::array& padded, af::array& m);
-	float mask_detector(const af::array& image, const af::array& a_x);
-	float mask_detector_custom(const af::array& image);
-	float mask_detector_ME(const af::array& image);
+	af::array make_and_add_watermark_custom(float* a);
+	af::array make_and_add_watermark_ME(af::array& coefficients, float* a);
+	void compute_ME_mask(const af::array& image, const af::array& padded, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
+	void compute_ME_mask(const af::array& image, const af::array& coefficients, af::array& m_e, af::array& error_sequence);
+	float mask_detector_custom(const af::array& watermarked_image);
+	float mask_detector_ME(const af::array& watermarked_image);
 };

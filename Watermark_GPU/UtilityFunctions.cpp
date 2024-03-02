@@ -91,19 +91,19 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 	af::array a_x;
 
 	//warmup for arrayfire
-	watermarks.make_and_add_watermark_custom(image, &a);
-	watermarks.make_and_add_watermark_ME(image, a_x, &a);
+	watermarks.make_and_add_watermark_custom(&a);
+	watermarks.make_and_add_watermark_ME(a_x, &a);
 
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = watermarks.make_and_add_watermark_custom(image, &a);
+	af::array watermark_NVF = watermarks.make_and_add_watermark_custom(&a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ΜΕ = watermarks.make_and_add_watermark_ME(image,a_x, &a);
+	af::array watermark_ΜΕ = watermarks.make_and_add_watermark_ME(a_x, &a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
@@ -129,6 +129,7 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 	return 0;
 }
 
+//TODO refactor this...
 int UtilityFunctions::test_for_video(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
@@ -192,9 +193,9 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			watermarks.load_image(gpu_frame);
 			//υπολογισμός ME watermarked frame.
 			if (i % 2 && two_frames_watermark == false)
-				frames_me.push_back(watermarks.make_and_add_watermark_ME(gpu_frame, dummy_a_x, &a));
+				frames_me.push_back(watermarks.make_and_add_watermark_ME(dummy_a_x, &a));
 			else {
-				frames_me.push_back(watermarks.make_and_add_watermark_ME(gpu_frame, a_x[counter], &a));
+				frames_me.push_back(watermarks.make_and_add_watermark_ME(a_x[counter], &a));
 				counter++;
 			}
 			//timer::end();
@@ -217,7 +218,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 		gpu_frame = af::transpose(gpu_frame).as(af::dtype::f32);
 		watermarks.load_image(gpu_frame);
 		//frames_nvf.push_back(make_and_add_watermark_NVF(gpu_frame, w, p, psnr, queue, context, program_nvf, false));
-		frames_me.push_back(watermarks.make_and_add_watermark_ME(gpu_frame, dummy_a_x, &a));
+		frames_me.push_back(watermarks.make_and_add_watermark_ME(dummy_a_x, &a));
 		//τα υπόλοιπα frames θα μπουν όπως έχουν
 		for (unsigned int i = 1; i < frames; i++) {
 			CImg<unsigned char> temp(video_cimg.at(i).get_channel(0));
