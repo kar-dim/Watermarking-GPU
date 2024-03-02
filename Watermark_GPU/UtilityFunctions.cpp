@@ -92,7 +92,7 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 
 	//warmup for arrayfire
 	watermarks.make_and_add_watermark_custom(&a);
-	watermarks.make_and_add_watermark_ME(a_x, &a);
+	watermarks.make_and_add_watermark_prediction_error(a_x, &a);
 
 	//make NVF watermark
 	timer::start();
@@ -103,14 +103,14 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ΜΕ = watermarks.make_and_add_watermark_ME(a_x, &a);
+	af::array watermark_ΜΕ = watermarks.make_and_add_watermark_prediction_error(a_x, &a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//warmup for arrayfire
 	watermarks.mask_detector_custom(watermark_NVF);
-	watermarks.mask_detector_ME(watermark_ΜΕ);
+	watermarks.mask_detector_prediction_error(watermark_ΜΕ);
 
 	//detection of NVF
 	timer::start();
@@ -120,7 +120,7 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 
 	//detection of ME
 	timer::start();
-	float correlation_me = watermarks.mask_detector_ME(watermark_ΜΕ);
+	float correlation_me = watermarks.mask_detector_prediction_error(watermark_ΜΕ);
 	timer::end();
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
@@ -193,9 +193,9 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			watermarks.load_image(gpu_frame);
 			//υπολογισμός ME watermarked frame.
 			if (i % 2 && two_frames_watermark == false)
-				frames_me.push_back(watermarks.make_and_add_watermark_ME(dummy_a_x, &a));
+				frames_me.push_back(watermarks.make_and_add_watermark_prediction_error(dummy_a_x, &a));
 			else {
-				frames_me.push_back(watermarks.make_and_add_watermark_ME(a_x[counter], &a));
+				frames_me.push_back(watermarks.make_and_add_watermark_prediction_error(a_x[counter], &a));
 				counter++;
 			}
 			//timer::end();
@@ -218,7 +218,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 		gpu_frame = af::transpose(gpu_frame).as(af::dtype::f32);
 		watermarks.load_image(gpu_frame);
 		//frames_nvf.push_back(make_and_add_watermark_NVF(gpu_frame, w, p, psnr, queue, context, program_nvf, false));
-		frames_me.push_back(watermarks.make_and_add_watermark_ME(dummy_a_x, &a));
+		frames_me.push_back(watermarks.make_and_add_watermark_prediction_error(dummy_a_x, &a));
 		//τα υπόλοιπα frames θα μπουν όπως έχουν
 		for (unsigned int i = 1; i < frames; i++) {
 			CImg<unsigned char> temp(video_cimg.at(i).get_channel(0));
@@ -296,7 +296,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 		timer::start();
 		watermarks.load_image(frames_me[i]);
 		//frames_nvf_cor[i] = watermarks.mask_detector(frames_nvf[i], w, p, psnr, program_me);
-		frames_me_cor[i] = watermarks.mask_detector_ME(frames_me[i]);
+		frames_me_cor[i] = watermarks.mask_detector_prediction_error(frames_me[i]);
 		timer::end();
 		//εφαρμόζω clamping στο 0-255 μόνο για εμφάνιση της εικόνας! (αλλιώς αλλάζουν τα raw data που είναι λάθος)
 		af::array clamped = af::clamp(frames_me[i], 0, 255);
@@ -382,7 +382,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	for (unsigned int i = 0; i < frames; i++) {
 		timer::start();
 		//frames_nvf_cor_w[i] = watermarks.mask_detector(frames_nvf[i], w, p, psnr, program_me);
-		frames_me_cor_w[i] = watermarks.mask_detector_ME(frames_me_w[i]);
+		frames_me_cor_w[i] = watermarks.mask_detector_prediction_error(frames_me_w[i]);
 		timer::end();
 		//εφαρμόζω clamping στο 0-255 μόνο για εμφάνιση της εικόνας! (αλλιώς αλλάζουν τα raw data που είναι λάθος)
 		clamped = af::clamp(frames_me_w[i], 0, 255);
