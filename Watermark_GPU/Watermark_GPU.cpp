@@ -62,10 +62,10 @@ int main(void)
 	try {
 		program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
 		program_nvf = cl::Program(context, program_data);
-		program_nvf.build({ device }, "-cl-fast-relaxed-math");
+		program_nvf.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
 		program_data = UtilityFunctions::loadProgram("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
-		program_me.build({ device }, "-cl-fast-relaxed-math");
+		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
 	}
 	catch (cl::Error& e) {
 		cout << "Could not build a kernel, Reason:\n\n";

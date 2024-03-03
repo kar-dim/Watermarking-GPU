@@ -33,12 +33,11 @@ __kernel void me(__read_only image2d_t padded,
 
         uint counter = 0;
         for (int i = 0; i < 8; i++) {
-            float cur_x = x_[i];
-            int base_index = i + x_minus_pad_mul_8_mul_real_height + y_minus_pad_mul_8;
-            rx[base_index] = cur_x * cur_value;
-            neighb[base_index] = cur_x;
+            const uint base_index = i + x_minus_pad_mul_8_mul_real_height + y_minus_pad_mul_8;
+            rx[base_index] = x_[i] * cur_value;
+            neighb[base_index] = x_[i];
             for (int j = 0; j < 8; j++) {
-                Rx[counter + x_minus_pad_mul_64_mul_real_height + y_minus_pad_mul_64] = cur_x * x_[j];
+                Rx[counter + x_minus_pad_mul_64_mul_real_height + y_minus_pad_mul_64] = x_[i] * x_[j];
                 counter++;
             }
         }
