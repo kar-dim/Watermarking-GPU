@@ -25,7 +25,7 @@ private:
 	void compute_custom_mask(const af::array &image, const af::array& padded, af::array& m);
 	void compute_prediction_error_mask(const af::array& image, const af::array& padded, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
 	void compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& m_e, af::array& error_sequence);
-	af::array make_and_add_watermark(float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&, float*)>& compute_mask);
+	af::array make_and_add_watermark(float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
 public:
