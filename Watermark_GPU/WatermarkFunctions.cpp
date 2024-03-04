@@ -161,6 +161,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		} while (!window.close());
 		af::array rx_all = afcl::array(rows * p_squared_minus_one, cols, rx_buff(), af::dtype::f32, true);
 		af::array x_ = af::moddims(afcl::array(rows * p_squared_minus_one, cols, neighb_buff(), af::dtype::f32, true), p_squared_minus_one, elems);
+		cout << " max: " << af::max<float>(x_) << " min: " << af::min<float>(x_) << " mean: " << af::mean<float>(x_) << "total sum: " << af::sum<float>(af::flat(x_)) << "\n";
 		//reduction sum of blocks
 		//all [p^2-1,1] blocks will be summed in rx
 		//all [p^2-1, p^2-1] blocks will be summed in Rx
@@ -176,10 +177,10 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
-			af::Window window(1600, 900, "pics");
+			/* af::Window window(1600, 900, "pics");
 			do {
 				window.image(m_e);
-			} while (!window.close());
+			} while (!window.close()); */
 		}
 	}
 	catch (const cl::Error &ex) {

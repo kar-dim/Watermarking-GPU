@@ -20,32 +20,23 @@ __kernel void me(__read_only image2d_t image,
     //shift neighborhood values, so that consecutive values are neighbors only
     for (int i = 4; i < 8; i++)
         x_[i] = x_[i + 1];
-
-    //initialize local memory sums
-#pragma unroll
-    for (int i = 0; i < 64; i++) {
-        Rx_local[(local_id * 64) + i] = 0.0f;
-    }
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    //TODO debug
+    //calculate this thread's 64 local values
     int counter = 0;
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            Rx_local[(local_id * 64) + counter] += x_[i] * x_[j];
+            Rx_local[(local_id * 64) + counter] = x_[i] * x_[j];
             counter++;
         }
     }
-
+    //calculate rx and neighb arrays
     int base_index = (x * height * 8) + (y * 8);
     for (int i = 0; i < 8; i++) {
         const int output_index = i + base_index;
         rx[output_index] = x_[i] * cur_value;
         neighb[output_index] = x_[i];
     }
-
-    barrier(CLK_LOCAL_MEM_FENCE);
     //first local thread of the group will do the reduction sums into the global memory
+    barrier(CLK_LOCAL_MEM_FENCE);
     if (local_id == 0) {
         const int output_index = (x * height) + y;
         float chunk64sum = 0;
