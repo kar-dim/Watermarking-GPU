@@ -16,18 +16,20 @@ private:
 	std::string w_file_path, custom_kernel_name;
 	int p, p_squared, p_squared_minus_one, pad;
 	float psnr;
+	bool is_old_opencl;
 	dim_t rows, cols;
 	size_t max_workgroup_size;
 
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
-	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, const af::array&, af::array&)> &compute_custom_mask);
+	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, af::array&)> &compute_custom_mask);
 	float mask_detector(const af::array& watermarked_image, const af::array& coefficients);
-	void compute_custom_mask(const af::array &image, const af::array& padded, af::array& m);
-	void compute_prediction_error_mask(const af::array& image, const af::array& padded, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
+	void compute_custom_mask(const af::array &image, af::array& m);
+	void compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
 	void compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& m_e, af::array& error_sequence);
-	af::array make_and_add_watermark(float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&)>& compute_mask);
+	af::array make_and_add_watermark(float* a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
-	af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
+	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
+	inline bool check_local_size_restrictions(const dim_t rows, const dim_t cols, const dim_t local_rows, const dim_t local_cols);
 public:
 	WatermarkFunctions(const af::array &image, std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
 	WatermarkFunctions(std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);

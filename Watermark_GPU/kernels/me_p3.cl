@@ -5,66 +5,56 @@ __kernel void me(__read_only image2d_t image,
     __local float Rx_local[4096]
     )
 {
-    const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE
-        | CLK_ADDRESS_CLAMP
-        | CLK_FILTER_NEAREST;
-
-    const uint width = get_image_width(image);
-    const uint height = get_image_height(image);
-    const int2 pixelcoord = (int2) (get_global_id(0), get_global_id(1));
+    const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
+    const int width = get_image_width(image), height = get_image_height(image);
+    const int x = get_global_id(0), y = get_global_id(1);
     const int local_id = get_local_id(1);
 
-    uint k = 0;
+    int k = 0;
     float x_[9];
-    for (int j = pixelcoord.x - 1; j <= pixelcoord.x + 1; j++) {
-        for (int i = pixelcoord.y - 1; i <= pixelcoord.y + 1; i++) {
+    for (int j = x - 1; j <= x + 1; j++)
+        for (int i = y - 1; i <= y + 1; i++)
             x_[k++] = read_imagef(image, sampler, (int2)(j, i)).x;
-        }
-    }
-    
     const float cur_value = x_[4];
 
+    //shift neighborhood values, so that consecutive values are neighbors only
     for (int i = 4; i < 8; i++)
         x_[i] = x_[i + 1];
 
-    int counter0 = 0;
+    //initialize local memory sums
+#pragma unroll
     for (int i = 0; i < 64; i++) {
-        Rx_local[(local_id * 64) + i] = 0;
+        Rx_local[(local_id * 64) + i] = 0.0f;
     }
     barrier(CLK_LOCAL_MEM_FENCE);
-    counter0 = 0;
+
+    //TODO debug
+    int counter = 0;
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            //printf("local_id: %d, counter0: %d, Rx_local[] index: %d\n", local_id, counter0, local_id * counter0);
-            Rx_local[(local_id * counter0) + counter0] += x_[i] * x_[j];
-            counter0++;
+            Rx_local[(local_id * 64) + counter] += x_[i] * x_[j];
+            counter++;
         }
     }
 
-    const uint y_minus_pad_mul_8 = (pixelcoord.y) * 8;
-    const uint y_minus_pad_mul_64 = y_minus_pad_mul_8 * 8;
-    const uint x_minus_pad_mul_8_mul_real_height = (pixelcoord.x) * (height) * 8;
-    const uint x_minus_pad_mul_64_mul_real_height = x_minus_pad_mul_8_mul_real_height * 8;
-
-    //uint counter = 0;
+    int base_index = (x * height * 8) + (y * 8);
     for (int i = 0; i < 8; i++) {
-        const uint base_index = i + x_minus_pad_mul_8_mul_real_height + y_minus_pad_mul_8;
-        rx[base_index] = x_[i] * cur_value;
-        neighb[base_index] = x_[i];
-        //for (int j = 0; j < 8; j++) {
-            //Rx[counter + x_minus_pad_mul_64_mul_real_height + y_minus_pad_mul_64] = x_[i] * x_[j];
-            //counter++;
-        //}
+        const int output_index = i + base_index;
+        rx[output_index] = x_[i] * cur_value;
+        neighb[output_index] = x_[i];
     }
+
     barrier(CLK_LOCAL_MEM_FENCE);
+    //first local thread of the group will do the reduction sums into the global memory
     if (local_id == 0) {
+        const int output_index = (x * height) + y;
         float chunk64sum = 0;
         for (int i = 0; i <64; i++) {
             chunk64sum = 0;
             for (int j = 0; j < 4096; j+=64) {
                 chunk64sum += Rx_local[i + j];
             }
-            Rx[i + ((pixelcoord.x) * (height)) + (pixelcoord.y)] = chunk64sum;
+            Rx[i + output_index] = chunk64sum;
         }
     }
 }

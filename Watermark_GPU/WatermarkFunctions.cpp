@@ -32,6 +32,7 @@ WatermarkFunctions::WatermarkFunctions(std::string w_file_path, const int p, con
 	device.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &max_workgroup_size);
 	if (max_workgroup_size > 256)
 		max_workgroup_size = 256;
+	this->is_old_opencl = device.getInfo<CL_DEVICE_OPENCL_C_VERSION>().find("OpenCL C 1.2") != std::string::npos;
 	this->rows = -1;
 	this->cols = -1;
 }
@@ -62,13 +63,20 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
-void WatermarkFunctions::compute_custom_mask(const af::array& image, const af::array& padded, af::array& m)
+//helper method that checks if (only) an old opencl version can run the kernels, based on the local size (must be perfect divisors)
+//NVIDIA (OpenCL 1.2) only is broken, because GlobalGroupSize % LocalGroupSize should be 0, 
+bool WatermarkFunctions::check_local_size_restrictions(const dim_t rows, const dim_t cols, const dim_t local_rows, const dim_t local_cols) {
+	return this->is_old_opencl || (rows % local_rows != 0) || (cols % local_cols != 0);
+}
+
+void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& m)
 {
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
+	const af::array image_transpose = image.T();
 	try {
 		cl_int err = 0;
-		cl_mem *image_buff = padded.device<cl_mem>();
+		cl_mem *image_buff = image_transpose.device<cl_mem>();
 		cl::Image2D image2d(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL, &err);
 		const size_t orig[] = { 0,0,0 };
 		const size_t des[] = { cols, rows, 1 };
@@ -78,15 +86,13 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, const af::a
 		err = kernel.setArg(0, image2d);
 		err = kernel.setArg(1, buff);
 		err = kernel.setArg(2, p);
-		//NVIDIA (OpenCL 1.2) only is broken, because GlobalGroupSize % LocalGroupSize should be 0, 
-		//we don't want to pad global size and add extra checks in the kernel (and lose performance and mask values), because it does not make sense..
-		if (device.getInfo<CL_DEVICE_OPENCL_C_VERSION>().find("OpenCL C 1.2") != std::string::npos && ((rows * cols) % max_workgroup_size != 0))
-			throw std::exception("TODO: Old OpenCL version, not supported!");
-		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, rows), cl::NDRange(1, max_workgroup_size));
+		if (check_local_size_restrictions(rows, cols, 16, 16) == false)
+			throw std::exception("Old OpenCL version, not supported!");
+		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, rows), cl::NDRange(16, 16) );
 		queue.finish();
 		m = afcl::array(rows, cols, buff(), af::dtype::f32, true);
 		//af::print("m", m);
-		padded.unlock();
+		image_transpose.unlock();
 	}
 	catch (const cl::Error& ex) {
 		std::string error_str("ERROR in compute_nvf_mask(): " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
@@ -95,10 +101,10 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, const af::a
 	}
 }
 
-af::array WatermarkFunctions::make_and_add_watermark(float* a, const std::function<void(const af::array&, const af::array&, af::array&, af::array&)>& compute_mask)
+af::array WatermarkFunctions::make_and_add_watermark(float* a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
 {
 	af::array m, error_sequence;
-	compute_mask(image, image.T(), m, error_sequence);
+	compute_mask(image, m, error_sequence);
 	af::array u = m * w;
 	float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.dims(0) * image.dims(1)));
 	*a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
@@ -107,28 +113,29 @@ af::array WatermarkFunctions::make_and_add_watermark(float* a, const std::functi
 
 af::array WatermarkFunctions::make_and_add_watermark_custom(float* a)
 {
-	return make_and_add_watermark(a, [&](const af::array& image, const af::array& padded, af::array& m, af::array& error_sequence) {
-		compute_custom_mask(image, padded, m);
+	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
+		compute_custom_mask(image, m);
 	});
 }
 
 af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array& coefficients, float* a)
 {
-	return make_and_add_watermark(a, [&](const af::array& image, const af::array& padded, af::array& m, af::array& error_sequence) {
-		compute_prediction_error_mask(image, padded, m, error_sequence, coefficients, true);
+	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
+		compute_prediction_error_mask(image, m, error_sequence, coefficients, true);
 	});
 }
 
 //Compute ME mask. Used in both creation and detection of the watermark.
 //can also calculate error sequence and prediction error filter
-void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, const af::array& padded, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
+void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
 {
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
 	const auto elems = rows * cols;
+	const af::array image_transpose = image.T();
 	cl_int err = 0;
 	try {
-		cl_mem *buffer = image.device<cl_mem>();
+		cl_mem *buffer = image_transpose.device<cl_mem>();
 		cl::Image2D image2d(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), rows, cols, 0, NULL, &err);
 		const size_t orig[] = { 0,0,0 };
 		const size_t des[] = { static_cast<size_t>(rows), static_cast<size_t>(cols), 1 };
@@ -143,22 +150,25 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, c
 		err = kernel.setArg(3, neighb_buff);
 		err = kernel.setArg(4, cl::Local(sizeof(float) * 4096));
 		//err = kernel.setArg(4, p);
-		//NVIDIA (OpenCL 1.2) only is broken, because GlobalGroupSize % LocalGroupSize should be 0, 
-		//we don't want to pad global size and add extra checks in the kernel (and lose performance and mask values), because it does not make sense..
-		const int me_workgroup_size = 64;
-		if (device.getInfo<CL_DEVICE_OPENCL_C_VERSION>().find("OpenCL C 1.2") != std::string::npos && (elems % me_workgroup_size != 0))
-			throw std::exception("TODO: Old OpenCL version, not supported!");
-		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, cols), cl::NDRange(1, me_workgroup_size));
+		if (check_local_size_restrictions(rows, cols, 1, 64) == false)
+			throw std::exception("Old OpenCL version, not supported!");
+		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, cols), cl::NDRange(1, 64));
 		queue.finish();
 		af::array Rx_all = afcl::array(rows, cols, Rx_buff(), af::dtype::f32, true);
+		af::Window window(1600, 900, "pics");
+		do {
+			window.image(Rx_all);
+		} while (!window.close());
 		af::array rx_all = afcl::array(rows * p_squared_minus_one, cols, rx_buff(), af::dtype::f32, true);
 		af::array x_ = af::moddims(afcl::array(rows * p_squared_minus_one, cols, neighb_buff(), af::dtype::f32, true), p_squared_minus_one, elems);
 		//reduction sum of blocks
 		//all [p^2-1,1] blocks will be summed in rx
 		//all [p^2-1, p^2-1] blocks will be summed in Rx
-		image.unlock();
+		image_transpose.unlock();
 		af::array rx = af::sum(af::moddims(rx_all, p_squared_minus_one, elems), 1);
+
 		//TODO!!!! FIX otan DEN isxyei h synthiki elems % p_squared_minus_one == 0 !!! NA KANW PAD!!!! 
+
 		af::array Rx_padded = af::moddims(Rx_all, p_squared_minus_one * p_squared_minus_one, elems/(p_squared_minus_one * p_squared_minus_one));
 		af::array Rx = af::moddims(af::sum(Rx_padded, 1), p_squared_minus_one, p_squared_minus_one);
 		coefficients = af::solve(Rx, rx);
@@ -166,6 +176,10 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, c
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
+			af::Window window(1600, 900, "pics");
+			do {
+				window.image(m_e);
+			} while (!window.close());
 		}
 	}
 	catch (const cl::Error &ex) {
@@ -206,7 +220,7 @@ float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::
 }
 
 //the main mask detector function
-float WatermarkFunctions::mask_detector(const af::array& image, const std::function<void(const af::array&, const af::array&, af::array&)>& compute_custom_mask)
+float WatermarkFunctions::mask_detector(const af::array& image, const std::function<void(const af::array&, af::array&)>& compute_custom_mask)
 {
 	//padding
 	const auto nopadded_region_cols = af::seq(pad, static_cast<double>(image.dims(1) + pad - 1));
@@ -215,11 +229,11 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 	af::array padded = af::constant(0.0f, image.dims(1) + 2 * pad, image.dims(0) + 2 * pad);
 	padded(nopadded_region_cols, nopadded_region_rows) = image.T();
 	if (compute_custom_mask != nullptr) {
-		compute_prediction_error_mask(image, padded, m, e_z, a_z, false);
-		compute_custom_mask(image, padded, m);
+		compute_prediction_error_mask(image, m, e_z, a_z, false);
+		compute_custom_mask(image, m);
 	}
 	else {
-		compute_prediction_error_mask(image, padded, m, e_z, a_z, true);
+		compute_prediction_error_mask(image, m, e_z, a_z, true);
 	}
 	af::array u = m * w;
 	padded(nopadded_region_cols, nopadded_region_rows) = u.T();
@@ -230,22 +244,16 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 //fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
 float WatermarkFunctions::mask_detector(const af::array& watermarked_image, const af::array& coefficients)
 {
-	//padding
-	const auto nopadded_region_cols = af::seq(pad, static_cast<double>(watermarked_image.dims(1) + pad - 1));
-	const auto nopadded_region_rows = af::seq(pad, static_cast<double>(watermarked_image.dims(0) + pad - 1));
-	af::array padded = af::constant(0.0f, watermarked_image.dims(1) + 2 * pad, watermarked_image.dims(0) + 2 * pad);
-	padded(nopadded_region_cols, nopadded_region_rows) = watermarked_image.T();
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
 	af::array u = m_e * w;
-	padded(nopadded_region_cols, nopadded_region_rows) = u.T();
-	compute_prediction_error_mask(u, padded, m_eu, e_u, a_u, false);
+	compute_prediction_error_mask(u, m_eu, e_u, a_u, false);
 	return calculate_correlation(e_u, e_z);
 }
 
 float WatermarkFunctions::mask_detector_custom(const af::array& watermarked_image) {
-	return mask_detector(watermarked_image, [&](const af::array& watermarked_image, const af::array& padded, af::array& m){
-		compute_custom_mask(watermarked_image, padded, m);
+	return mask_detector(watermarked_image, [&](const af::array& watermarked_image,af::array& m){
+		compute_custom_mask(watermarked_image, m);
 	});
 }
 
