@@ -78,9 +78,16 @@ int main(void)
 	}
 
 	//test algorithms
-	int return_value = inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ? 
+	try {
+		inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ?
 			UtilityFunctions::test_for_video(device, queue, context, program_nvf, program_me, inir, p, psnr) :
 			UtilityFunctions::test_for_image(device, queue, context, program_nvf, program_me, inir, p, psnr);
+	}
+	catch (const std::exception& ex) {
+		cout << ex.what();
+		system("pause");
+		return -1;
+	}
 	system("pause");
-	return return_value;
+	return 0;
 }

@@ -155,13 +155,8 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, cols), cl::NDRange(1, 64));
 		queue.finish();
 		af::array Rx_all = afcl::array(rows, cols, Rx_buff(), af::dtype::f32, true);
-		af::Window window(1600, 900, "pics");
-		do {
-			window.image(Rx_all);
-		} while (!window.close());
 		af::array rx_all = afcl::array(rows * p_squared_minus_one, cols, rx_buff(), af::dtype::f32, true);
 		af::array x_ = af::moddims(afcl::array(rows * p_squared_minus_one, cols, neighb_buff(), af::dtype::f32, true), p_squared_minus_one, elems);
-		cout << " max: " << af::max<float>(x_) << " min: " << af::min<float>(x_) << " mean: " << af::mean<float>(x_) << "total sum: " << af::sum<float>(af::flat(x_)) << "\n";
 		//reduction sum of blocks
 		//all [p^2-1,1] blocks will be summed in rx
 		//all [p^2-1, p^2-1] blocks will be summed in Rx
@@ -169,18 +164,20 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		af::array rx = af::sum(af::moddims(rx_all, p_squared_minus_one, elems), 1);
 
 		//TODO!!!! FIX otan DEN isxyei h synthiki elems % p_squared_minus_one == 0 !!! NA KANW PAD!!!! 
-
-		af::array Rx_padded = af::moddims(Rx_all, p_squared_minus_one * p_squared_minus_one, elems/(p_squared_minus_one * p_squared_minus_one));
+		af::array Rx_padded;
+		if (elems % p_squared_minus_one == 0) {
+			Rx_padded = af::moddims(Rx_all, p_squared_minus_one * p_squared_minus_one, elems / (p_squared_minus_one * p_squared_minus_one));
+		}
+		else {
+			//todo
+			throw std::exception("TODO Not supported for now!\n");
+		}
 		af::array Rx = af::moddims(af::sum(Rx_padded, 1), p_squared_minus_one, p_squared_minus_one);
 		coefficients = af::solve(Rx, rx);
 		error_sequence = af::moddims(af::flat(image).T() - af::matmul(coefficients, x_, AF_MAT_TRANS), rows, cols);
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
-			/* af::Window window(1600, 900, "pics");
-			do {
-				window.image(m_e);
-			} while (!window.close()); */
 		}
 	}
 	catch (const cl::Error &ex) {

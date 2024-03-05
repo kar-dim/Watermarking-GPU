@@ -8,7 +8,7 @@ __kernel void me(__read_only image2d_t image,
     const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
     const int width = get_image_width(image), height = get_image_height(image);
     const int x = get_global_id(0), y = get_global_id(1);
-    const int local_id = get_local_id(1);
+    const int local_id = get_local_id(1), local_size = get_local_size(1);
 
     int k = 0;
     float x_[9];
@@ -17,9 +17,10 @@ __kernel void me(__read_only image2d_t image,
             x_[k++] = read_imagef(image, sampler, (int2)(j, i)).x;
     const float cur_value = x_[4];
 
-    //shift neighborhood values, so that consecutive values are neighbors only
+    //shift neighborhood values, so that consecutive values are neighbors only (to eliminate "if"s)
     for (int i = 4; i < 8; i++)
         x_[i] = x_[i + 1];
+
     //calculate this thread's 64 local values
     int counter = 0;
     for (int i = 0; i < 8; i++) {
@@ -40,9 +41,9 @@ __kernel void me(__read_only image2d_t image,
     if (local_id == 0) {
         const int output_index = (x * height) + y;
         float chunk64sum = 0;
-        for (int i = 0; i <64; i++) {
+        for (int i = 0; i < local_size; i++) {
             chunk64sum = 0;
-            for (int j = 0; j < 4096; j+=64) {
+            for (int j = 0; j < 4096; j += local_size) {
                 chunk64sum += Rx_local[i + j];
             }
             Rx[i + output_index] = chunk64sum;
