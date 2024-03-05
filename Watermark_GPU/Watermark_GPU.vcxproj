@@ -49,7 +49,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(AF_PATH)\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH_V12_1)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>

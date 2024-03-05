@@ -35,8 +35,8 @@ int main(void)
 	cout << "\n";
 
 	const cl::Device device({ afcl::getDeviceId() });
-	const cl::Context context({ afcl::getContext() });
-	const cl::CommandQueue queue({ afcl::getQueue() });
+	const cl::Context context({ afcl::getContext(true)});
+	const cl::CommandQueue queue({ afcl::getQueue(true)});
 
 	const int p = inir.GetInteger("parameters", "p", -1);
 	const float psnr = static_cast<float>(inir.GetReal("parameters", "psnr", -1.0f));
@@ -57,12 +57,12 @@ int main(void)
 	}
 
 	//compile opencl kernels
-	std::string program_data;
 	cl::Program program_nvf, program_me;
 	try {
-		program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
+		std::string program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
 		program_nvf = cl::Program(context, program_data);
-		program_nvf.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
+		const std::string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
+		program_nvf.build({ device }, nvf_buildFlags.c_str());
 		program_data = UtilityFunctions::loadProgram("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
 		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
@@ -84,7 +84,7 @@ int main(void)
 			UtilityFunctions::test_for_image(device, queue, context, program_nvf, program_me, inir, p, psnr);
 	}
 	catch (const std::exception& ex) {
-		cout << ex.what();
+		cout << ex.what() << "\n";
 		system("pause");
 		return -1;
 	}

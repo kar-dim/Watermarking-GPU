@@ -21,7 +21,7 @@ __kernel void me(__read_only image2d_t image,
     for (int i = 4; i < 8; i++)
         x_[i] = x_[i + 1];
 
-    //calculate this thread's 64 local values
+    //calculate this thread's 64 local Rx values
     int counter = 0;
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
@@ -30,23 +30,22 @@ __kernel void me(__read_only image2d_t image,
         }
     }
     //calculate rx and neighb arrays
-    int base_index = (x * height * 8) + (y * 8);
+    int output_index = (x * height * 8) + (y * 8);
     for (int i = 0; i < 8; i++) {
-        const int output_index = i + base_index;
         rx[output_index] = x_[i] * cur_value;
         neighb[output_index] = x_[i];
+        output_index++;
     }
     //first local thread of the group will do the reduction sums into the global memory
     barrier(CLK_LOCAL_MEM_FENCE);
     if (local_id == 0) {
         const int output_index = (x * height) + y;
-        float chunk64sum = 0;
+        float reduction_sum = 0;
         for (int i = 0; i < local_size; i++) {
-            chunk64sum = 0;
-            for (int j = 0; j < 4096; j += local_size) {
-                chunk64sum += Rx_local[i + j];
-            }
-            Rx[i + output_index] = chunk64sum;
+            reduction_sum = 0;
+            for (int j = 0; j < 4096; j += local_size)
+                reduction_sum += Rx_local[i + j];
+            Rx[i + output_index] = reduction_sum;
         }
     }
 }

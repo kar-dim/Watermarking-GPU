@@ -66,7 +66,9 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 //helper method that checks if (only) an old opencl version can run the kernels, based on the local size (must be perfect divisors)
 //NVIDIA (OpenCL 1.2) only is broken, because GlobalGroupSize % LocalGroupSize should be 0, 
 bool WatermarkFunctions::check_local_size_restrictions(const dim_t rows, const dim_t cols, const dim_t local_rows, const dim_t local_cols) {
-	return this->is_old_opencl || (rows % local_rows != 0) || (cols % local_cols != 0);
+	if (!this->is_old_opencl)
+		return true;
+	return (rows % local_rows == 0) && (cols % local_cols == 0);
 }
 
 void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& m)
@@ -86,6 +88,7 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 		err = kernel.setArg(0, image2d);
 		err = kernel.setArg(1, buff);
 		err = kernel.setArg(2, p);
+		err = kernel.setArg(3, pad);
 		if (check_local_size_restrictions(rows, cols, 16, 16) == false)
 			throw std::exception("Old OpenCL version, not supported!");
 		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, rows), cl::NDRange(16, 16) );
@@ -96,7 +99,6 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 	}
 	catch (const cl::Error& ex) {
 		std::string error_str("ERROR in compute_nvf_mask(): " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
-		cout << error_str;
 		throw std::exception(error_str.c_str());
 	}
 }
@@ -136,9 +138,9 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 	cl_int err = 0;
 	try {
 		cl_mem *buffer = image_transpose.device<cl_mem>();
-		cl::Image2D image2d(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), rows, cols, 0, NULL, &err);
+		cl::Image2D image2d(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL, &err);
 		const size_t orig[] = { 0,0,0 };
-		const size_t des[] = { static_cast<size_t>(rows), static_cast<size_t>(cols), 1 };
+		const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };
 		err = clEnqueueCopyBufferToImage(queue(), *buffer, image2d(), 0, orig, des, NULL, NULL, NULL);
 		cl::Buffer neighb_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * elems * (p_squared_minus_one), NULL, &err);
 		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * elems, NULL, &err);
@@ -150,20 +152,21 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		err = kernel.setArg(3, neighb_buff);
 		err = kernel.setArg(4, cl::Local(sizeof(float) * 4096));
 		//err = kernel.setArg(4, p);
-		if (check_local_size_restrictions(rows, cols, 1, 64) == false)
+		if (check_local_size_restrictions(cols, rows, 1, 64) == false)
 			throw std::exception("Old OpenCL version, not supported!");
-		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, cols), cl::NDRange(1, 64));
+		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, rows), cl::NDRange(1, 64));
 		queue.finish();
+		image_transpose.unlock();
 		af::array Rx_all = afcl::array(rows, cols, Rx_buff(), af::dtype::f32, true);
 		af::array rx_all = afcl::array(rows * p_squared_minus_one, cols, rx_buff(), af::dtype::f32, true);
 		af::array x_ = af::moddims(afcl::array(rows * p_squared_minus_one, cols, neighb_buff(), af::dtype::f32, true), p_squared_minus_one, elems);
 		//reduction sum of blocks
 		//all [p^2-1,1] blocks will be summed in rx
 		//all [p^2-1, p^2-1] blocks will be summed in Rx
-		image_transpose.unlock();
 		af::array rx = af::sum(af::moddims(rx_all, p_squared_minus_one, elems), 1);
 
-		//TODO!!!! FIX otan DEN isxyei h synthiki elems % p_squared_minus_one == 0 !!! NA KANW PAD!!!! 
+		//TODO!!!! FIX when elems % p_squared_minus_one != 0 !!!
+		//can't test on nvidia..
 		af::array Rx_padded;
 		if (elems % p_squared_minus_one == 0) {
 			Rx_padded = af::moddims(Rx_all, p_squared_minus_one * p_squared_minus_one, elems / (p_squared_minus_one * p_squared_minus_one));
@@ -182,7 +185,6 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 	}
 	catch (const cl::Error &ex) {
 		std::string error_str("ERROR in compute_me_mask(): " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
-		cout << error_str;
 		throw std::exception(error_str.c_str());
 	}
 }
