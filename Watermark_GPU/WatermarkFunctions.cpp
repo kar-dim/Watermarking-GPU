@@ -89,9 +89,9 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 		err = kernel.setArg(1, buff);
 		err = kernel.setArg(2, p);
 		err = kernel.setArg(3, pad);
-		if (check_local_size_restrictions(rows, cols, 16, 16) == false)
-			throw std::exception("Old OpenCL version, not supported!");
-		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, rows), cl::NDRange(16, 16) );
+		//custom masks have no local memory allocated, local size restrictions can be ignored in old opencl versions
+		cl::NDRange local_range = check_local_size_restrictions(rows, cols, 16, 16) == false ? cl::NullRange : cl::NDRange(16, 16);
+		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, rows), local_range);
 		queue.finish();
 		m = afcl::array(rows, cols, buff(), af::dtype::f32, true);
 		//af::print("m", m);
@@ -144,13 +144,14 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		err = clEnqueueCopyBufferToImage(queue(), *buffer, image2d(), 0, orig, des, NULL, NULL, NULL);
 		cl::Buffer neighb_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * elems * (p_squared_minus_one), NULL, &err);
 		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * elems, NULL, &err);
-		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * elems * (p_squared_minus_one), NULL, &err);
+		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * elems, NULL, &err);
 		cl::Kernel kernel = cl::Kernel(program_me, "me", &err);
 		err = kernel.setArg(0, image2d);
 		err = kernel.setArg(1, Rx_buff);
 		err = kernel.setArg(2, rx_buff);
 		err = kernel.setArg(3, neighb_buff);
 		err = kernel.setArg(4, cl::Local(sizeof(float) * 4096));
+		err = kernel.setArg(5, cl::Local(sizeof(float) * 512));
 		//err = kernel.setArg(4, p);
 		if (check_local_size_restrictions(cols, rows, 1, 64) == false)
 			throw std::exception("Old OpenCL version, not supported!");
@@ -158,24 +159,26 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		queue.finish();
 		image_transpose.unlock();
 		af::array Rx_all = afcl::array(rows, cols, Rx_buff(), af::dtype::f32, true);
-		af::array rx_all = afcl::array(rows * p_squared_minus_one, cols, rx_buff(), af::dtype::f32, true);
+		af::array rx_all = afcl::array(rows, cols, rx_buff(), af::dtype::f32, true);
 		af::array x_ = af::moddims(afcl::array(rows * p_squared_minus_one, cols, neighb_buff(), af::dtype::f32, true), p_squared_minus_one, elems);
 		//reduction sum of blocks
 		//all [p^2-1,1] blocks will be summed in rx
 		//all [p^2-1, p^2-1] blocks will be summed in Rx
-		af::array rx = af::sum(af::moddims(rx_all, p_squared_minus_one, elems), 1);
+		
 
 		//TODO!!!! FIX when elems % p_squared_minus_one != 0 !!!
-		//can't test on nvidia..
-		af::array Rx_padded;
-		if (elems % p_squared_minus_one == 0) {
+		//can't test on nvidia.. (needs padding with zeros somewhere)
+		af::array Rx_padded, rx_padded;
+		if (elems % (p_squared_minus_one * p_squared_minus_one) == 0) {
 			Rx_padded = af::moddims(Rx_all, p_squared_minus_one * p_squared_minus_one, elems / (p_squared_minus_one * p_squared_minus_one));
+			rx_padded = af::moddims(rx_all, p_squared_minus_one, elems / p_squared_minus_one);
 		}
 		else {
 			//todo
 			throw std::exception("TODO Not supported for now!\n");
 		}
 		af::array Rx = af::moddims(af::sum(Rx_padded, 1), p_squared_minus_one, p_squared_minus_one);
+		af::array rx = af::sum(rx_padded, 1);
 		coefficients = af::solve(Rx, rx);
 		error_sequence = af::moddims(af::flat(image).T() - af::matmul(coefficients, x_, AF_MAT_TRANS), rows, cols);
 		if (mask_needed) {

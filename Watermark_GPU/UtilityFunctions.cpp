@@ -73,77 +73,71 @@ int UtilityFunctions::test_for_image(const cl::Device& device, const cl::Command
 	}
 	const int rows = rgb_image_cimg.height();
 	const int cols = rgb_image_cimg.width();
-
 	timer::start();
 	af::array rgb_image(cols, rows, 3, rgb_img_vals);
 	af::sync();
 	timer::end();
 	cout << "Time to transfer RGB (uint8 *3 channels) image from RAM to VRAM: " << timer::secs_passed() << "\n\n";
 	rgb_image = af::transpose(rgb_image);
-
 	//grayscale
 	const af::array image = af::round(0.299 * rgb_image(af::span, af::span, 0)) + af::round(0.587 * rgb_image(af::span, af::span, 1)) + af::round(0.114 * rgb_image(af::span, af::span, 2));
-	
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	WatermarkFunctions watermarks(image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	WatermarkFunctions watermarkFunctions(image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
 
 	float a;
 	af::array a_x;
-
 	//warmup for arrayfire
-	watermarks.make_and_add_watermark_custom(&a);
-	watermarks.make_and_add_watermark_prediction_error(a_x, &a);
-
+	watermarkFunctions.make_and_add_watermark_custom(&a);
+	watermarkFunctions.make_and_add_watermark_prediction_error(a_x, &a);
+	
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = watermarks.make_and_add_watermark_custom(&a);
+	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark_custom(&a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
-
+	
 	//make ME watermark
 	timer::start();
-	af::array watermark_ΜΕ = watermarks.make_and_add_watermark_prediction_error(a_x, &a);
+	af::array watermark_ΜΕ = watermarkFunctions.make_and_add_watermark_prediction_error(a_x, &a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
-
+	
 	//warmup for arrayfire
-	watermarks.mask_detector_custom(watermark_NVF);
-	watermarks.mask_detector_prediction_error(watermark_ΜΕ);
-
+	watermarkFunctions.mask_detector_custom(watermark_NVF);
+	watermarkFunctions.mask_detector_prediction_error(watermark_ΜΕ);
+	
 	//detection of NVF
 	timer::start();
-	float correlation_nvf = watermarks.mask_detector_custom(watermark_NVF);
+	float correlation_nvf = watermarkFunctions.mask_detector_custom(watermark_NVF);
 	timer::end();
 	cout << "Time to calculate correlation (NVF) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
-
+	
 	//detection of ME
 	timer::start();
-	float correlation_me = watermarks.mask_detector_prediction_error(watermark_ΜΕ);
+	float correlation_me = watermarkFunctions.mask_detector_prediction_error(watermark_ΜΕ);
 	timer::end();
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
 	cout << "Correlation [ME]: " << std::fixed << std::setprecision(16) << correlation_me << "\n";
-
 	return 0;
 }
 
-//TODO refactor this...
 int UtilityFunctions::test_for_video(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const unsigned int frames = (unsigned int)inir.GetInteger("parameters_video", "frames", -1);
 	const float fps = (float)inir.GetReal("parameters_video", "fps", -1);
-	if (rows <= 16 || cols <= 16) {
+	if (rows <= 64 || cols <= 64) {
 		cout << "Video dimensions too low\n";
 		return -1;
 	}
-	if (rows > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || rows > 2160 || cols > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || cols > 3840) {
+	if (rows > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || cols > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) {
 		cout << "Video dimensions too high for this GPU\n";
 		return -1;
 	}
-	if (fps <= 1 || fps > 60) {
+	if (fps <= 15 || fps > 60) {
 		cout << "Video FPS is too low or too high\n";
 		return -1;
 	}
@@ -155,11 +149,8 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	const float frame_period = 1.0f / fps;
 	float time_diff;
 
-	/*
+	/* REALTIME Watermarking of RAW video */
 
-					REALTIME ΥΔΑΤΟΓΡΑΦΗΣΗ (RAW VIDEO)
-
-	*/
 	//επιλογή είτε να υδατογραφήσουμε ΟΛΟ ΤΟ ΒΙΝΤΕΟ ειτε να υδατογραφήσουμε μόνο το πρώτο frame
 	bool first_frame_w = false, two_frames_watermark = false;
 	float a;
