@@ -146,12 +146,13 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		kernel.setArg(3, cl::Local(sizeof(float) * 4096));
 		kernel.setArg(4, cl::Local(sizeof(float) * 512));
 		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, pad_rows), cl::NDRange(1, 64));
+		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
+		af::array x_all = af::moddims(af::unwrap(image, p, p, 1, 1, pad, pad), p_squared, elems);
+		af::array x_ = af::join(0, x_all(af::seq(0, (p_squared / 2) - 1), af::span), x_all(af::seq((p_squared / 2) + 1, af::end), af::span));
 		queue.finish();
 		image_transpose.unlock();
 		af::array Rx_all = afcl::array(pad_rows, cols, Rx_buff(), af::dtype::f32, true);
 		af::array rx_all = afcl::array(pad_rows, cols, rx_buff(), af::dtype::f32, true);
-		af::array x_all = af::moddims(af::unwrap(image, p, p, 1, 1, pad, pad), p_squared, elems);
-		af::array x_ = af::join(0, x_all(af::seq(0, (p_squared / 2) -1), af::span), x_all(af::seq((p_squared / 2) + 1, af::end), af::span));
 		af::array Rx_padded = af::moddims(Rx_all, p_squared_minus_one_squared, (pad_rows * cols) / p_squared_minus_one_squared);
 		af::array rx_padded = af::moddims(rx_all, p_squared_minus_one, (pad_rows * cols) / p_squared_minus_one);
 		//reduction sum of blocks
