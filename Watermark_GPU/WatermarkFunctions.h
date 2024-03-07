@@ -14,7 +14,7 @@ private:
 	const cl::Program program_me, program_custom;
 	af::array image, w;
 	std::string w_file_path, custom_kernel_name;
-	int p, p_squared, p_squared_minus_one, pad;
+	int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
 	float psnr;
 	bool is_old_opencl;
 	dim_t rows, cols;
@@ -29,7 +29,6 @@ private:
 	af::array make_and_add_watermark(float* a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
-	inline bool check_local_size_restrictions(const dim_t rows, const dim_t cols, const dim_t local_rows, const dim_t local_cols);
 public:
 	WatermarkFunctions(const af::array &image, std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
 	WatermarkFunctions(std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
@@ -39,4 +38,6 @@ public:
 	af::array make_and_add_watermark_prediction_error(af::array& coefficients, float* a);
 	float mask_detector_custom(const af::array& watermarked_image);
 	float mask_detector_prediction_error(const af::array& watermarked_image);
+	static af::array normalize_to_f32(af::array& a);
+	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
 };

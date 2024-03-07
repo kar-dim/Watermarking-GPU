@@ -26,14 +26,6 @@
 using namespace cimg_library;
 using std::cout;
 
-af::array UtilityFunctions::normalize_to_f32(af::array& a)
-{
-	float mx = af::max<float>(a);
-	float mn = af::min<float>(a);
-	float diff = mx - mn;
-	return (a - mn) / diff;
-}
-
 std::string UtilityFunctions::loadProgram(std::string input)
 {
 	std::ifstream stream(input.c_str());
@@ -198,7 +190,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			//if ((time_diff = frame_period - timer::secs_passed()) > 0) {
 				//std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000 * time_diff)));
 			//}
-			//window1.image(normalize_to_f32(frames_me[i]));
+			//window1.image(WatermarkFunctions::normalize_to_f32(frames_me[i]));
 		}
 	}
 	else {
@@ -397,7 +389,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000 * time_diff)));
 		}
 		cimgd.display(temp0);
-		//window3.image(normalize_to_f32(clamped));
+		//window3.image(WatermarkFunctions::normalize_to_f32(clamped));
 		//cout << timer::secs_passed() << "\n";
 		//cout << frames_me_cor_w[i] << "\n";
 

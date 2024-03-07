@@ -17,7 +17,6 @@
  */
 class UtilityFunctions {
 public:
-	static af::array normalize_to_f32(af::array& a);
 	static int test_for_image(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
 	static int test_for_video(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
 	static std::string loadProgram(std::string input);
