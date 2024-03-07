@@ -50,29 +50,23 @@ namespace timer {
 }
 
 int UtilityFunctions::test_for_image(const cl::Device& device, const cl::CommandQueue &queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader &inir, const int p, const float psnr) {
+	//load image from disk into an arrayfire array
 	timer::start();
-	CImg<unsigned char> rgb_image_cimg(strdup(inir.Get("paths", "image", "NO_IMAGE").c_str()));
-	unsigned char* rgb_img_vals = rgb_image_cimg.data();
+	const af::array image = af::rgb2gray(af::loadImage(strdup(inir.Get("paths", "image", "NO_IMAGE").c_str()), true), 0.299f, 0.587f, 0.114f);
+	af::sync();
 	timer::end();
-	cout << "Time to load and tranfer RGB (uint8 *3 channels) image from disk to RAM: " << timer::secs_passed() << "\n";
-	if (rgb_image_cimg.width() <= 16 || rgb_image_cimg.height() <= 16) {
+	const int rows = image.dims(0);
+	const int cols = image.dims(1);
+	cout << "Time to load and tranfer RGB image from disk to VRAM: " << timer::secs_passed() << "\n";
+	if (cols <= 64 || rows <= 16) {
 		cout << "Image dimensions too low\n";
 		return -1;
 	}
-	if (rgb_image_cimg.width() > device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>() || rgb_image_cimg.width() > 7680 || rgb_image_cimg.height() > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || rgb_image_cimg.height() > 4320) {
+	if (cols > device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>() || cols > 7680 || rows > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || rows > 4320) {
 		cout << "Image dimensions too high for this GPU\n";
 		return -1;
 	}
-	const int rows = rgb_image_cimg.height();
-	const int cols = rgb_image_cimg.width();
-	timer::start();
-	af::array rgb_image(cols, rows, 3, rgb_img_vals);
-	af::sync();
-	timer::end();
-	cout << "Time to transfer RGB (uint8 *3 channels) image from RAM to VRAM: " << timer::secs_passed() << "\n\n";
-	rgb_image = af::transpose(rgb_image);
-	//grayscale
-	const af::array image = af::round(0.299 * rgb_image(af::span, af::span, 0)) + af::round(0.587 * rgb_image(af::span, af::span, 1)) + af::round(0.114 * rgb_image(af::span, af::span, 2));
+
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
 	WatermarkFunctions watermarkFunctions(image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
 
@@ -121,6 +115,8 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const unsigned int frames = (unsigned int)inir.GetInteger("parameters_video", "frames", -1);
 	const float fps = (float)inir.GetReal("parameters_video", "fps", -1);
+	const bool watermark_first_frame_only = inir.GetBoolean("parameters_video", "watermark_first_frame_only", false);
+	const bool watermark_by_two_frames = inir.GetBoolean("parameters_video", "watermark_by_two_frames", false);
 	if (rows <= 64 || cols <= 64) {
 		cout << "Video dimensions too low\n";
 		return -1;
@@ -137,48 +133,41 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 		cout << "Frame count too low\n";
 		return -1;
 	}
-	//πόση ώρα ανάμεσα σε κάθε frame
+
 	const float frame_period = 1.0f / fps;
 	float time_diff;
 
 	/* REALTIME Watermarking of RAW video */
 
-	//επιλογή είτε να υδατογραφήσουμε ΟΛΟ ΤΟ ΒΙΝΤΕΟ ειτε να υδατογραφήσουμε μόνο το πρώτο frame
-	bool first_frame_w = false, two_frames_watermark = false;
 	float a;
-	//φόρτωση του video
-	//CImgDisplay disp;
+	//load video
 	CImgList<unsigned char> video_cimg;
 	video_cimg = video_cimg.load_yuv(strdup(inir.Get("paths", "video", "NO_VIDEO").c_str()), cols, rows, 420, 0, frames - 1, 1, false);
-	//οι δυο vectors θα έχουν όλα τα watermarked frames.
-	//std::vector<af::array> frames_nvf;
-	//frames_nvf.reserve(frames);
 	std::vector<af::array> frames_me;
 	frames_me.reserve(frames);
 	std::vector<af::array> a_x, x_;
 	for (unsigned int i = 0; i < (frames / 2) + 1; i++) {
 		a_x.push_back(af::constant(0, 1, 1));
 	}
-	int counter = 0;
+
 	af::array dummy_a_x;
-	WatermarkFunctions watermarks(inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
-	watermarks.load_W(rows, cols);
-	if (!first_frame_w) {
+	WatermarkFunctions watermarkFunctions(inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	watermarkFunctions.load_W(rows, cols);
+	if (!watermark_first_frame_only) {
+		int counter = 0;
 		//af::Window window1(1280, 720, "Watermarked Video");
 		for (unsigned int i = 0; i < frames; i++) {
 			//διάβασμα και μεταφορά από τη RAM -> VRAM της Υ συνιστώσας
 			//timer::start();
 			CImg<unsigned char> temp(video_cimg.at(i).get_channel(0));
 			unsigned char* y_vals = temp.data();
-			af::array gpu_frame(cols, rows, y_vals);
-			//af::print("ar", gpu_frame);
-			gpu_frame = af::transpose(gpu_frame).as(af::dtype::f32);
-			watermarks.load_image(gpu_frame);
+			af::array gpu_frame = af::transpose(af::array(cols, rows, y_vals)).as(af::dtype::f32);
+			watermarkFunctions.load_image(gpu_frame);
 			//υπολογισμός ME watermarked frame.
-			if (i % 2 && two_frames_watermark == false)
-				frames_me.push_back(watermarks.make_and_add_watermark_prediction_error(dummy_a_x, &a));
+			if (i % 2 && watermark_by_two_frames == false)
+				frames_me.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
 			else {
-				frames_me.push_back(watermarks.make_and_add_watermark_prediction_error(a_x[counter], &a));
+				frames_me.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(a_x[counter], &a));
 				counter++;
 			}
 			//timer::end();
@@ -199,9 +188,9 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 		unsigned char* y_vals = temp.data();
 		af::array gpu_frame(cols, rows, y_vals);
 		gpu_frame = af::transpose(gpu_frame).as(af::dtype::f32);
-		watermarks.load_image(gpu_frame);
+		watermarkFunctions.load_image(gpu_frame);
 		//frames_nvf.push_back(make_and_add_watermark_NVF(gpu_frame, w, p, psnr, queue, context, program_nvf, false));
-		frames_me.push_back(watermarks.make_and_add_watermark_prediction_error(dummy_a_x, &a));
+		frames_me.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
 		//τα υπόλοιπα frames θα μπουν όπως έχουν
 		for (unsigned int i = 1; i < frames; i++) {
 			CImg<unsigned char> temp(video_cimg.at(i).get_channel(0));
@@ -269,35 +258,27 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 
 	*/
 
-	//Φτιάχνουμε άλλους δυο vectors που θα κρατάνε το correlation
-	//std::vector<float> frames_nvf_cor(frames);
 	std::vector<float> frames_me_cor(frames);
 	//παρακάτω είναι realtime detection (θα δείξω στην οθόνη τη ΜΕ watermark sequence)
 	//μπορεί να τροποποιηθεί ώστε να βρίσκει correlation κάθε 2ο frame (τότε δε δείχνω στην οθόνη προφανώς τίποτα)
 	CImgDisplay cimgd0;
 	for (unsigned int i = 0; i < frames; i++) {
 		timer::start();
-		watermarks.load_image(frames_me[i]);
-		//frames_nvf_cor[i] = watermarks.mask_detector(frames_nvf[i], w, p, psnr, program_me);
-		frames_me_cor[i] = watermarks.mask_detector_prediction_error(frames_me[i]);
+		watermarkFunctions.load_image(frames_me[i]);
+		frames_me_cor[i] = watermarkFunctions.mask_detector_prediction_error(frames_me[i]);
 		timer::end();
 		//εφαρμόζω clamping στο 0-255 μόνο για εμφάνιση της εικόνας! (αλλιώς αλλάζουν τα raw data που είναι λάθος)
 		af::array clamped = af::clamp(frames_me[i], 0, 255);
 		unsigned char* ptr = af::clamp(clamped.T(), 0, 255).as(af::dtype::u8).host<unsigned char>();
 		unsigned char* ptr2 = new unsigned char[rows * cols];
-#pragma omp parallel for
-		for (int i = 0; i < rows * cols; i++)
-			ptr2[i] = ptr[i];
-
+		std::memcpy(ptr2, ptr, (rows* cols) * sizeof(unsigned char));
 		af::freeHost(ptr);
 		ptr = NULL;
 		CImg<unsigned char> temp0(cols, rows);
 		delete[] temp0._data;
 		//temp0._data δε χρειάζεται delete[], γίνεται από τον CImg destructor
 		temp0._data = new unsigned char[rows * cols];
-#pragma omp parallel for
-		for (int i = 0; i < rows * cols; i++)
-			temp0._data[i] = ptr2[i];
+		std::memcpy(temp0._data, ptr2, rows* cols * sizeof(unsigned char));
 
 		if ((time_diff = frame_period - timer::secs_passed()) > 0) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000 * time_diff)));
@@ -340,6 +321,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 
 */
 
+	/*
 //αρχικά διαβάζουμε το συμπιεσμένο βίντεο.
 	CImgList<unsigned char> video_cimg_w;
 	video_cimg_w = video_cimg_w.load_video(strdup(inir.Get("paths", "video_compressed", "NO_VIDEO").c_str()), 0, frames - 1);
@@ -365,7 +347,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	for (unsigned int i = 0; i < frames; i++) {
 		timer::start();
 		//frames_nvf_cor_w[i] = watermarks.mask_detector(frames_nvf[i], w, p, psnr, program_me);
-		frames_me_cor_w[i] = watermarks.mask_detector_prediction_error(frames_me_w[i]);
+		frames_me_cor_w[i] = watermarkFunctions.mask_detector_prediction_error(frames_me_w[i]);
 		timer::end();
 		//εφαρμόζω clamping στο 0-255 μόνο για εμφάνιση της εικόνας! (αλλιώς αλλάζουν τα raw data που είναι λάθος)
 		clamped = af::clamp(frames_me_w[i], 0, 255);
@@ -393,6 +375,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 		//cout << timer::secs_passed() << "\n";
 		//cout << frames_me_cor_w[i] << "\n";
 
-		return 0;
 	}
+	*/
+	return 0;
 }
