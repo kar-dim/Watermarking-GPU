@@ -74,7 +74,7 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 		cl_mem *image_buff = image_transpose.device<cl_mem>();
 		cl::Image2D image2d(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL, &err);
 		const size_t orig[] = { 0,0,0 };
-		const size_t des[] = { cols, rows, 1 };
+		const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };
 		err = clEnqueueCopyBufferToImage(queue(), *image_buff, image2d(), 0, orig, des, NULL, NULL, NULL);
 		cl::Buffer buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * rows * cols, NULL, &err);
 		cl::Kernel kernel = cl::Kernel(program_custom, custom_kernel_name.c_str(), &err);
@@ -82,8 +82,8 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 		err = kernel.setArg(1, buff);
 		err = kernel.setArg(2, p);
 		err = kernel.setArg(3, pad);
-		const int pad_rows = (rows % 64 == 0) ? rows : rows + 64 - (rows % 64);
-		const int pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+		const auto pad_rows = (rows % 64 == 0) ? rows : rows + 64 - (rows % 64);
+		const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(pad_cols, pad_rows), cl::NDRange(16, 16));
 		queue.finish();
 		m = afcl::array(rows, cols, buff(), af::dtype::f32, true);
@@ -126,7 +126,6 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 {
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
-	const auto elems = rows * cols;
 	const af::array image_transpose = image.T();
 	cl_int err;
 	try {
@@ -135,7 +134,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		const size_t orig[] = { 0,0,0 };
 		const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };
 		//fix for NVIDIA (OpenCL 1.2) limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (rows)
-		int pad_rows = (rows % 64 == 0) ? rows : rows + 64 - (rows % 64);
+		const auto pad_rows = (rows % 64 == 0) ? rows : rows + 64 - (rows % 64);
 		clEnqueueCopyBufferToImage(queue(), *buffer, image2d(), 0, orig, des, NULL, NULL, NULL);
 		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_rows * cols, NULL, &err);
 		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_rows * cols, NULL, &err);
@@ -147,7 +146,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		kernel.setArg(4, cl::Local(sizeof(float) * 512));
 		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, pad_rows), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
-		af::array x_all = af::moddims(af::unwrap(image, p, p, 1, 1, pad, pad), p_squared, elems);
+		af::array x_all = af::moddims(af::unwrap(image, p, p, 1, 1, pad, pad), p_squared, rows * cols);
 		af::array x_ = af::join(0, x_all(af::seq(0, (p_squared / 2) - 1), af::span), x_all(af::seq((p_squared / 2) + 1, af::end), af::span));
 		queue.finish();
 		image_transpose.unlock();
@@ -226,7 +225,7 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 }
 
 //fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
-float WatermarkFunctions::mask_detector(const af::array& watermarked_image, const af::array& coefficients)
+float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients)
 {
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);

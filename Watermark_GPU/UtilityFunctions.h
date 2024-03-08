@@ -10,7 +10,8 @@
 #include <string>
 #include <chrono>
 #include "INIReader.h"
-
+#include <CImg.h>
+using namespace cimg_library;
 /*!
  *  \brief  Helper methods for testing the watermark algorithms
  *  \author Dimitris Karatzas
@@ -19,7 +20,11 @@ class UtilityFunctions {
 public:
 	static int test_for_image(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
 	static int test_for_video(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
-	static std::string loadProgram(std::string input);
+	static std::string loadProgram(const std::string input);
+	template<typename T>
+	static af::array cimg_yuv_to_afarray(const CImg<T> &cimg_image) {
+		return af::transpose(af::array(cimg_image.width(), cimg_image.height(), cimg_image.get_channel(0).data()).as(af::dtype::f32));
+	}
 };
 
 /*!

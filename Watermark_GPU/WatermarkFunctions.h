@@ -22,7 +22,6 @@ private:
 
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
 	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, af::array&)> &compute_custom_mask);
-	float mask_detector(const af::array& watermarked_image, const af::array& coefficients);
 	void compute_custom_mask(const af::array &image, af::array& m);
 	void compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
 	void compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& m_e, af::array& error_sequence);
@@ -38,6 +37,7 @@ public:
 	af::array make_and_add_watermark_prediction_error(af::array& coefficients, float* a);
 	float mask_detector_custom(const af::array& watermarked_image);
 	float mask_detector_prediction_error(const af::array& watermarked_image);
+	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients);
 	static af::array normalize_to_f32(af::array& a);
 	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
 };
