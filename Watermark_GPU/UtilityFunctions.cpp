@@ -135,12 +135,12 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 	}
 
 	std::vector<af::array> watermarked_frames;
-	std::vector<af::array> a_x;
+	std::vector<af::array> coefficients;
 	watermarked_frames.reserve(frames);
-	a_x.reserve((frames / 2) + 1);
+	coefficients.reserve((frames / 2) + 1);
 	//preallocate coefficient's vector with empty arrays
 	for (int i = 0; i < (frames / 2) + 1; i++)
-		a_x.push_back(af::constant<float>(0.0f, 1, 1));
+		coefficients.push_back(af::constant<float>(0.0f, 1, 1));
 	const float frame_period = 1.0f / fps;
 	float time_diff, a;
 
@@ -162,13 +162,17 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			for (int i = 0; i < frames; i++) {
 				//copy from CImg to arrayfire
 				watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)));
-				//calculate watermarked frame, if "by two frames" is on, we don't keep the "a_x"
-				if (i % 2 !=0 && watermark_by_two_frames == false)
-					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
-				else {
-					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(a_x[counter], &a));
-					counter++;
+				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
+				if (watermark_by_two_frames == true) {
+					if (i % 2 != 0)
+						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
+					else {
+						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(coefficients[counter], &a));
+						counter++;
+					}
 				}
+				else
+					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
 			}
 		}
 		else {
@@ -177,10 +181,10 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(0)));
 			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
 			//rest of the frames will be as-is, no watermark
-			for (int i = 1; i < frames; i++) {
-				af::array gpu_frame = UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i));
-				watermarked_frames.push_back(gpu_frame.as(af::dtype::f32));
-			}
+			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
+			//with compression the watermark is "kept alive" in (some) subsequent frames, and only then it makes sense to use this method!
+			for (int i = 1; i < frames; i++)
+				watermarked_frames.push_back(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)).as(af::dtype::f32));
 		}
 	}
 
@@ -267,7 +271,7 @@ int UtilityFunctions::test_for_video(const cl::Device& device, const cl::Command
 			for (int i = 0; i < frames; i++) {
 				timer::start();
 				if (i % 2 != 0) {
-					correlations[i] = watermarkFunctions.mask_detector_prediction_error_fast(watermarked_frames[i], a_x[counter]);
+					correlations[i] = watermarkFunctions.mask_detector_prediction_error_fast(watermarked_frames[i], coefficients[counter]);
 					timer::end();
 					cout << "Watermark detection (fast) secs passed: " << timer::secs_passed() << "\n";
 					counter++;
