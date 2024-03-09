@@ -1,16 +1,12 @@
 ﻿#pragma once
 #pragma warning(disable:4996)
-#ifdef __APPLE__
-#include <OpenCL/cl.hpp>
-#else
-#include <CL/cl2.hpp>
-#endif
 
 #include <arrayfire.h>
 #include <string>
-#include <chrono>
-#include "INIReader.h"
 #include <CImg.h>
+#include <vector>
+#include "WatermarkFunctions.h"
+
 using namespace cimg_library;
 /*!
  *  \brief  Helper methods for testing the watermark algorithms
@@ -18,13 +14,13 @@ using namespace cimg_library;
  */
 class UtilityFunctions {
 public:
-	static int test_for_image(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
-	static int test_for_video(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
 	static std::string loadProgram(const std::string input);
+	static void accurate_timer_sleep(double seconds);
 	template<typename T>
 	static af::array cimg_yuv_to_afarray(const CImg<T> &cimg_image) {
 		return af::transpose(af::array(cimg_image.width(), cimg_image.height(), cimg_image.get_channel(0).data()).as(af::dtype::f32));
 	}
+	static void realtime_detection(WatermarkFunctions& watermarkFunctions, const std::vector<af::array>& watermarked_frames, const int frames, const bool display_frames, const float frame_period);
 };
 
 /*!

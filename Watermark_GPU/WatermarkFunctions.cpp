@@ -1,12 +1,4 @@
 ﻿#pragma warning(disable:4996)
-#define CL_HPP_TARGET_OPENCL_VERSION 200
-#define CL_HPP_ENABLE_EXCEPTIONS
-#ifdef __APPLE__
-#include <OpenCL/cl.hpp>
-#else
-#include <CL/cl2.hpp>
-#endif
-
 #include "WatermarkFunctions.h"
 #include <fstream>
 #include <arrayfire.h>
@@ -30,10 +22,6 @@ WatermarkFunctions::WatermarkFunctions(std::string w_file_path, const int p, con
 	this->psnr = psnr;
 	this->w_file_path = w_file_path;
 	this->custom_kernel_name = custom_kernel_name;
-	device.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &max_workgroup_size);
-	if (max_workgroup_size > 256)
-		max_workgroup_size = 256;
-	this->is_old_opencl = device.getInfo<CL_DEVICE_OPENCL_C_VERSION>().find("OpenCL C 1.2") != std::string::npos;
 	this->rows = -1;
 	this->cols = -1;
 }

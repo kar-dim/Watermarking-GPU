@@ -8,8 +8,9 @@
 #include <CL/cl2.hpp>
 #endif
 
-#include "INIReader.h"
+#include "Watermark_GPU.h"
 #include "UtilityFunctions.h"
+#include "INIReader.h"
 #include <iostream>
 #include <af/opencl.h>
 
@@ -80,8 +81,8 @@ int main(void)
 	//test algorithms
 	try {
 		inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ?
-			UtilityFunctions::test_for_video(device, queue, context, program_nvf, program_me, inir, p, psnr) :
-			UtilityFunctions::test_for_image(device, queue, context, program_nvf, program_me, inir, p, psnr);
+			test_for_video(device, queue, context, program_nvf, program_me, inir, p, psnr) :
+			test_for_image(device, queue, context, program_nvf, program_me, inir, p, psnr);
 	}
 	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";

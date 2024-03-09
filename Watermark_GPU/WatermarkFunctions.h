@@ -1,6 +1,14 @@
 ﻿#pragma once
+#define CL_HPP_TARGET_OPENCL_VERSION 200
+#define CL_HPP_ENABLE_EXCEPTIONS
+#undef max
+#undef min
+#ifdef __APPLE__
+#include <OpenCL/cl.hpp>
+#else
+#include <CL/cl2.hpp>
+#endif
 #include <af/opencl.h>
-#pragma warning(disable:4996)
 
 /*!
  *  \brief  Functions for watermark computation and detection
@@ -16,9 +24,7 @@ private:
 	std::string w_file_path, custom_kernel_name;
 	int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
 	float psnr;
-	bool is_old_opencl;
 	dim_t rows, cols;
-	size_t max_workgroup_size;
 
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
 	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, af::array&)> &compute_custom_mask);

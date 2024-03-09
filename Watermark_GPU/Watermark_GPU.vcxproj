@@ -94,10 +94,10 @@
     <ClCompile Include="Watermark_GPU.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Watermark_CPU\Watermark_CPU\INIReader.h" />
     <ClInclude Include="INIReader.h" />
     <ClInclude Include="UtilityFunctions.h" />
     <ClInclude Include="WatermarkFunctions.h" />
+    <ClInclude Include="Watermark_GPU.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="kernels\me_p3.cl" />
