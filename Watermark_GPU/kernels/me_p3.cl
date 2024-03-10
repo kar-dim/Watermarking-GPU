@@ -6,11 +6,11 @@ __kernel void me(__read_only image2d_t image,
     __local float Rx_local_final[64], //final reduction Rx value of each thread
     __local float rx_local_final[64]) //final reduction rx value of each thread
 {
-    const int x = get_global_id(0), y = get_global_id(1);
+    const int x = get_global_id(1), y = get_global_id(0);
     const int width = get_image_width(image), height = get_image_height(image);
     const int local_id = get_local_id(1);
-    const int padded_height = get_global_size(1);
-    const int output_index = (x * padded_height) + y;
+    const int padded_cols = get_global_size(1);
+    const int output_index = (y * padded_cols) + x;
 
     //clear local memory
     Rx_local_final[local_id] = 0.0f;
@@ -22,7 +22,7 @@ __kernel void me(__read_only image2d_t image,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     //fix for OpenCL 1.2 where global size % local size should be 0, and local size is padded, a bound check is needed
-    if (y < height) {
+    if (x < width) {
         const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
         int k = 0;
         float x_[9];

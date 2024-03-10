@@ -72,10 +72,9 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 		err = kernel.setArg(3, pad);
 		const auto pad_rows = (rows % 64 == 0) ? rows : rows + 64 - (rows % 64);
 		const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(pad_cols, pad_rows), cl::NDRange(16, 16));
+		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
 		m = afcl::array(rows, cols, buff(), af::dtype::f32, true);
-		//af::print("m", m);
 		image_transpose.unlock();
 	}
 	catch (const cl::Error& ex) {
@@ -122,10 +121,10 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		const size_t orig[] = { 0,0,0 };
 		const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };
 		//fix for NVIDIA (OpenCL 1.2) limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (rows)
-		const auto pad_rows = (rows % 64 == 0) ? rows : rows + 64 - (rows % 64);
+		const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 		clEnqueueCopyBufferToImage(queue(), *buffer, image2d(), 0, orig, des, NULL, NULL, NULL);
-		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_rows * cols, NULL, &err);
-		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_rows * cols, NULL, &err);
+		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_cols * rows, NULL, &err);
+		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_cols * rows, NULL, &err);
 		cl::Kernel kernel = cl::Kernel(program_me, "me", &err);
 		kernel.setArg(0, image2d);
 		kernel.setArg(1, Rx_buff);
@@ -134,16 +133,16 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		kernel.setArg(4, cl::Local(sizeof(float) * 512));
 		kernel.setArg(5, cl::Local(sizeof(float) * 64));
 		kernel.setArg(6, cl::Local(sizeof(float) * 64));
-		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(cols, pad_rows), cl::NDRange(1, 64));
+		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, pad_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
 		af::array x_all = af::moddims(af::unwrap(image, p, p, 1, 1, pad, pad), p_squared, rows * cols);
 		af::array x_ = af::join(0, x_all(af::seq(0, (p_squared / 2) - 1), af::span), x_all(af::seq((p_squared / 2) + 1, af::end), af::span));
 		queue.finish();
 		image_transpose.unlock();
-		af::array Rx_all = afcl::array(pad_rows, cols, Rx_buff(), af::dtype::f32, true);
-		af::array rx_all = afcl::array(pad_rows, cols, rx_buff(), af::dtype::f32, true);
-		af::array Rx_padded = af::moddims(Rx_all, p_squared_minus_one_squared, (pad_rows * cols) / p_squared_minus_one_squared);
-		af::array rx_padded = af::moddims(rx_all, p_squared_minus_one, (pad_rows * cols) / p_squared_minus_one);
+		af::array Rx_all = afcl::array(pad_cols, rows, Rx_buff(), af::dtype::f32, true);
+		af::array rx_all = afcl::array(pad_cols, rows, rx_buff(), af::dtype::f32, true);
+		af::array Rx_padded = af::moddims(Rx_all, p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
+		af::array rx_padded = af::moddims(rx_all, p_squared_minus_one, (pad_cols * rows) / p_squared_minus_one);
 		//reduction sum of blocks
 		//all [p^2-1,1] blocks will be summed in rx
 		//all [p^2-1, p^2-1] blocks will be summed in Rx
@@ -154,7 +153,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
-			//display_array(mask_needed);
+			//display_array(m_e);
 		}
 	}
 	catch (const cl::Error &ex) {

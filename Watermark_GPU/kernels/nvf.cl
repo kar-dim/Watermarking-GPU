@@ -5,7 +5,7 @@ __kernel void nvf(__read_only image2d_t image,
 {	
 	const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
 	const int width = get_image_width(image), height = get_image_height(image);
-	const int x = get_global_id(0), y = get_global_id(1);
+	const int x = get_global_id(1), y = get_global_id(0);
 
 	//fix for OpenCL 1.2 where global size % local size should be 0, and local size is padded, a bound check is needed
 	if (y < height && x < width) {
