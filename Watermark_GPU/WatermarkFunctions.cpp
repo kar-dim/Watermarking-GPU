@@ -12,7 +12,7 @@
 
 using std::cout;
 
-WatermarkFunctions::WatermarkFunctions(std::string w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const std::string custom_kernel_name)
+WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const std::string custom_kernel_name)
 		:program_me(prog_me), program_custom(prog_custom) {
 	this->p = p;
 	this->p_squared = p * p;
