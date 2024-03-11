@@ -24,6 +24,7 @@ WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int 
 	this->custom_kernel_name = custom_kernel_name;
 	this->rows = -1;
 	this->cols = -1;
+	
 }
 
 WatermarkFunctions::WatermarkFunctions(const af::array& image, std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name)
@@ -135,9 +136,9 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		kernel.setArg(6, cl::Local(sizeof(float) * 64));
 		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, pad_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
-		af::array x_all = af::moddims(af::unwrap(image, p, p, 1, 1, pad, pad), p_squared, rows * cols);
+		af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad);
 		af::array x_ = af::join(0, x_all(af::seq(0, (p_squared / 2) - 1), af::span), x_all(af::seq((p_squared / 2) + 1, af::end), af::span));
-		queue.finish();
+		queue.finish(); 
 		image_transpose.unlock();
 		af::array Rx_all = afcl::array(pad_cols, rows, Rx_buff(), af::dtype::f32, true);
 		af::array rx_all = afcl::array(pad_cols, rows, rx_buff(), af::dtype::f32, true);

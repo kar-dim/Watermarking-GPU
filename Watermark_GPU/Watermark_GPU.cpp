@@ -25,6 +25,10 @@ using std::string;
  */
 int main(void)
 {
+	//openmp initialization
+#pragma omp parallel for
+	for (int i = 0; i < 24; i++) {}
+
 	//open parameters file
 	INIReader inir("settings.ini");
 	if (inir.ParseError() < 0) {
@@ -35,9 +39,9 @@ int main(void)
 	af::info();
 	cout << "\n";
 
+	const cl::Context context(afcl::getContext(true));
+	cl::CommandQueue queue(context); //custom queue, not arrayfire's
 	const cl::Device device({ afcl::getDeviceId() });
-	const cl::Context context({ afcl::getContext(true)});
-	const cl::CommandQueue queue({ afcl::getQueue(true)});
 
 	const int p = inir.GetInteger("parameters", "p", -1);
 	const float psnr = static_cast<float>(inir.GetReal("parameters", "psnr", -1.0f));
@@ -61,7 +65,7 @@ int main(void)
 	cl::Program program_nvf, program_me;
 	try {
 		std::string program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
-		program_nvf = cl::Program(context, program_data);
+		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
 		const std::string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
 		program_nvf.build({ device }, nvf_buildFlags.c_str());
 		program_data = UtilityFunctions::loadProgram("kernels/me_p3.cl");
@@ -81,8 +85,8 @@ int main(void)
 	//test algorithms
 	try {
 		inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ?
-			test_for_video(device, queue, context, program_nvf, program_me, inir, p, psnr) :
-			test_for_image(device, queue, context, program_nvf, program_me, inir, p, psnr);
+			test_for_video(device, program_nvf, program_me, inir, p, psnr) :
+			test_for_image(device, program_nvf, program_me, inir, p, psnr);
 	}
 	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";

@@ -13,8 +13,8 @@ __kernel void nvf(__read_only image2d_t image,
 		float mean = 0.0f, variance = 0.0f;
 		//p_squared is supplied at compile-time to minimize array elements (VLAs not supported in OpenCL)
 		float local_values[p_squared];
-		for (i = y - pad; i <= y + pad; i++) {
-			for (j = x - pad; j <= x + pad; j++) {
+		for (j = x - pad; j <= x + pad; j++) {
+			for (i = y - pad; i <= y + pad; i++) {
 				local_values[k] = read_imagef(image, sampler, (int2)(j, i)).x;
 				mean += local_values[k];
 				k++;

@@ -46,7 +46,7 @@ __kernel void me(__read_only image2d_t image,
         }
     }
 
-    //first local thread of the group will do the reduction sums into the global memory
+    //first local thread of the group will do the reduction sums into the local memory
     barrier(CLK_LOCAL_MEM_FENCE);
     if (local_id == 0) {
         float reduction_sum_Rx, reduction_sum_rx;

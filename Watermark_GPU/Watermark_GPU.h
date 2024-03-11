@@ -23,7 +23,7 @@
 using namespace cimg_library;
 using std::cout;
 
-int test_for_image(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
+int test_for_image(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
 	//load image from disk into an arrayfire array
 	timer::start();
 	const af::array image = af::rgb2gray(af::loadImage(strdup(inir.Get("paths", "image", "NO_IMAGE").c_str()), true), 0.299f, 0.587f, 0.114f);
@@ -84,7 +84,7 @@ int test_for_image(const cl::Device& device, const cl::CommandQueue& queue, cons
 	return 0;
 }
 
-int test_for_video(const cl::Device& device, const cl::CommandQueue& queue, const cl::Context& context, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
+int test_for_video(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const int frames = inir.GetInteger("parameters_video", "frames", -1);
