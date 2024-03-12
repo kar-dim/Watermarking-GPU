@@ -46,10 +46,12 @@ __kernel void me(__read_only image2d_t image,
     //each thread will calculate the reduction sums of Rx and rx and write them to global memory
     barrier(CLK_LOCAL_MEM_FENCE);
     float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
-    for (int j = 0; j < 4096; j += 64)
+    for (int j = 0; j < 512; j += 64) {
         reduction_sum_Rx += Rx_local[local_id + j];
-    for (int j = 0; j < 512; j += 64)
         reduction_sum_rx += rx_local[local_id + j];
+    }
+    for (int j = 512; j < 4096; j += 64)
+        reduction_sum_Rx += Rx_local[local_id + j];
     Rx[output_index] = reduction_sum_Rx;
     rx[output_index] = reduction_sum_rx;
 }
