@@ -17,7 +17,6 @@
 class WatermarkFunctions {
 private:
 	const cl::Context context{ afcl::getContext(true) };
-	const cl::Device device{ afcl::getDeviceId() };
 	const cl::CommandQueue queue{ afcl::getQueue(true) };
 	const cl::Program program_me, program_custom;
 	af::array image, w;

@@ -25,9 +25,6 @@ using std::string;
  */
 int main(void)
 {
-	//openmp initialization
-#pragma omp parallel for
-	for (int i = 0; i < 24; i++) {}
 
 	//open parameters file
 	INIReader inir("settings.ini");
@@ -40,7 +37,6 @@ int main(void)
 	cout << "\n";
 
 	const cl::Context context(afcl::getContext(true));
-	cl::CommandQueue queue(context); //custom queue, not arrayfire's
 	const cl::Device device({ afcl::getDeviceId() });
 
 	const int p = inir.GetInteger("parameters", "p", -1);
