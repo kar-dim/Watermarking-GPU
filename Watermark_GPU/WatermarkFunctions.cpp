@@ -1,8 +1,6 @@
-﻿#pragma warning(disable:4996)
-#include "WatermarkFunctions.h"
+﻿#include "WatermarkFunctions.h"
 #include <fstream>
 #include <arrayfire.h>
-#include <iosfwd>
 #include <iostream>
 #include <string>
 #include <af/opencl.h>

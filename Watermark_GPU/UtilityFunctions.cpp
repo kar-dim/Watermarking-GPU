@@ -7,9 +7,7 @@
 #include <chrono>
 #include <vector>
 #include <arrayfire.h>
-#define cimg_use_opencv
-#define cimg_use_png
-#include <CImg.h>
+#include "cimg_init.h"
 #include <thread>
 #include <cmath>
 

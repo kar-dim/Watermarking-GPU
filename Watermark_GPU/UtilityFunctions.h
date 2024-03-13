@@ -1,9 +1,7 @@
 ﻿#pragma once
-#pragma warning(disable:4996)
-
 #include <arrayfire.h>
 #include <string>
-#include <CImg.h>
+#include "cimg_init.h"
 #include <vector>
 #include "WatermarkFunctions.h"
 

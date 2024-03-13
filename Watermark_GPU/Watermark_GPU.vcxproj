@@ -94,7 +94,9 @@
     <ClCompile Include="Watermark_GPU.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cimg_init.h" />
     <ClInclude Include="INIReader.h" />
+    <ClInclude Include="opencl_init.h" />
     <ClInclude Include="UtilityFunctions.h" />
     <ClInclude Include="WatermarkFunctions.h" />
     <ClInclude Include="Watermark_GPU.h" />

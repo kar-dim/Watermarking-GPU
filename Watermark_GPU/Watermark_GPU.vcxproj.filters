@@ -41,6 +41,12 @@
     <ClInclude Include="Watermark_GPU.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="opencl_init.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cimg_init.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="kernels\me_p3.cl">
