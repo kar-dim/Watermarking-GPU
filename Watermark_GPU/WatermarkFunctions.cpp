@@ -71,8 +71,8 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 		err = kernel.setArg(1, buff);
 		err = kernel.setArg(2, p);
 		err = kernel.setArg(3, pad);
-		const auto pad_rows = (rows % 64 == 0) ? rows : rows + 64 - (rows % 64);
-		const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+		const auto pad_rows = (rows % 16 == 0) ? rows : rows + 16 - (rows % 16);
+		const auto pad_cols = (cols % 16 == 0) ? cols : cols + 16 - (cols % 16);
 		err = queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
 		m = afcl::array(rows, cols, buff(), af::dtype::f32, true);
@@ -91,7 +91,7 @@ af::array WatermarkFunctions::make_and_add_watermark(float* a, const std::functi
 	af::array u = m * w;
 	float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.dims(0) * image.dims(1)));
 	*a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
-	return image + (*a * u);
+ 	return image + (*a * u);
 }
 
 af::array WatermarkFunctions::make_and_add_watermark_custom(float* a)
