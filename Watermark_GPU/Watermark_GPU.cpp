@@ -122,7 +122,6 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	timer::start();
 	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark_custom(&a);
 	timer::end();
-	WatermarkFunctions::display_array(watermark_NVF.as(af_dtype::u8));
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
