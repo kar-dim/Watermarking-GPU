@@ -25,6 +25,7 @@ private:
 	af::array make_and_add_watermark(float* a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
+	cl::Image2D copyBufferToImage(const cl_mem* image_buff, const dim_t rows, const dim_t cols);
 public:
 	WatermarkFunctions(const af::array &image, std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
 	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
@@ -35,6 +36,5 @@ public:
 	float mask_detector_custom(const af::array& watermarked_image);
 	float mask_detector_prediction_error(const af::array& watermarked_image);
 	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients);
-	static af::array normalize_to_f32(af::array& a);
 	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
 };
