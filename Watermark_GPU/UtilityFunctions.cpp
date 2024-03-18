@@ -7,7 +7,6 @@
 #include <chrono>
 #include <vector>
 #include <arrayfire.h>
-#include "cimg_init.h"
 #include <thread>
 #include <cmath>
 
@@ -68,7 +67,6 @@ void UtilityFunctions::realtime_detection(WatermarkFunctions& watermarkFunctions
 	float time_diff;
 	for (int i = 0; i < frames; i++) {
 		timer::start();
-		watermarkFunctions.load_image(watermarked_frames[i]);
 		correlations[i] = watermarkFunctions.mask_detector_prediction_error(watermarked_frames[i]);
 		timer::end();
 		const float watermark_time_secs = timer::secs_passed();
@@ -82,11 +80,8 @@ void UtilityFunctions::realtime_detection(WatermarkFunctions& watermarkFunctions
 			af::freeHost(watermarked_frames_ptr);
 			watermarked_frames_ptr = NULL;
 			timer::end();
-			if ((time_diff = frame_period - (watermark_time_secs + timer::secs_passed())) > 0) {
-				timer::start();
+			if ((time_diff = frame_period - (watermark_time_secs + timer::secs_passed())) > 0)
 				accurate_timer_sleep(time_diff);
-				timer::end();
-			}
 			window.display(cimg_watermarked);
 		}
 		cout << "Correlation of " << i + 1 << " frame: " << correlations[i] << "\n\n";
