@@ -4,7 +4,7 @@
 #ifdef __APPLE__
 #include <OpenCL/cl.hpp>
 #else
-#include <CL/cl2.hpp>
+#include <CL/cl.hpp>
 #endif
 
 #include "UtilityFunctions.h"

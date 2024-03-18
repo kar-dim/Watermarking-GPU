@@ -4,7 +4,7 @@
 #ifdef __APPLE__
 #include <OpenCL/cl.hpp>
 #else
-#include <CL/cl2.hpp>
+#include <CL/cl.hpp>
 #endif
 
 #include "UtilityFunctions.h"
@@ -124,9 +124,6 @@ af::array make_and_add_watermark_NVF(af::array& image, const af::array& w, const
 
 	//επιστροφή υδατογραφήματος
 	return y;
-
-	//αν πεταχτεί exception τότε θα φτάσουμε εδώ, επιστρέφουμε null array
-	return NULL;
 }
 
 //συνάρτηση που ενθέτει το υδατογράφημα στην original_image με χρήση της ME mask  και το επιστρέφει.
@@ -384,14 +381,4 @@ float mask_detector(af::array& image, const af::array& w, af::array& a_x, const 
 	//υπολογισμός correlation
 	correlation = dot_ez_eu / (d_ez * d_eu);
 	return correlation;
-}
-
-
-//βοηθητική συνάρτηση για να θέσουμε τις περιοχές της εικόνας
-//χρειάστηκε να πειραχτεί το cl2.hpp αρχείο ώστε να γίνει define
-//ένα κατάλληλο macro
-cl::size_t<3> range3(size_t a, size_t b, size_t c) {
-	cl::size_t<3> range;
-	range[0] = a; range[1] = b; range[2] = c;
-	return range;
 }
