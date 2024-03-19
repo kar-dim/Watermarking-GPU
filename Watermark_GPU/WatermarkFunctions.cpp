@@ -45,7 +45,6 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 	std::ifstream w_stream(this->w_file_path.c_str(), std::ios::binary);
 	if (!w_stream.is_open()) {
 		std::string error_str("Error opening '" + this->w_file_path + "' file for Random noise W array");
-		cout << error_str;
 		throw std::exception(error_str.c_str());
 	}
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
