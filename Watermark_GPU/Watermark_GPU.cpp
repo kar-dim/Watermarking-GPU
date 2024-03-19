@@ -127,14 +127,14 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ΜΕ = watermarkFunctions.make_and_add_watermark_prediction_error(a_x, &a);
+	af::array watermark_ME = watermarkFunctions.make_and_add_watermark_prediction_error(a_x, &a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//warmup for arrayfire
 	watermarkFunctions.mask_detector_custom(watermark_NVF);
-	watermarkFunctions.mask_detector_prediction_error(watermark_ΜΕ);
+	watermarkFunctions.mask_detector_prediction_error(watermark_ME);
 
 	//detection of NVF
 	timer::start();
@@ -144,7 +144,7 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 
 	//detection of ME
 	timer::start();
-	float correlation_me = watermarkFunctions.mask_detector_prediction_error(watermark_ΜΕ);
+	float correlation_me = watermarkFunctions.mask_detector_prediction_error(watermark_ME);
 	timer::end();
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
