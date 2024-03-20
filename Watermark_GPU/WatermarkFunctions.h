@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "opencl_init.h"
 #include <af/opencl.h>
+#include <string>
 
 /*!
  *  \brief  Functions for watermark computation and detection
@@ -27,7 +28,7 @@ private:
 	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
 	cl::Image2D copyBufferToImage(const cl_mem* image_buff, const dim_t rows, const dim_t cols);
 public:
-	WatermarkFunctions(const af::array &image, std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
+	WatermarkFunctions(const af::array &image, const std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
 	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);

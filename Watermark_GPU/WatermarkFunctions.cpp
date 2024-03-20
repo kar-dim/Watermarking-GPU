@@ -27,7 +27,7 @@ WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int 
 }
 
 //full constructor
-WatermarkFunctions::WatermarkFunctions(const af::array& image, std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name)
+WatermarkFunctions::WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name)
 		:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr, program_me, program_custom, custom_kernel_name) {
 	load_image(image);
 	load_W(this->rows, this->cols);
