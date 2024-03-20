@@ -1,3 +1,4 @@
+__attribute__((reqd_work_group_size(1, 64, 1)))
 __kernel void me(__read_only image2d_t image,
     __global float* Rx,
     __global float* rx,
