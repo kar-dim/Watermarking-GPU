@@ -132,8 +132,8 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		kernel.setArg(4, cl::Local(sizeof(float) * 512));
 		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, pad_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
-		af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad);
-		af::array x_ = af::join(0, x_all(af::seq(0, (p_squared / 2) - 1), af::span), x_all(af::seq((p_squared / 2) + 1, af::end), af::span));
+		af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad, false);
+		af::array x_ = af::join(1, x_all(af::span, af::seq(0, (p_squared / 2) - 1)), x_all(af::span, af::seq((p_squared / 2) + 1, af::end)));
 		queue.finish(); 
 		image_transpose.unlock();
 		af::array Rx_partial_sums = af::moddims(afcl::array(pad_cols, rows, Rx_buff(), af::dtype::f32, true), p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
@@ -144,7 +144,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
 		af::array rx = af::sum(rx_partial_sums, 1);
 		coefficients = af::solve(Rx, rx);
-		error_sequence = af::moddims(af::flat(image).T() - af::matmul(coefficients, x_, AF_MAT_TRANS), rows, cols);
+		error_sequence = af::moddims(af::flat(image).T() - af::matmul(coefficients, x_, AF_MAT_TRANS, AF_MAT_TRANS), rows, cols);
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
