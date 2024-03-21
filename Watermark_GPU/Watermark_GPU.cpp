@@ -115,19 +115,19 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	float a;
 	af::array a_x;
 	//warmup for arrayfire
-	watermarkFunctions.make_and_add_watermark_custom(&a);
-	watermarkFunctions.make_and_add_watermark_prediction_error(a_x, &a);
+	watermarkFunctions.make_and_add_watermark_custom(a);
+	watermarkFunctions.make_and_add_watermark_prediction_error(a_x, a);
 
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark_custom(&a);
+	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark_custom(a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ME = watermarkFunctions.make_and_add_watermark_prediction_error(a_x, &a);
+	af::array watermark_ME = watermarkFunctions.make_and_add_watermark_prediction_error(a_x, a);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
@@ -207,21 +207,21 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
 				if (watermark_by_two_frames == true) {
 					if (i % 2 != 0)
-						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
+						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, a));
 					else {
-						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(coefficients[counter], &a));
+						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(coefficients[counter], a));
 						counter++;
 					}
 				}
 				else
-					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
+					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, a));
 			}
 		}
 		else {
 			//add the watermark only in the first frame
 			//copy from CImg to arrayfire
 			watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(0)));
-			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, &a));
+			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, a));
 			//rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
 			//with compression, the watermark is "kept alive" in (some) subsequent frames, only then it makes sense to use this method!

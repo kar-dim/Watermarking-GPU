@@ -83,18 +83,18 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 	}
 }
 
-af::array WatermarkFunctions::make_and_add_watermark(float* a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
+af::array WatermarkFunctions::make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
 {
 	af::array m, error_sequence;
 	compute_mask(image, m, error_sequence);
-	af::array u = m * w;
-	float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.dims(0) * image.dims(1)));
-	*a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
- 	return image + (*a * u);
+	const af::array u = m * w;
+	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
+	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
+ 	return image + (a * u);
 }
 
 //public method called from host to apply the custom mask and return the watermarked image
-af::array WatermarkFunctions::make_and_add_watermark_custom(float* a)
+af::array WatermarkFunctions::make_and_add_watermark_custom(float& a)
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
 		compute_custom_mask(image, m);
@@ -102,7 +102,7 @@ af::array WatermarkFunctions::make_and_add_watermark_custom(float* a)
 }
 
 //public method called from host to apply the prediction error mask and return the watermarked image
-af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array& coefficients, float* a)
+af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array& coefficients, float& a)
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
 		compute_prediction_error_mask(image, m, error_sequence, coefficients, true);
@@ -144,7 +144,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 		af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
 		af::array rx = af::sum(rx_partial_sums, 1);
 		coefficients = af::solve(Rx, rx);
-		error_sequence = af::moddims(af::flat(image).T() - af::matmul(coefficients, x_, AF_MAT_TRANS, AF_MAT_TRANS), rows, cols);
+		error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
@@ -190,12 +190,7 @@ float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::
 //the main mask detector function
 float WatermarkFunctions::mask_detector(const af::array& image, const std::function<void(const af::array&, af::array&)>& compute_custom_mask)
 {
-	//padding
-	const auto nopadded_region_cols = af::seq(pad, static_cast<double>(image.dims(1) + pad - 1));
-	const auto nopadded_region_rows = af::seq(pad, static_cast<double>(image.dims(0) + pad - 1));
 	af::array m, e_z, a_z;
-	af::array padded = af::constant(0.0f, image.dims(1) + 2 * pad, image.dims(0) + 2 * pad);
-	padded(nopadded_region_cols, nopadded_region_rows) = image.T();
 	if (compute_custom_mask != nullptr) {
 		compute_prediction_error_mask(image, m, e_z, a_z, false);
 		compute_custom_mask(image, m);
@@ -204,7 +199,6 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 		compute_prediction_error_mask(image, m, e_z, a_z, true);
 	}
 	af::array u = m * w;
-	padded(nopadded_region_cols, nopadded_region_rows) = u.T();
 	af::array e_u = compute_error_sequence(u, a_z);
 	return calculate_correlation(e_u, e_z);
 }
