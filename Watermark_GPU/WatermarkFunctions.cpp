@@ -159,9 +159,9 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array WatermarkFunctions::calculate_error_sequence(const af::array& u, const af::array& coefficients) {
-	af::array padded_image_all = af::moddims(af::unwrap(u, p, p, 1, 1, pad, pad, true), p_squared, u.dims(0) * u.dims(1));
-	af::array x_ = af::join(0, padded_image_all.rows(0, (p_squared / 2) - 1), padded_image_all.rows((p_squared / 2) + 1, af::end));
-	return af::moddims(af::flat(u).T() - af::matmul(coefficients, x_, AF_MAT_TRANS), u.dims(0), u.dims(1));
+	af::array u_neighb = af::unwrap(u, p, p, 1, 1, pad, pad, false);
+	af::array x_ = af::join(1, u_neighb(af::span, af::seq(0, (p_squared / 2) - 1)), u_neighb(af::span, af::seq((p_squared / 2) + 1, af::end)));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, x_), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
