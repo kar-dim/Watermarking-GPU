@@ -1,16 +1,16 @@
-# icsd-thesis
-Ο κώδικας της Διπλωματικής Εργασίας μου στο Τμήμα Μηχανικών Πληροφοριακών και Επικοινωνιακών Συστημάτων (Πανεπιστήμιο Αιγαίου, Πολυτεχνική Σχολή) με τίτλο "Αποδοτική υλοποίηση αλγορίθμων υδατογράφησης και ανίχνευσης υδατογραφήματος σε εικόνα και βίντεο με χρήση της μονάδας επεξεργασίας γραφικών".
-Η Διπλωματική Εργασία έχει ως στόχο τη σύγκριση των παραπάνω αλγορίθμων (κυρίως στο θέμα της ταχύτητας εκτέλεσης) όταν υλοποιούνται σε GPU και σε CPU.
+# ICSD thesis Part 2 / GPU Watermarking
 
-Part 2 / Χρήση GPU για υπολογισμούς. (Part 1 / Χρήση CPU [εδώ](https://github.com/kar-dim/diploma-thesis_CPU) )
+Code for my Diploma thesis at Information and Communication Systems Engineering (University of the Aegean, School of Engineering) with title "Efficient implementation of watermark and watermark detection algorithms for image and video using the graphics processing unit".
+This Diploma thesis aims to compare the above algorithms (mainly in execution speed) when they are implemented in GPU and CPU.
+Part 2 / GPU usage for calculations. (Part 1 / CPU usage [here](https://github.com/kar-dim/diploma-thesis_CPU) )
 
-Χρησιμοποιήθηκαν οι παρακάτω βιβλιοθήκες:
-- CImg
-- LibPNG + zlib
+Libraries used:
+- [ArrayFire](https://arrayfire.org)
+- [CImg](https://cimg.eu/)
+- [inih](https://github.com/jtilly/inih)
     
-Για να γίνει το build, απαιτείται η περαιτέρω εγκατάσταση των παρακάτω:
-- AMD APP SDK 3.0 (ή Nvidia CUDA Toolkit για NVIDIA GPU). Αν χρησιμοποιηθεί το AMD APP SDK 3.0 πρέπει να μπει το "cl2.hpp" που έχουμε τροποποιήσει στο default include path.
-- ArrayFire και να οριστεί το "AF_PATH" (στη default τιμή) Environment Variable.
-- OpenCV (αν χρειάζεται να γίνει εφαρμογή σε video) και να οριστεί το "OPENCV_DIR" (στη default τιμή) Environment Variable.
-
-
+For building the project, the below must be installed:
+- AMD APP SDK 3.0 (or Nvidia CUDA Toolkit for NVIDIA GPU). Must be included in default include path. If AMD APP SDK 3.0 is used, occurrences of "cl.hpp" in code should be replaced with "cl2.hpp"
+- LibPNG (can be installed from Visual Studio marketplace).
+- ArrayFire should be installed globally, with default installation options. Environment Variable "AF_PATH" will be defined automatically.
+- OpenCV (for video testing, used internally by CImg), with default installation options. Environment Variable "OPENCV_DIR" will be defined automatically.
