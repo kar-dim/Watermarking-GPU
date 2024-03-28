@@ -38,10 +38,15 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 		std::string error_str("Error opening '" + this->w_file_path + "' file for Random noise W array");
 		throw std::exception(error_str.c_str());
 	}
+	w_stream.seekg(0, std::ios::end);
+	const auto total_bytes = w_stream.tellg();
+	w_stream.seekg(0, std::ios::beg);
+	if (rows * cols * sizeof(float) != total_bytes) {
+		std::string error_str("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + std::string(", Image width: ") + std::to_string(cols) + std::string(", Image height: ") + std::to_string(rows));
+		throw std::exception(error_str.c_str());
+	}
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
-	int value_read_count = 0;
-	while (!w_stream.eof())
-		w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[value_read_count++]), sizeof(float));
+	w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[0]), total_bytes);
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
