@@ -1,29 +1,25 @@
-﻿#pragma warning(disable:4996)
+#pragma warning(disable:4996)
 #include "Watermark_GPU.h"
-#include "opencl_init.h"
-#include "UtilityFunctions.h"
+#include <cuda_runtime.h>
 #include "INIReader.h"
 #include <iostream>
 #include <iomanip>
-#include <af/opencl.h>
 #include "cimg_init.h"
-#include "WatermarkFunctions.h"
+#include "WatermarkFunctions.cuh"
 #include "UtilityFunctions.h"
 #include <vector>
-
 using std::cout;
 using std::string;
 using namespace cimg_library;
 
 /*!
- *  \brief  This is a project implementation of my Thesis with title: 
+ *  \brief  This is a project implementation of my Thesis with title:
  *			EFFICIENT IMPLEMENTATION OF WATERMARKING ALGORITHMS AND
- *			WATERMARK DETECTION IN IMAGE AND VIDEO USING GPU
+ *			WATERMARK DETECTION IN IMAGE AND VIDEO USING GPU, CUDA version
  *  \author Dimitris Karatzas
  */
 int main(void)
 {
-
 	//open parameters file
 	INIReader inir("settings.ini");
 	if (inir.ParseError() < 0) {
@@ -33,9 +29,6 @@ int main(void)
 
 	af::info();
 	cout << "\n";
-
-	const cl::Context context(afcl::getContext(true));
-	const cl::Device device({ afcl::getDeviceId() });
 
 	const int p = inir.GetInteger("parameters", "p", -1);
 	const float psnr = static_cast<float>(inir.GetReal("parameters", "psnr", -1.0f));
@@ -55,32 +48,16 @@ int main(void)
 		return -1;
 	}
 
-	//compile opencl kernels
-	cl::Program program_nvf, program_me;
-	try {
-		std::string program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
-		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
-		const std::string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
-		program_nvf.build({ device }, nvf_buildFlags.c_str());
-		program_data = UtilityFunctions::loadProgram("kernels/me_p3.cl");
-		program_me = cl::Program(context, program_data);
-		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
-	}
-	catch (cl::Error& e) {
-		cout << "Could not build a kernel, Reason:\n\n";
-		cout << e.what();
-		if (program_nvf.get() != NULL)
-			cout << program_nvf.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
-		if (program_me.get() != NULL)
-			cout << program_me.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
-		return -1;
-	}
+	int device;
+	cudaGetDevice(&device);
+	cudaDeviceProp properties;
+	cudaGetDeviceProperties(&properties, device);
 
 	//test algorithms
 	try {
 		inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ?
-			test_for_video(device, program_nvf, program_me, inir, p, psnr) :
-			test_for_image(device, program_nvf, program_me, inir, p, psnr);
+			test_for_video(inir, properties, p, psnr) :
+			test_for_image(inir, properties, p, psnr);
 	}
 	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
@@ -91,7 +68,7 @@ int main(void)
 	return 0;
 }
 
-int test_for_image(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
+int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
 	//load image from disk into an arrayfire array
 	timer::start();
 	const af::array image = af::rgb2gray(af::loadImage(strdup(inir.Get("paths", "image", "NO_IMAGE").c_str()), true), 0.299f, 0.587f, 0.114f);
@@ -104,13 +81,14 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 		cout << "Image dimensions too low\n";
 		return -1;
 	}
-	if (cols > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>()) || cols > 7680 || rows > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) || rows > 4320) {
+
+	if (cols > static_cast<dim_t>(properties.maxTexture2D[0]) || cols > 7680 || rows > static_cast<dim_t>(properties.maxTexture2D[1]) || rows > 4320) {
 		cout << "Image dimensions too high for this GPU\n";
 		return -1;
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	WatermarkFunctions watermarkFunctions(image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	WatermarkFunctions watermarkFunctions(image, inir.Get("paths", "w_path", "w.txt"), p, psnr);
 
 	float a;
 	af::array a_x;
@@ -125,6 +103,7 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
+	
 	//make ME watermark
 	timer::start();
 	af::array watermark_ME = watermarkFunctions.make_and_add_watermark_prediction_error(a_x, a);
@@ -132,6 +111,7 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
+	
 	//warmup for arrayfire
 	watermarkFunctions.mask_detector_custom(watermark_NVF);
 	watermarkFunctions.mask_detector_prediction_error(watermark_ME);
@@ -149,10 +129,11 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
 	cout << "Correlation [ME]: " << std::fixed << std::setprecision(16) << correlation_me << "\n";
+
 	return 0;
 }
 
-int test_for_video(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
+int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const int frames = inir.GetInteger("parameters_video", "frames", -1);
@@ -164,7 +145,7 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 		cout << "Video dimensions too low\n";
 		return -1;
 	}
-	if (rows > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || cols > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) {
+	if (rows > static_cast<dim_t>(properties.maxTexture2D[1]) || cols > static_cast<dim_t>(properties.maxTexture2D[0])) {
 		cout << "Video dimensions too high for this GPU\n";
 		return -1;
 	}
@@ -190,7 +171,7 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 
 	//initialize watermark functions class
 	af::array dummy_a_x;
-	WatermarkFunctions watermarkFunctions(inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	WatermarkFunctions watermarkFunctions(inir.Get("paths", "w_path", "w.txt"), p, psnr);
 	watermarkFunctions.load_W(rows, cols);
 
 	//realtime watermarking of raw video

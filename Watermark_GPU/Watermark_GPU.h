@@ -1,6 +1,5 @@
-﻿#pragma once
-#include "opencl_init.h"
+#pragma once
 #include "INIReader.h"
-
-int test_for_image(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
-int test_for_video(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr);
+#include <cuda_runtime.h>
+int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr);
+int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr);

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -11,30 +11,26 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <VCProjectVersion>16.0</VCProjectVersion>
-    <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{2905fb46-feae-4e12-afac-de4920b64608}</ProjectGuid>
-    <RootNamespace>WatermarkGPU</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectGuid>{D5B36CD3-74BB-4510-9BD6-822405798796}</ProjectGuid>
+    <RootNamespace>Watermark_GPU</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
-  <ImportGroup Label="Shared">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.4.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -43,23 +39,27 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(CUDA_PATH)\lib\x64;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(AF_PATH)\lib\afopencl.lib;OpenCL.lib;$(OPENCV_DIR)\lib\opencv_world452d.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;$(AF_PATH)\lib\afcuda.lib;$(OPENCV_DIR)\lib\opencv_world452d.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+    </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452d.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
     </PostBuildEvent>
@@ -67,47 +67,52 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(AF_PATH)\lib\afopencl.lib;OpenCL.lib;$(OPENCV_DIR)\lib\opencv_world452.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib\lib;$(CUDA_PATH)\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;$(AF_PATH)\lib\afcuda.lib;$(OPENCV_DIR)\lib\opencv_world452.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <FastMath>true</FastMath>
+    </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="kernels.cu" />
+    <CudaCompile Include="WatermarkFunctions.cu" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="UtilityFunctions.cpp" />
-    <ClCompile Include="WatermarkFunctions.cpp" />
     <ClCompile Include="Watermark_GPU.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cimg_init.h" />
     <ClInclude Include="INIReader.h" />
-    <ClInclude Include="opencl_init.h" />
+    <ClInclude Include="kernels.cuh" />
     <ClInclude Include="UtilityFunctions.h" />
-    <ClInclude Include="WatermarkFunctions.h" />
+    <ClInclude Include="WatermarkFunctions.cuh" />
     <ClInclude Include="Watermark_GPU.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="kernels\me_p3.cl" />
-    <None Include="kernels\nvf.cl" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.4.targets" />
     <Import Project="..\packages\libpng-msvc-x64.1.6.33.8807\build\native\libpng-msvc-x64.targets" Condition="Exists('..\packages\libpng-msvc-x64.1.6.33.8807\build\native\libpng-msvc-x64.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

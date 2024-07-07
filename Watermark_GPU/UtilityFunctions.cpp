@@ -1,6 +1,6 @@
-﻿#pragma warning(disable:4996)
+#pragma warning(disable:4996)
 #include "UtilityFunctions.h"
-#include "WatermarkFunctions.h"
+#include "WatermarkFunctions.cuh"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -10,19 +10,9 @@
 #include <thread>
 #include <cmath>
 
+
 using namespace cimg_library;
 using std::cout;
-
-std::string UtilityFunctions::loadProgram(const std::string input)
-{
-	std::ifstream stream(input.c_str());
-	if (!stream.is_open()) {
-		std::string error_str("Could not load Program: " + input);
-		throw std::exception(error_str.c_str());
-	}
-	std::string s(std::istreambuf_iterator<char>(stream), (std::istreambuf_iterator<char>()));
-	return s;
-}
 
 namespace timer {
 	void start() {
@@ -59,7 +49,7 @@ void UtilityFunctions::accurate_timer_sleep(double seconds) {
 }
 
 //main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
-void UtilityFunctions::realtime_detection(WatermarkFunctions& watermarkFunctions, const std::vector<af::array> &watermarked_frames, const int frames, const bool display_frames, const float frame_period) {
+void UtilityFunctions::realtime_detection(WatermarkFunctions& watermarkFunctions, const std::vector<af::array>& watermarked_frames, const int frames, const bool display_frames, const float frame_period) {
 	std::vector<float> correlations(frames);
 	CImgDisplay window;
 	const auto rows = static_cast<unsigned int>(watermarked_frames[1].dims(0));

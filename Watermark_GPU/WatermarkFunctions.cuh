@@ -1,6 +1,7 @@
-﻿#pragma once
-#include "opencl_init.h"
-#include <af/opencl.h>
+#pragma once
+#include <functional>
+#include <cuda_runtime.h>
+#include <arrayfire.h>
 #include <string>
 
 /*!
@@ -9,27 +10,25 @@
  */
 class WatermarkFunctions {
 private:
-	const cl::Context context{ afcl::getContext(true) };
-	const cl::CommandQueue queue{ afcl::getQueue(true) };
-	const cl::Program program_me, program_custom;
-	const std::string w_file_path, custom_kernel_name;
+	const std::string w_file_path;
 	const int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
 	const float psnr;
 	af::array image, w;
 	dim_t rows, cols;
+	cudaStream_t af_cuda_stream, custom_kernels_stream;
 
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
-	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, af::array&)> &compute_custom_mask);
-	void compute_custom_mask(const af::array &image, af::array& m);
+	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, af::array&)>& compute_custom_mask);
+	void compute_custom_mask(const af::array& image, af::array& m);
 	void compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
 	void compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& m_e, af::array& error_sequence);
 	af::array make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
-	cl::Image2D copyBufferToImage(const cl_mem* image_buff, const dim_t rows, const dim_t cols);
+	cudaTextureObject_t copyBufferToImage(const float* image_buff, const unsigned int rows, const unsigned int cols);
 public:
-	WatermarkFunctions(const af::array &image, const std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
-	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
+	WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr);
+	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
 	af::array make_and_add_watermark_custom(float& a);

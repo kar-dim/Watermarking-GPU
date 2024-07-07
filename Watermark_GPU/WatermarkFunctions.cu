@@ -1,25 +1,29 @@
-﻿#include "WatermarkFunctions.h"
+#include "kernels.cuh"
+#include "WatermarkFunctions.cuh"
 #include <fstream>
 #include <arrayfire.h>
 #include <iostream>
 #include <string>
-#include <af/opencl.h>
+#include <af/cuda.h>
 #include <cmath>
 #include <memory>
 #include <functional>
+#include <cuda_runtime.h>
 
 using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
-WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const std::string custom_kernel_name)
-		:p(p), p_squared(p*p), p_squared_minus_one(p_squared-1), p_squared_minus_one_squared(p_squared_minus_one * p_squared_minus_one), pad(p/2), psnr(psnr), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), program_me(prog_me), program_custom(prog_custom) {
+WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int p, const float psnr)
+	:p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr), w_file_path(w_file_path) {
+	this->af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
+	cudaStreamCreate(&custom_kernels_stream);
 	this->rows = -1;
 	this->cols = -1;
 }
 
 //full constructor
-WatermarkFunctions::WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name)
-		:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr, program_me, program_custom, custom_kernel_name) {
+WatermarkFunctions::WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr)
+	:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr) {
 	load_image(image);
 	load_W(this->rows, this->cols);
 }
@@ -50,42 +54,44 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
-//helper method to copy an OpenCL buffer into an OpenCL Image (fast copy that happens in the device)
-cl::Image2D WatermarkFunctions::copyBufferToImage(const cl_mem *image_buff, const dim_t rows, const dim_t cols) {
-	cl::Image2D image2d(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL);
-	const size_t orig[] = { 0,0,0 };
-	const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };
-	clEnqueueCopyBufferToImage(queue(), *image_buff, image2d(), 0, orig, des, NULL, NULL, NULL);
-	return image2d;
+//helper method to copy an arrayfire cuda buffer into a cuda Texture Object Image (fast copy that happens in the device)
+cudaTextureObject_t WatermarkFunctions::copyBufferToImage(const float* image_buff, const unsigned int rows, const unsigned int cols) {
+	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
+	cudaArray* cuArray;
+	cudaMallocArray(&cuArray, &channelDesc, cols, rows);
+	cudaMemcpy2DToArray(cuArray, 0, 0, image_buff, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
+	struct cudaResourceDesc resDesc;
+	memset(&resDesc, 0, sizeof(resDesc));
+	resDesc.resType = cudaResourceTypeArray;
+	resDesc.res.array.array = cuArray;
+	struct cudaTextureDesc texDesc;
+	memset(&texDesc, 0, sizeof(texDesc));
+	texDesc.addressMode[0] = cudaAddressModeBorder;
+	texDesc.addressMode[1] = cudaAddressModeBorder;
+	texDesc.filterMode = cudaFilterModePoint;
+	texDesc.readMode = cudaReadModeElementType;
+	texDesc.normalizedCoords = 0;
+	cudaTextureObject_t texObj = 0;
+	cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+	return texObj;
 }
 
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
 void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& m)
 {
-	const auto rows = image.dims(0);
-	const auto cols = image.dims(1);
-	//fix for OpenCL 1.2 limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (cols and rows)
-	const auto pad_rows = (rows % 16 == 0) ? rows : rows + 16 - (rows % 16);
-	const auto pad_cols = (cols % 16 == 0) ? cols : cols + 16 - (cols % 16);
+	const auto rows = static_cast<unsigned int>(image.dims(0));
+	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	try {
-		cl_mem *image_buff = image_transpose.device<cl_mem>();
-		cl::Image2D image2d = copyBufferToImage(image_buff, rows, cols);
-		cl::Buffer buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * rows * cols, NULL);
-		cl::Kernel kernel = cl::Kernel(program_custom, custom_kernel_name.c_str());
-		kernel.setArg(0, image2d);
-		kernel.setArg(1, buff);
-		kernel.setArg(2, p);
-		kernel.setArg(3, pad);
-		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
-		queue.finish();
-		m = afcl::array(rows, cols, buff(), af::dtype::f32, true);
-		image_transpose.unlock();
-	}
-	catch (const cl::Error& ex) {
-		std::string error_str("ERROR in compute_nvf_mask(): " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
-		throw std::exception(error_str.c_str());
-	}
+	float *image_buff = image_transpose.device<float>();
+	cudaTextureObject_t imageTex = copyBufferToImage(image_buff, rows, cols);
+	float* mask_output;
+	cudaMalloc(&mask_output, rows * cols * sizeof(float));
+	dim3 blockSize(16, 16);
+	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
+	nvf <<<gridSize, blockSize, 0, af_cuda_stream >>> (imageTex, mask_output, p*p, pad, cols, rows);
+	cudaDeviceSynchronize();
+	m = af::array(rows, cols, mask_output, afDevice);
+	image_transpose.unlock();
 }
 
 af::array WatermarkFunctions::make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
@@ -95,7 +101,7 @@ af::array WatermarkFunctions::make_and_add_watermark(float& a, const std::functi
 	const af::array u = m * w;
 	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
- 	return image + (a * u);
+	return image + (a * u);
 }
 
 //public method called from host to apply the custom mask and return the watermarked image
@@ -103,7 +109,7 @@ af::array WatermarkFunctions::make_and_add_watermark_custom(float& a)
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
 		compute_custom_mask(image, m);
-	});
+		});
 }
 
 //public method called from host to apply the prediction error mask and return the watermarked image
@@ -111,54 +117,42 @@ af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array&
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
 		compute_prediction_error_mask(image, m, error_sequence, coefficients, true);
-	});
+		});
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
 //can also calculate error sequence and prediction error filter
 void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
 {
-	const auto rows = image.dims(0);
-	const auto cols = image.dims(1);
-	//fix for OpenCL 1.2 limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (cols)
-	const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+	const auto rows = static_cast<unsigned int>(image.dims(0));
+	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	cl_int err;
-	try {
-		cl_mem *buffer = image_transpose.device<cl_mem>();
-		cl::Image2D image2d = copyBufferToImage(buffer, rows, cols);
-		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_cols * rows, NULL, &err);
-		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_cols * rows, NULL, &err);
-		cl::Kernel kernel = cl::Kernel(program_me, "me", &err);
-		kernel.setArg(0, image2d);
-		kernel.setArg(1, Rx_buff);
-		kernel.setArg(2, rx_buff);
-		kernel.setArg(3, cl::Local(sizeof(float) * 4096));
-		kernel.setArg(4, cl::Local(sizeof(float) * 512));
-		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, pad_cols), cl::NDRange(1, 64));
-		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
-		af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad, false);
-		af::array x_ = af::join(1, x_all(af::span, af::seq(0, (p_squared / 2) - 1)), x_all(af::span, af::seq((p_squared / 2) + 1, af::end)));
-		queue.finish(); 
-		image_transpose.unlock();
-		af::array Rx_partial_sums = af::moddims(afcl::array(pad_cols, rows, Rx_buff(), af::dtype::f32, true), p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
-		af::array rx_partial_sums = af::moddims(afcl::array(pad_cols, rows, rx_buff(), af::dtype::f32, true), p_squared_minus_one, (pad_cols * rows) / p_squared_minus_one);
-		//reduction sum of blocks
-		//all [p^2-1,1] blocks will be summed in rx
-		//all [p^2-1, p^2-1] blocks will be summed in Rx
-		af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
-		af::array rx = af::sum(rx_partial_sums, 1);
-		coefficients = af::solve(Rx, rx);
-		error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
-		if (mask_needed) {
-			af::array error_sequence_abs = af::abs(error_sequence);
-			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
-			//display_array(m_e);
-		}
-	}
-	catch (const cl::Error &ex) {
-		std::string error_str("ERROR in compute_me_mask(): " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
-		throw std::exception(error_str.c_str());
+	const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+
+	float* image_buff = image_transpose.device<float>();
+	cudaTextureObject_t imageTex = copyBufferToImage(image_buff, rows, cols);
+	float* Rx_buff, *rx_buff;
+	cudaMalloc(&Rx_buff, rows * pad_cols * sizeof(float));
+	cudaMalloc(&rx_buff, rows * pad_cols * sizeof(float));
+	dim3 blockSize(1, 64);
+	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (pad_cols + blockSize.y - 1) / blockSize.y);
+	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (imageTex, Rx_buff, rx_buff, cols, pad_cols, rows);
+	af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad, false);
+	af::array x_ = af::join(1, x_all(af::span, af::seq(0, (p_squared / 2) - 1)), x_all(af::span, af::seq((p_squared / 2) + 1, af::end)));
+	cudaDeviceSynchronize();
+	image_transpose.unlock();
+	af::array Rx_partial_sums = af::moddims(af::array(pad_cols, rows, Rx_buff, afDevice), p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
+	af::array rx_partial_sums = af::moddims(af::array(pad_cols, rows, rx_buff, afDevice), p_squared_minus_one, (pad_cols * rows) / p_squared_minus_one);
+	//reduction sum of blocks
+	//all [p^2-1,1] blocks will be summed in rx
+	//all [p^2-1, p^2-1] blocks will be summed in Rx
+	af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
+	af::array rx = af::sum(rx_partial_sums, 1);
+	coefficients = af::solve(Rx, rx);
+	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
+	if (mask_needed) {
+		af::array error_sequence_abs = af::abs(error_sequence);
+		m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 	}
 }
 
@@ -220,9 +214,9 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 
 //calls main mask detector for custom masks
 float WatermarkFunctions::mask_detector_custom(const af::array& watermarked_image) {
-	return mask_detector(watermarked_image, [&](const af::array& watermarked_image,af::array& m){
+	return mask_detector(watermarked_image, [&](const af::array& watermarked_image, af::array& m) {
 		compute_custom_mask(watermarked_image, m);
-	});
+		});
 }
 
 //calls main mask detector for prediction error mask
