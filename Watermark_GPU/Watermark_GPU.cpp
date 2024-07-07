@@ -23,7 +23,7 @@ int main(void)
 	//open parameters file
 	INIReader inir("settings.ini");
 	if (inir.ParseError() < 0) {
-		cout << "Could not load opencl configuration file\n";
+		cout << "Could not load CUDA configuration file\n";
 		return -1;
 	}
 
