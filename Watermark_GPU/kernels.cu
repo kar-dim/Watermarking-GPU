@@ -7,7 +7,7 @@ __global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int p_square
 	if (x < width && y < height) {
 		int i, j, k = 0;
 		float mean = 0.0f, variance = 0.0f, local_mean_diff;
-		//p_squared is supplied at compile-time to minimize array elements (VLAs not supported in OpenCL)
+		//maximum local values size is 81 for a 9x9 block
 		float local_values[81];
 		for (j = x - pad; j <= x + pad; j++) {
 			for (i = y - pad; i <= y + pad; i++) {
