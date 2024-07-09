@@ -93,11 +93,29 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 	const af::array image_transpose = image.T();
 	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
 	float* mask_output = cuda_utils::cudaMallocPtr<float>(rows * cols);
-	dim3 blockSize(16, 16);
-	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
-	nvf <<<gridSize, blockSize, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
+	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(16, 16), rows, cols), dim3(16, 16));
+	nvf <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
 	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
 	m = af::array(rows, cols, mask_output, afDevice);
+}
+
+//helper method to calculate the neighbors ("x_" array)
+af::array WatermarkFunctions::calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) {
+	af::array array_unwrapped = af::unwrap(array, p, p, 1, 1, pad, pad, false);
+	return af::join(1, array_unwrapped(af::span, af::seq(0, (p_squared / 2) - 1)), array_unwrapped(af::span, af::seq((p_squared / 2) + 1, af::end)));
+}
+
+//helper method to sum the incomplete Rx_partial and rx_partial arrays which were produced from the custom kernel
+//and to transform them to the correct size, so that they can be used by the system solver
+std::pair<af::array, af::array> WatermarkFunctions::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols) {
+	af::array Rx_partial_sums = af::moddims(Rx_partial, p_squared_minus_one_squared, (padded_cols * rows) / p_squared_minus_one_squared);
+	af::array rx_partial_sums = af::moddims(rx_partial, p_squared_minus_one, (padded_cols * rows) / p_squared_minus_one);
+	//reduction sum of blocks
+	//all [p^2-1,1] blocks will be summed in rx
+	//all [p^2-1, p^2-1] blocks will be summed in Rx
+	af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
+	af::array rx = af::sum(rx_partial_sums, 1);
+	return std::make_pair(Rx, rx);
 }
 
 af::array WatermarkFunctions::make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
@@ -133,48 +151,39 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-
+	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	//copy arrayfire array from device to device's texture cache and allocate Rx,rx buffers
 	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
-	float* Rx_buff = cuda_utils::cudaMallocPtr<float>(rows * pad_cols);
-	float* rx_buff = cuda_utils::cudaMallocPtr<float>(rows * pad_cols);
+	float* Rx_buff = cuda_utils::cudaMallocPtr<float>(rows * padded_cols);
+	float* rx_buff = cuda_utils::cudaMallocPtr<float>(rows * padded_cols);
 	//call custom kernel to fill Rx and rx partial sums (in different stream than arrayfire, may help)
-	dim3 blockSize(1, 64);
-	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (pad_cols + blockSize.y - 1) / blockSize.y);
-	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, pad_cols, rows);
+	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
+	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
 	//calculate the neighbors "x_" array
-	af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad, false);
-	af::array x_ = af::join(1, x_all(af::span, af::seq(0, (p_squared / 2) - 1)), x_all(af::span, af::seq((p_squared / 2) + 1, af::end)));
+	af::array x_ = calculate_neighbors_array(image, p, p_squared, pad);
 	//wait for custom kernel to finish and release texture memory
 	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
-	af::array Rx_partial_sums = af::moddims(af::array(pad_cols, rows, Rx_buff, afDevice), p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
-	af::array rx_partial_sums = af::moddims(af::array(pad_cols, rows, rx_buff, afDevice), p_squared_minus_one, (pad_cols * rows) / p_squared_minus_one);
-	//reduction sum of blocks
-	//all [p^2-1,1] blocks will be summed in rx
-	//all [p^2-1, p^2-1] blocks will be summed in Rx
-	af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
-	af::array rx = af::sum(rx_partial_sums, 1);
-	coefficients = af::solve(Rx, rx);
+	//transform the partial Rx,rx arrays by summing and changing their dimensions
+	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols, rows, rx_buff, afDevice), padded_cols);
+	//solve the system to get coefficients and error sequence, and optionally the mask if needed
+	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 	if (mask_needed) {
-		af::array error_sequence_abs = af::abs(error_sequence);
+		const af::array error_sequence_abs = af::abs(error_sequence);
 		m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 	}
 }
 
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array WatermarkFunctions::calculate_error_sequence(const af::array& u, const af::array& coefficients) {
-	af::array u_neighb = af::unwrap(u, p, p, 1, 1, pad, pad, false);
-	af::array x_ = af::join(1, u_neighb(af::span, af::seq(0, (p_squared / 2) - 1)), u_neighb(af::span, af::seq((p_squared / 2) + 1, af::end)));
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, x_), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p_squared, pad)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
 void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, const af::array& coeficcients, af::array& m_e, af::array& error_sequence)
 {
 	error_sequence = calculate_error_sequence(image, coeficcients);
-	af::array error_sequence_abs = af::abs(error_sequence);
+	const af::array error_sequence_abs = af::abs(error_sequence);
 	m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 }
 
@@ -186,10 +195,9 @@ af::array WatermarkFunctions::compute_error_sequence(const af::array& u, const a
 
 //helper method used in detectors
 float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::array& e_z) {
-	float dot_ez_eu, d_ez, d_eu;
-	dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
-	d_ez = std::sqrt(af::sum<float>(af::pow(e_z, 2)));
-	d_eu = std::sqrt(af::sum<float>(af::pow(e_u, 2)));
+	float dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
+	float d_ez = std::sqrt(af::sum<float>(af::pow(e_z, 2)));
+	float d_eu = std::sqrt(af::sum<float>(af::pow(e_u, 2)));
 	return dot_ez_eu / (d_ez * d_eu);
 }
 
@@ -204,8 +212,8 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 	else {
 		compute_prediction_error_mask(image, m, e_z, a_z, true);
 	}
-	af::array u = m * w;
-	af::array e_u = compute_error_sequence(u, a_z);
+	const af::array u = m * w;
+	const af::array e_u = compute_error_sequence(u, a_z);
 	return calculate_correlation(e_u, e_z);
 }
 
@@ -214,7 +222,7 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 {
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
-	af::array u = m_e * w;
+	const af::array u = m_e * w;
 	compute_prediction_error_mask(u, m_eu, e_u, a_u, false);
 	return calculate_correlation(e_u, e_z);
 }

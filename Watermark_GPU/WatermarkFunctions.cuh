@@ -26,6 +26,8 @@ private:
 	af::array make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
+	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad);
+	std::pair<af::array, af::array> WatermarkFunctions::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols);
 	void synchronize_and_cleanup_texture_data(const std::pair<cudaTextureObject_t, cudaArray*>& texture_data, const af::array& array_to_unlock);
 	std::pair<cudaTextureObject_t, cudaArray*> copy_array_to_texture_data(const af::array &image, const unsigned int rows, const unsigned int cols);
 public:
