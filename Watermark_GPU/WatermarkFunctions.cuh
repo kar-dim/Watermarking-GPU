@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 #include <arrayfire.h>
 #include <string>
+#include <utility>
 
 /*!
  *  \brief  Functions for watermark computation and detection
@@ -25,7 +26,8 @@ private:
 	af::array make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
-	cudaTextureObject_t copyBufferToImage(const float* image_buff, const unsigned int rows, const unsigned int cols);
+	void synchronize_and_cleanup_image_buffers(const std::pair<cudaTextureObject_t, cudaArray*>& imageBuffers, const af::array& array_to_unlock);
+	std::pair<cudaTextureObject_t, cudaArray*> copyBufferToImage(const float* image_buff, const unsigned int rows, const unsigned int cols);
 public:
 	WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr);
 	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr);

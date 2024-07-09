@@ -55,7 +55,7 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 }
 
 //helper method to copy an arrayfire cuda buffer into a cuda Texture Object Image (fast copy that happens in the device)
-cudaTextureObject_t WatermarkFunctions::copyBufferToImage(const float* image_buff, const unsigned int rows, const unsigned int cols) {
+std::pair<cudaTextureObject_t, cudaArray*> WatermarkFunctions::copyBufferToImage(const float* image_buff, const unsigned int rows, const unsigned int cols) {
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
 	cudaArray* cuArray;
 	cudaMallocArray(&cuArray, &channelDesc, cols, rows);
@@ -73,7 +73,15 @@ cudaTextureObject_t WatermarkFunctions::copyBufferToImage(const float* image_buf
 	texDesc.normalizedCoords = 0;
 	cudaTextureObject_t texObj = 0;
 	cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
-	return texObj;
+	return std::make_pair(texObj, cuArray);
+}
+
+//helper method for cleanup and to execute common tasks after the masking kernels are executed
+void WatermarkFunctions::synchronize_and_cleanup_image_buffers(const std::pair<cudaTextureObject_t, cudaArray*> &imageBuffers, const af::array &array_to_unlock) {
+	cudaDeviceSynchronize();
+	cudaDestroyTextureObject(imageBuffers.first);
+	cudaFreeArray(imageBuffers.second);
+	array_to_unlock.unlock();
 }
 
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
@@ -83,15 +91,14 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
 	float *image_buff = image_transpose.device<float>();
-	cudaTextureObject_t imageTex = copyBufferToImage(image_buff, rows, cols);
+	auto imageBuffers = copyBufferToImage(image_buff, rows, cols);
 	float* mask_output;
 	cudaMalloc(&mask_output, rows * cols * sizeof(float));
 	dim3 blockSize(16, 16);
 	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
-	nvf <<<gridSize, blockSize, 0, af_cuda_stream >>> (imageTex, mask_output, p*p, pad, cols, rows);
-	cudaDeviceSynchronize();
+	nvf <<<gridSize, blockSize, 0, af_cuda_stream >>> (imageBuffers.first, mask_output, p*p, pad, cols, rows);
+	synchronize_and_cleanup_image_buffers(imageBuffers, image_transpose);
 	m = af::array(rows, cols, mask_output, afDevice);
-	image_transpose.unlock();
 }
 
 af::array WatermarkFunctions::make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
@@ -130,17 +137,16 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 	const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 
 	float* image_buff = image_transpose.device<float>();
-	cudaTextureObject_t imageTex = copyBufferToImage(image_buff, rows, cols);
+	auto imageBuffers = copyBufferToImage(image_buff, rows, cols);
 	float* Rx_buff, *rx_buff;
 	cudaMalloc(&Rx_buff, rows * pad_cols * sizeof(float));
 	cudaMalloc(&rx_buff, rows * pad_cols * sizeof(float));
 	dim3 blockSize(1, 64);
 	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (pad_cols + blockSize.y - 1) / blockSize.y);
-	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (imageTex, Rx_buff, rx_buff, cols, pad_cols, rows);
+	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (imageBuffers.first, Rx_buff, rx_buff, cols, pad_cols, rows);
 	af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad, false);
 	af::array x_ = af::join(1, x_all(af::span, af::seq(0, (p_squared / 2) - 1)), x_all(af::span, af::seq((p_squared / 2) + 1, af::end)));
-	cudaDeviceSynchronize();
-	image_transpose.unlock();
+	synchronize_and_cleanup_image_buffers(imageBuffers, image_transpose);
 	af::array Rx_partial_sums = af::moddims(af::array(pad_cols, rows, Rx_buff, afDevice), p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
 	af::array rx_partial_sums = af::moddims(af::array(pad_cols, rows, rx_buff, afDevice), p_squared_minus_one, (pad_cols * rows) / p_squared_minus_one);
 	//reduction sum of blocks
