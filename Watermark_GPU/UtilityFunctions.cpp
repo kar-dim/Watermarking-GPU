@@ -10,7 +10,6 @@
 #include <thread>
 #include <cmath>
 
-
 using namespace cimg_library;
 using std::cout;
 

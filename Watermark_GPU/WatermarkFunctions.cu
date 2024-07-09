@@ -9,6 +9,7 @@
 #include <memory>
 #include <functional>
 #include <cuda_runtime.h>
+#include "cuda_utils.h"
 
 using std::cout;
 
@@ -91,8 +92,7 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
 	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
-	float* mask_output;
-	cudaMalloc(&mask_output, rows * cols * sizeof(float));
+	float* mask_output = cuda_utils::cudaMallocPtr<float>(rows * cols);
 	dim3 blockSize(16, 16);
 	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
 	nvf <<<gridSize, blockSize, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
@@ -135,11 +135,10 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 	const af::array image_transpose = image.T();
 	const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 
-	//copy arrayfire array from device to device's texture cache
+	//copy arrayfire array from device to device's texture cache and allocate Rx,rx buffers
 	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
-	float* Rx_buff, *rx_buff;
-	cudaMalloc(&Rx_buff, rows * pad_cols * sizeof(float));
-	cudaMalloc(&rx_buff, rows * pad_cols * sizeof(float));
+	float* Rx_buff = cuda_utils::cudaMallocPtr<float>(rows * pad_cols);
+	float* rx_buff = cuda_utils::cudaMallocPtr<float>(rows * pad_cols);
 	//call custom kernel to fill Rx and rx partial sums (in different stream than arrayfire, may help)
 	dim3 blockSize(1, 64);
 	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (pad_cols + blockSize.y - 1) / blockSize.y);
