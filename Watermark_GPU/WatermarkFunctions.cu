@@ -55,11 +55,11 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 }
 
 //helper method to copy an arrayfire cuda buffer into a cuda Texture Object Image (fast copy that happens in the device)
-std::pair<cudaTextureObject_t, cudaArray*> WatermarkFunctions::copyBufferToImage(const float* image_buff, const unsigned int rows, const unsigned int cols) {
+std::pair<cudaTextureObject_t, cudaArray*> WatermarkFunctions::copy_array_to_texture_data(const af::array & array, const unsigned int rows, const unsigned int cols) {
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
 	cudaArray* cuArray;
 	cudaMallocArray(&cuArray, &channelDesc, cols, rows);
-	cudaMemcpy2DToArray(cuArray, 0, 0, image_buff, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
+	cudaMemcpy2DToArray(cuArray, 0, 0, array.device<float>(), cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
 	struct cudaResourceDesc resDesc;
 	memset(&resDesc, 0, sizeof(resDesc));
 	resDesc.resType = cudaResourceTypeArray;
@@ -77,10 +77,10 @@ std::pair<cudaTextureObject_t, cudaArray*> WatermarkFunctions::copyBufferToImage
 }
 
 //helper method for cleanup and to execute common tasks after the masking kernels are executed
-void WatermarkFunctions::synchronize_and_cleanup_image_buffers(const std::pair<cudaTextureObject_t, cudaArray*> &imageBuffers, const af::array &array_to_unlock) {
+void WatermarkFunctions::synchronize_and_cleanup_texture_data(const std::pair<cudaTextureObject_t, cudaArray*> &texture_data, const af::array &array_to_unlock) {
 	cudaDeviceSynchronize();
-	cudaDestroyTextureObject(imageBuffers.first);
-	cudaFreeArray(imageBuffers.second);
+	cudaDestroyTextureObject(texture_data.first);
+	cudaFreeArray(texture_data.second);
 	array_to_unlock.unlock();
 }
 
@@ -90,14 +90,13 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	float *image_buff = image_transpose.device<float>();
-	auto imageBuffers = copyBufferToImage(image_buff, rows, cols);
+	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
 	float* mask_output;
 	cudaMalloc(&mask_output, rows * cols * sizeof(float));
 	dim3 blockSize(16, 16);
 	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
-	nvf <<<gridSize, blockSize, 0, af_cuda_stream >>> (imageBuffers.first, mask_output, p*p, pad, cols, rows);
-	synchronize_and_cleanup_image_buffers(imageBuffers, image_transpose);
+	nvf <<<gridSize, blockSize, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
+	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
 	m = af::array(rows, cols, mask_output, afDevice);
 }
 
@@ -136,17 +135,20 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 	const af::array image_transpose = image.T();
 	const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 
-	float* image_buff = image_transpose.device<float>();
-	auto imageBuffers = copyBufferToImage(image_buff, rows, cols);
+	//copy arrayfire array from device to device's texture cache
+	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
 	float* Rx_buff, *rx_buff;
 	cudaMalloc(&Rx_buff, rows * pad_cols * sizeof(float));
 	cudaMalloc(&rx_buff, rows * pad_cols * sizeof(float));
+	//call custom kernel to fill Rx and rx partial sums (in different stream than arrayfire, may help)
 	dim3 blockSize(1, 64);
 	dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (pad_cols + blockSize.y - 1) / blockSize.y);
-	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (imageBuffers.first, Rx_buff, rx_buff, cols, pad_cols, rows);
+	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, pad_cols, rows);
+	//calculate the neighbors "x_" array
 	af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad, false);
 	af::array x_ = af::join(1, x_all(af::span, af::seq(0, (p_squared / 2) - 1)), x_all(af::span, af::seq((p_squared / 2) + 1, af::end)));
-	synchronize_and_cleanup_image_buffers(imageBuffers, image_transpose);
+	//wait for custom kernel to finish and release texture memory
+	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
 	af::array Rx_partial_sums = af::moddims(af::array(pad_cols, rows, Rx_buff, afDevice), p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
 	af::array rx_partial_sums = af::moddims(af::array(pad_cols, rows, rx_buff, afDevice), p_squared_minus_one, (pad_cols * rows) / p_squared_minus_one);
 	//reduction sum of blocks
