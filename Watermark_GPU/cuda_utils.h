@@ -11,7 +11,7 @@ namespace cuda_utils {
         return ptr;
     }
 
-    dim3 grid_size_calculate(const dim3 blockSize, const int rows, const int cols) {
+    inline dim3 grid_size_calculate(const dim3 blockSize, const int rows, const int cols) {
         return dim3 ((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
     }
 }
