@@ -37,7 +37,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 	const int output_index = (y * padded_width) + x;
     const bool is_padded = padded_width > width;
 
-    __shared__ float Rx_local[4096];
+    __shared__ float Rx_local[64][36];
     __shared__ float rx_local[512];
 
     if (y < height) {
@@ -57,8 +57,10 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
             counter = 0;
             for (int i = 0; i < 8; i++) {
                 rx_local[rx_stride + i] = x_[i] * current_pixel;
-                for (int j = 0; j < 8; j++) {
-                    Rx_local[Rx_stride + counter] = x_[i] * x_[j];
+                Rx_local[local_id][counter] = x_[i] * x_[i];
+                counter++;
+                for (int j = i+1; j < 8; j++) {
+                    Rx_local[local_id][counter] = x_[i] * x_[j];
                     counter++;
                 }
             }
@@ -70,8 +72,8 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
         __syncthreads();
         const int limit = (is_padded && padded_width - x <= 64) ? 64 - (padded_width - width) : 64;
         float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
-        for (int j = 0; j < (4096 * limit) / 64; j += 64)
-            reduction_sum_Rx += Rx_local[local_id + j];
+        for (int j = 0; j < limit; j++)
+            reduction_sum_Rx += Rx_local[j][Rx_mappings[local_id]];
         for (int j = 0; j < (512 * limit) / 64; j += 64)
             reduction_sum_rx += rx_local[local_id + j];
         Rx[output_index] = reduction_sum_Rx;
