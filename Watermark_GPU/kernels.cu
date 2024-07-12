@@ -33,7 +33,6 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
 	const int local_id = threadIdx.y;
 	const int rx_stride = local_id * 8;
-	const int Rx_stride = local_id * 64;
 	const int output_index = (y * padded_width) + x;
     const bool is_padded = padded_width > width;
 
