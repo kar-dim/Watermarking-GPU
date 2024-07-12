@@ -2,7 +2,8 @@ __attribute__((reqd_work_group_size(1, 64, 1)))
 __kernel void me(__read_only image2d_t image,
     __global float* Rx,
     __global float* rx,
-    __local float Rx_local[4096], //64 local threads, 64 values each
+    __constant int* Rx_mappings,
+    __local float Rx_local[64][36], //64 local threads, 36 values each
     __local float rx_local[512]) //64 local threads, 8 values each
 {
     const int x = get_global_id(1), y = get_global_id(0);
@@ -32,8 +33,10 @@ __kernel void me(__read_only image2d_t image,
         counter = 0;
         for (int i = 0; i < 8; i++) {
             rx_local[rx_stride + i] = x_[i] * current_pixel;
-            for (int j = 0; j < 8; j++) {
-                Rx_local[Rx_stride + counter] = x_[i] * x_[j];
+            Rx_local[local_id][counter] = x_[i] * x_[i];
+            counter++;
+            for (int j = i + 1; j < 8; j++) {
+                Rx_local[local_id][counter] = x_[i] * x_[j];
                 counter++;
             }
         }
@@ -44,8 +47,8 @@ __kernel void me(__read_only image2d_t image,
     barrier(CLK_LOCAL_MEM_FENCE);
     const int limit = (is_padded && padded_width - x <= 64) ? 64 - (padded_width - width) : 64;
     float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
-    for (int j = 0; j < (4096 * limit) / 64; j += 64)
-        reduction_sum_Rx += Rx_local[local_id + j];
+    for (int j = 0; j < limit; j++)
+        reduction_sum_Rx += Rx_local[j][Rx_mappings[local_id]];
     for (int j = 0; j < (512 * limit) / 64; j += 64)
         reduction_sum_rx += rx_local[local_id + j];
     Rx[output_index] = reduction_sum_Rx;

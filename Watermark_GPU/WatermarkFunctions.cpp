@@ -88,6 +88,25 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 	}
 }
 
+//helper method to calculate the neighbors ("x_" array)
+af::array WatermarkFunctions::calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) {
+	af::array array_unwrapped = af::unwrap(array, p, p, 1, 1, pad, pad, false);
+	return af::join(1, array_unwrapped(af::span, af::seq(0, (p_squared / 2) - 1)), array_unwrapped(af::span, af::seq((p_squared / 2) + 1, af::end)));
+}
+
+//helper method to sum the incomplete Rx_partial and rx_partial arrays which were produced from the custom kernel
+//and to transform them to the correct size, so that they can be used by the system solver
+std::pair<af::array, af::array> WatermarkFunctions::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols) {
+	af::array Rx_partial_sums = af::moddims(Rx_partial, p_squared_minus_one_squared, (padded_cols * rows) / p_squared_minus_one_squared);
+	af::array rx_partial_sums = af::moddims(rx_partial, p_squared_minus_one, (padded_cols * rows) / p_squared_minus_one);
+	//reduction sum of blocks
+	//all [p^2-1,1] blocks will be summed in rx
+	//all [p^2-1, p^2-1] blocks will be summed in Rx
+	af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
+	af::array rx = af::sum(rx_partial_sums, 1);
+	return std::make_pair(Rx, rx);
+}
+
 af::array WatermarkFunctions::make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
 {
 	af::array m, error_sequence;
@@ -118,42 +137,36 @@ af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array&
 //can also calculate error sequence and prediction error filter
 void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
 {
-	const auto rows = image.dims(0);
-	const auto cols = image.dims(1);
+	const unsigned int rows = static_cast<unsigned int>(image.dims(0));
+	const unsigned int cols = static_cast<unsigned int>(image.dims(1));
 	//fix for OpenCL 1.2 limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (cols)
-	const auto pad_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	const af::array image_transpose = image.T();
 	cl_int err;
 	try {
 		cl_mem *buffer = image_transpose.device<cl_mem>();
 		cl::Image2D image2d = copyBufferToImage(buffer, rows, cols);
-		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_cols * rows, NULL, &err);
-		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * pad_cols * rows, NULL, &err);
+		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
+		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
+		cl::Buffer Rx_mappings_buff(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void *)Rx_mappings, &err);
 		cl::Kernel kernel = cl::Kernel(program_me, "me", &err);
 		kernel.setArg(0, image2d);
 		kernel.setArg(1, Rx_buff);
 		kernel.setArg(2, rx_buff);
-		kernel.setArg(3, cl::Local(sizeof(float) * 4096));
-		kernel.setArg(4, cl::Local(sizeof(float) * 512));
-		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, pad_cols), cl::NDRange(1, 64));
+		kernel.setArg(3, Rx_mappings_buff);
+		kernel.setArg(4, cl::Local(sizeof(float) * 2304));
+		kernel.setArg(5, cl::Local(sizeof(float) * 512));
+		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
-		af::array x_all = af::unwrap(image, p, p, 1, 1, pad, pad, false);
-		af::array x_ = af::join(1, x_all(af::span, af::seq(0, (p_squared / 2) - 1)), x_all(af::span, af::seq((p_squared / 2) + 1, af::end)));
+		af::array x_ = calculate_neighbors_array(image, p, p_squared, pad);
 		queue.finish(); 
 		image_transpose.unlock();
-		af::array Rx_partial_sums = af::moddims(afcl::array(pad_cols, rows, Rx_buff(), af::dtype::f32, true), p_squared_minus_one_squared, (pad_cols * rows) / p_squared_minus_one_squared);
-		af::array rx_partial_sums = af::moddims(afcl::array(pad_cols, rows, rx_buff(), af::dtype::f32, true), p_squared_minus_one, (pad_cols * rows) / p_squared_minus_one);
-		//reduction sum of blocks
-		//all [p^2-1,1] blocks will be summed in rx
-		//all [p^2-1, p^2-1] blocks will be summed in Rx
-		af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
-		af::array rx = af::sum(rx_partial_sums, 1);
-		coefficients = af::solve(Rx, rx);
+		const auto correlation_arrays = correlation_arrays_transformation(afcl::array(padded_cols, rows, Rx_buff(), af::dtype::f32, true), afcl::array(padded_cols, rows, rx_buff(), af::dtype::f32, true), padded_cols);
+		coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 		error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
-			//display_array(m_e);
 		}
 	}
 	catch (const cl::Error &ex) {
@@ -164,16 +177,14 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array WatermarkFunctions::calculate_error_sequence(const af::array& u, const af::array& coefficients) {
-	af::array u_neighb = af::unwrap(u, p, p, 1, 1, pad, pad, false);
-	af::array x_ = af::join(1, u_neighb(af::span, af::seq(0, (p_squared / 2) - 1)), u_neighb(af::span, af::seq((p_squared / 2) + 1, af::end)));
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, x_), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p_squared, pad)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
 void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, const af::array& coeficcients, af::array& m_e, af::array& error_sequence)
 {
 	error_sequence = calculate_error_sequence(image, coeficcients);
-	af::array error_sequence_abs = af::abs(error_sequence);
+	const af::array error_sequence_abs = af::abs(error_sequence);
 	m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 }
 
@@ -185,10 +196,9 @@ af::array WatermarkFunctions::compute_error_sequence(const af::array& u, const a
 
 //helper method used in detectors
 float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::array& e_z) {
-	float dot_ez_eu, d_ez, d_eu;
-	dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
-	d_ez = std::sqrt(af::sum<float>(af::pow(e_z, 2)));
-	d_eu = std::sqrt(af::sum<float>(af::pow(e_u, 2)));
+	float dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
+	float d_ez = std::sqrt(af::sum<float>(af::pow(e_z, 2)));
+	float d_eu = std::sqrt(af::sum<float>(af::pow(e_u, 2)));
 	return dot_ez_eu / (d_ez * d_eu);
 }
 
@@ -203,8 +213,8 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 	else {
 		compute_prediction_error_mask(image, m, e_z, a_z, true);
 	}
-	af::array u = m * w;
-	af::array e_u = compute_error_sequence(u, a_z);
+	const af::array u = m * w;
+	const af::array e_u = compute_error_sequence(u, a_z);
 	return calculate_correlation(e_u, e_z);
 }
 
@@ -213,7 +223,7 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 {
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
-	af::array u = m_e * w;
+	const af::array u = m_e * w;
 	compute_prediction_error_mask(u, m_eu, e_u, a_u, false);
 	return calculate_correlation(e_u, e_z);
 }
