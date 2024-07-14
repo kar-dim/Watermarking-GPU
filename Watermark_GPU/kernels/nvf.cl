@@ -24,7 +24,7 @@ __kernel void nvf(__read_only image2d_t image,
 		for (i = 0; i < p_squared; i++)
 			variance += pown(local_values[i] - mean, 2);
 		//calculate mask
-		const float nvf_mask = 1.0f - (1.0f / (1.0f + (variance / (p_squared - 1))));
+		const float nvf_mask = variance / ((p_squared - 1) + variance);
 		//write pixel value
 		m_nvf[(x * height) + y] = nvf_mask;
 	}
