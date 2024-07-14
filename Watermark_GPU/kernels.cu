@@ -22,7 +22,7 @@ __global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int p_square
             variance += local_mean_diff * local_mean_diff;
 		}
 		//calculate mask
-		const float nvf_mask = 1.0f - (1.0f / (1.0f + (variance / (p_squared - 1))));
+        const float nvf_mask = variance / ((p_squared - 1) + variance);
 		//write pixel value
 		m_nvf[(x * height) + y] = nvf_mask;
 	}
