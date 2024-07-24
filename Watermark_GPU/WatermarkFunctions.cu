@@ -133,15 +133,15 @@ af::array WatermarkFunctions::make_and_add_watermark_custom(float& a)
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
 		compute_custom_mask(image, m);
-		});
+	});
 }
 
 //public method called from host to apply the prediction error mask and return the watermarked image
 af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array& coefficients, float& a)
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
-		compute_prediction_error_mask(image, m, error_sequence, coefficients, true);
-		});
+		compute_prediction_error_mask(image, m, error_sequence, coefficients, MASK_CALCULATION_REQUIRED_YES);
+	});
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
@@ -206,11 +206,11 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 {
 	af::array m, e_z, a_z;
 	if (compute_custom_mask != nullptr) {
-		compute_prediction_error_mask(image, m, e_z, a_z, false);
+		compute_prediction_error_mask(image, m, e_z, a_z, MASK_CALCULATION_REQUIRED_NO);
 		compute_custom_mask(image, m);
 	}
 	else {
-		compute_prediction_error_mask(image, m, e_z, a_z, true);
+		compute_prediction_error_mask(image, m, e_z, a_z, MASK_CALCULATION_REQUIRED_YES);
 	}
 	const af::array u = m * w;
 	const af::array e_u = compute_error_sequence(u, a_z);
