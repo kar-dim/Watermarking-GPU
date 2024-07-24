@@ -36,6 +36,7 @@ private:
 public:
 	WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr);
 	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr);
+	~WatermarkFunctions();
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
 	af::array make_and_add_watermark_custom(float& a);

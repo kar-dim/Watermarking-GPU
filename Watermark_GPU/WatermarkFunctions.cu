@@ -22,6 +22,11 @@ WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int 
 	this->cols = -1;
 }
 
+WatermarkFunctions::~WatermarkFunctions()
+{
+	cudaStreamDestroy(custom_kernels_stream);
+}
+
 //full constructor
 WatermarkFunctions::WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr)
 	:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr) {
