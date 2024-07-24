@@ -129,7 +129,7 @@ af::array WatermarkFunctions::make_and_add_watermark_custom(float& a)
 af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array& coefficients, float& a)
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
-		compute_prediction_error_mask(image, m, error_sequence, coefficients, true);
+		compute_prediction_error_mask(image, m, error_sequence, coefficients, MASK_CALCULATION_REQUIRED_YES);
 	});
 }
 
@@ -207,11 +207,11 @@ float WatermarkFunctions::mask_detector(const af::array& image, const std::funct
 {
 	af::array m, e_z, a_z;
 	if (compute_custom_mask != nullptr) {
-		compute_prediction_error_mask(image, m, e_z, a_z, false);
+		compute_prediction_error_mask(image, m, e_z, a_z, MASK_CALCULATION_REQUIRED_NO);
 		compute_custom_mask(image, m);
 	}
 	else {
-		compute_prediction_error_mask(image, m, e_z, a_z, true);
+		compute_prediction_error_mask(image, m, e_z, a_z, MASK_CALCULATION_REQUIRED_YES);
 	}
 	const af::array u = m * w;
 	const af::array e_u = compute_error_sequence(u, a_z);
@@ -224,7 +224,7 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
 	const af::array u = m_e * w;
-	compute_prediction_error_mask(u, m_eu, e_u, a_u, false);
+	compute_prediction_error_mask(u, m_eu, e_u, a_u, MASK_CALCULATION_REQUIRED_NO);
 	return calculate_correlation(e_u, e_z);
 }
 

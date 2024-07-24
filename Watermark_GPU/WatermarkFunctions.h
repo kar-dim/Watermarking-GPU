@@ -3,6 +3,9 @@
 #include <af/opencl.h>
 #include <string>
 
+#define MASK_CALCULATION_REQUIRED_NO false
+#define MASK_CALCULATION_REQUIRED_YES true
+
 /*!
  *  \brief  Functions for watermark computation and detection
  *  \author Dimitris Karatzas
