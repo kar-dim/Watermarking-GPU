@@ -145,7 +145,7 @@ af::array WatermarkFunctions::make_and_add_watermark_custom(float& a)
 af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array& coefficients, float& a)
 {
 	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
-		compute_prediction_error_mask(image, m, error_sequence, coefficients, MASK_CALCULATION_REQUIRED_YES);
+		compute_prediction_error_mask(image, m, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
 	});
 }
 
@@ -207,15 +207,15 @@ float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::
 }
 
 //the main mask detector function
-float WatermarkFunctions::mask_detector(const af::array& image, const std::function<void(const af::array&, af::array&)>& compute_custom_mask)
+float WatermarkFunctions::mask_detector(const af::array& image, bool custom_mask)
 {
 	af::array m, e_z, a_z;
-	if (compute_custom_mask != nullptr) {
-		compute_prediction_error_mask(image, m, e_z, a_z, MASK_CALCULATION_REQUIRED_NO);
+	if (custom_mask == CUSTOM_MASK_CALCULATION_REQUIRED_YES) {
+		compute_prediction_error_mask(image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
 		compute_custom_mask(image, m);
 	}
 	else {
-		compute_prediction_error_mask(image, m, e_z, a_z, MASK_CALCULATION_REQUIRED_YES);
+		compute_prediction_error_mask(image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
 	}
 	const af::array u = m * w;
 	const af::array e_u = compute_error_sequence(u, a_z);
@@ -228,20 +228,18 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
 	const af::array u = m_e * w;
-	compute_prediction_error_mask(u, m_eu, e_u, a_u, MASK_CALCULATION_REQUIRED_NO);
+	compute_prediction_error_mask(u, m_eu, e_u, a_u, ME_MASK_CALCULATION_REQUIRED_NO);
 	return calculate_correlation(e_u, e_z);
 }
 
 //calls main mask detector for custom masks
 float WatermarkFunctions::mask_detector_custom(const af::array& watermarked_image) {
-	return mask_detector(watermarked_image, [&](const af::array& watermarked_image, af::array& m) {
-		compute_custom_mask(watermarked_image, m);
-		});
+	return mask_detector(watermarked_image, CUSTOM_MASK_CALCULATION_REQUIRED_YES);
 }
 
 //calls main mask detector for prediction error mask
 float WatermarkFunctions::mask_detector_prediction_error(const af::array& watermarked_image) {
-	return mask_detector(watermarked_image, nullptr);
+	return mask_detector(watermarked_image, CUSTOM_MASK_CALCULATION_REQUIRED_NO);
 }
 
 //helper method to display an af::array in a window
