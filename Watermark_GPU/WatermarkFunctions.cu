@@ -228,7 +228,7 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
 	const af::array u = m_e * w;
-	compute_prediction_error_mask(u, m_eu, e_u, a_u, false);
+	compute_prediction_error_mask(u, m_eu, e_u, a_u, MASK_CALCULATION_REQUIRED_NO);
 	return calculate_correlation(e_u, e_z);
 }
 
