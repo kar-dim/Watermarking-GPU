@@ -13,7 +13,9 @@
  *  \author Dimitris Karatzas
  */
 class WatermarkFunctions {
-	static constexpr int Rx_mappings[64] {
+
+private:
+	static constexpr int Rx_mappings[64]{
 		0,  1,  2,  3,  4,  5,  6,  7,
 		1,  8,  9,  10, 11, 12, 13, 14,
 		2,  9,  15, 16, 17, 18, 19, 20,
@@ -23,7 +25,6 @@ class WatermarkFunctions {
 		6,  13, 19, 24, 28, 31, 33, 34,
 		7,  14, 20, 25, 29, 32, 34, 35
 	};
-private:
 	const cl::Context context{ afcl::getContext(true) };
 	const cl::CommandQueue queue{ afcl::getQueue(true) };
 	const cl::Program program_me, program_custom;
@@ -32,6 +33,7 @@ private:
 	const float psnr;
 	af::array image, w;
 	dim_t rows, cols;
+
 	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad);
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols);
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
