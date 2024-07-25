@@ -3,8 +3,10 @@
 #include <af/opencl.h>
 #include <string>
 
-#define MASK_CALCULATION_REQUIRED_NO false
-#define MASK_CALCULATION_REQUIRED_YES true
+#define ME_MASK_CALCULATION_REQUIRED_NO false
+#define ME_MASK_CALCULATION_REQUIRED_YES true
+#define CUSTOM_MASK_CALCULATION_REQUIRED_NO false
+#define CUSTOM_MASK_CALCULATION_REQUIRED_YES true
 
 /*!
  *  \brief  Functions for watermark computation and detection
@@ -33,7 +35,7 @@ private:
 	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad);
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols);
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
-	float mask_detector(const af::array& watermarked_image, const std::function<void(const af::array&, af::array&)> &compute_custom_mask);
+	float mask_detector(const af::array& watermarked_image, bool custom_mask);
 	void compute_custom_mask(const af::array &image, af::array& m);
 	void compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
 	void compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& m_e, af::array& error_sequence);
