@@ -26,7 +26,7 @@ int main(void)
 	INIReader inir("settings.ini");
 	if (inir.ParseError() < 0) {
 		cout << "Could not load CUDA configuration file\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
 
 	af::info();
@@ -38,16 +38,16 @@ int main(void)
 	//TODO for p>3 we have problems with ME masking buffers
 	if (p != 3) {
 		cout << "For now, only p=3 is allowed\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
 	/*if (p <= 0 || p % 2 != 1 || p > 9) {
 		cout << "p parameter must be a positive odd number less than 9\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}*/
 
 	if (psnr <= 0) {
 		cout << "PSNR must be a positive number\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
 
 	int device;
@@ -63,11 +63,9 @@ int main(void)
 	}
 	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
-		std::system("pause");
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
-	std::system("pause");
-	return 0;
+	exit_program(EXIT_SUCCESS);
 }
 
 int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
@@ -295,6 +293,10 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 
 		UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
 	}
-
 	return 0;
+}
+
+void exit_program(const int exit_code) {
+	std::system("pause");
+	std::exit(exit_code);
 }
