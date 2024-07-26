@@ -1,12 +1,12 @@
 #pragma warning(disable:4996)
-#include "Watermark_GPU.h"
+#include "Watermark_GPU.hpp"
 #include <cuda_runtime.h>
 #include "INIReader.h"
 #include <iostream>
 #include <iomanip>
 #include "cimg_init.h"
 #include "WatermarkFunctions.cuh"
-#include "UtilityFunctions.h"
+#include "UtilityFunctions.hpp"
 #include <vector>
 using std::cout;
 using std::string;

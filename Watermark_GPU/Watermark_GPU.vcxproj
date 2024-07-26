@@ -101,12 +101,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cimg_init.h" />
-    <ClInclude Include="cuda_utils.h" />
+    <ClInclude Include="cuda_utils.hpp" />
     <ClInclude Include="INIReader.h" />
     <ClInclude Include="kernels.cuh" />
-    <ClInclude Include="UtilityFunctions.h" />
+    <ClInclude Include="UtilityFunctions.hpp" />
     <ClInclude Include="WatermarkFunctions.cuh" />
-    <ClInclude Include="Watermark_GPU.h" />
+    <ClInclude Include="Watermark_GPU.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

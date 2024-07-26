@@ -1,6 +1,6 @@
 #pragma once
-#include <cstddef>
 #include <cuda_runtime.h>
+
 namespace cuda_utils {
 
     template <typename T>

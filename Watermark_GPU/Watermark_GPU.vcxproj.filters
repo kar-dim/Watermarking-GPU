@@ -28,7 +28,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Watermark_GPU.h">
+    <ClInclude Include="Watermark_GPU.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="INIReader.h">
@@ -37,7 +37,7 @@
     <ClInclude Include="cimg_init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="UtilityFunctions.h">
+    <ClInclude Include="UtilityFunctions.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="WatermarkFunctions.cuh">
@@ -46,7 +46,7 @@
     <ClInclude Include="kernels.cuh">
       <Filter>Kernels</Filter>
     </ClInclude>
-    <ClInclude Include="cuda_utils.h">
+    <ClInclude Include="cuda_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

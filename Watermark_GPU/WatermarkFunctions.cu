@@ -9,7 +9,7 @@
 #include <memory>
 #include <functional>
 #include <cuda_runtime.h>
-#include "cuda_utils.h"
+#include "cuda_utils.hpp"
 
 using std::cout;
 

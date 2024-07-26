@@ -1,5 +1,5 @@
 #pragma warning(disable:4996)
-#include "UtilityFunctions.h"
+#include "UtilityFunctions.hpp"
 #include "WatermarkFunctions.cuh"
 #include <iostream>
 #include <fstream>
