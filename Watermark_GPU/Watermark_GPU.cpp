@@ -205,7 +205,6 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME));
 			//rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
-			//with compression, the watermark is "kept alive" in (some) subsequent frames, only then it makes sense to use this method!
 			for (int i = 1; i < frames; i++)
 				watermarked_frames.push_back(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)).as(af::dtype::f32));
 		}

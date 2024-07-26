@@ -190,15 +190,15 @@ float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::
 }
 
 //the main mask detector function
-float WatermarkFunctions::mask_detector(const af::array& image, MASK_TYPE mask_type)
+float WatermarkFunctions::mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type)
 {
 	af::array m, e_z, a_z;
 	if (mask_type == MASK_TYPE::NVF) {
-		compute_prediction_error_mask(image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
-		compute_custom_mask(image, m);
+		compute_prediction_error_mask(watermarked_image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
+		compute_custom_mask(watermarked_image, m);
 	}
 	else {
-		compute_prediction_error_mask(image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
+		compute_prediction_error_mask(watermarked_image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
 	}
 	const af::array u = m * w;
 	const af::array e_u = calculate_error_sequence(u, a_z);
