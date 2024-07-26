@@ -1,13 +1,15 @@
 #pragma warning(disable:4996)
 #include "Watermark_GPU.hpp"
+#include "WatermarkFunctions.cuh"
+#include "UtilityFunctions.hpp"
 #include <cuda_runtime.h>
 #include "INIReader.h"
 #include <iostream>
 #include <iomanip>
 #include "cimg_init.h"
-#include "WatermarkFunctions.cuh"
-#include "UtilityFunctions.hpp"
 #include <vector>
+#include <cstdlib>
+
 using std::cout;
 using std::string;
 using namespace cimg_library;
@@ -61,10 +63,10 @@ int main(void)
 	}
 	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
-		system("pause");
+		std::system("pause");
 		return -1;
 	}
-	system("pause");
+	std::system("pause");
 	return 0;
 }
 
