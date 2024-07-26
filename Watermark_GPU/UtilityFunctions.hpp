@@ -1,9 +1,9 @@
 ﻿#pragma once
+#include "WatermarkFunctions.hpp"
+#include "cimg_init.h"
 #include <arrayfire.h>
 #include <string>
-#include "cimg_init.h"
 #include <vector>
-#include "WatermarkFunctions.h"
 
 using namespace cimg_library;
 /*!

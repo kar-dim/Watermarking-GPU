@@ -1,14 +1,14 @@
 ﻿#pragma warning(disable:4996)
-#include "Watermark_GPU.h"
+#include "Watermark_GPU.hpp"
 #include "opencl_init.h"
-#include "UtilityFunctions.h"
+#include "UtilityFunctions.hpp"
+#include "WatermarkFunctions.hpp"
+#include "UtilityFunctions.hpp"
+#include "cimg_init.h"
 #include "INIReader.h"
 #include <iostream>
 #include <iomanip>
 #include <af/opencl.h>
-#include "cimg_init.h"
-#include "WatermarkFunctions.h"
-#include "UtilityFunctions.h"
 #include <vector>
 
 using std::cout;

@@ -1,4 +1,4 @@
-﻿#include "WatermarkFunctions.h"
+﻿#include "WatermarkFunctions.hpp"
 #include <fstream>
 #include <arrayfire.h>
 #include <iostream>
@@ -6,7 +6,6 @@
 #include <af/opencl.h>
 #include <cmath>
 #include <memory>
-#include <functional>
 
 using std::cout;
 
