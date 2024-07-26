@@ -3,10 +3,13 @@
 #include <af/opencl.h>
 #include <string>
 
+enum MASK_TYPE {
+	ME,
+	NVF
+};
+
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true
-#define CUSTOM_MASK_CALCULATION_REQUIRED_NO false
-#define CUSTOM_MASK_CALCULATION_REQUIRED_YES true
 
 /*!
  *  \brief  Functions for watermark computation and detection
@@ -37,23 +40,18 @@ private:
 	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad);
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols);
 	float calculate_correlation(const af::array& e_u, const af::array& e_z);
-	float mask_detector(const af::array& watermarked_image, bool custom_mask);
 	void compute_custom_mask(const af::array &image, af::array& m);
 	void compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed);
 	void compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& m_e, af::array& error_sequence);
-	af::array make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask);
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
-	inline af::array compute_error_sequence(const af::array& u, const af::array& coefficients);
 	cl::Image2D copyBufferToImage(const cl_mem* image_buff, const dim_t rows, const dim_t cols);
 public:
 	WatermarkFunctions(const af::array &image, const std::string w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string custom_kernel_name);
 	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
-	af::array make_and_add_watermark_custom(float& a);
-	af::array make_and_add_watermark_prediction_error(af::array& coefficients, float& a);
-	float mask_detector_custom(const af::array& watermarked_image);
-	float mask_detector_prediction_error(const af::array& watermarked_image);
+	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type);
+	float mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type);
 	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients);
 	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
 };
