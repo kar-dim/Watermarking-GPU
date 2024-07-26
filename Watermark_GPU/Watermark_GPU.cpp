@@ -28,7 +28,7 @@ int main(void)
 	INIReader inir("settings.ini");
 	if (inir.ParseError() < 0) {
 		cout << "Could not load opencl configuration file\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
 
 	af::info();
@@ -43,16 +43,16 @@ int main(void)
 	//TODO for p>3 we have problems with ME masking buffers
 	if (p != 3) {
 		cout << "For now, only p=3 is allowed\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
 	/*if (p <= 0 || p % 2 != 1 || p > 9) {
 		cout << "p parameter must be a positive odd number less than 9\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}*/
 
 	if (psnr <= 0) {
 		cout << "PSNR must be a positive number\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
 
 	//compile opencl kernels
@@ -73,7 +73,7 @@ int main(void)
 			cout << program_nvf.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
 		if (program_me.get() != NULL)
 			cout << program_me.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
 
 	//test algorithms
@@ -84,11 +84,9 @@ int main(void)
 	}
 	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
-		system("pause");
-		return -1;
+		exit_program(EXIT_FAILURE);
 	}
-	system("pause");
-	return 0;
+	exit_program(EXIT_SUCCESS);
 }
 
 int test_for_image(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
@@ -312,6 +310,10 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 
 		UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
 	}
-	std::system("pause");
 	return 0;
+}
+
+void exit_program(const int exit_code) {
+	std::system("pause");
+	std::exit(exit_code);
 }
