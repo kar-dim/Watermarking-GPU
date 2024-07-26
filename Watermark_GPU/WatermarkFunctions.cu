@@ -1,5 +1,5 @@
-#include "kernels.cuh"
 #include "WatermarkFunctions.cuh"
+#include "kernels.cuh"
 #include <fstream>
 #include <arrayfire.h>
 #include <iostream>
@@ -7,7 +7,6 @@
 #include <af/cuda.h>
 #include <cmath>
 #include <memory>
-#include <functional>
 #include <cuda_runtime.h>
 #include "cuda_utils.hpp"
 
