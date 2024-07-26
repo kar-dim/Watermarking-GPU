@@ -179,8 +179,8 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, c
 //helper method used in detectors
 float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::array& e_z) {
 	float dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
-	float d_ez = std::sqrt(af::sum<float>(af::pow(e_z, 2)));
-	float d_eu = std::sqrt(af::sum<float>(af::pow(e_u, 2)));
+	float d_ez = static_cast<float>(af::norm(e_z));
+	float d_eu = static_cast<float>(af::norm(e_u));
 	return dot_ez_eu / (d_ez * d_eu);
 }
 

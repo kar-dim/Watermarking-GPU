@@ -3,13 +3,13 @@
 #include "opencl_init.h"
 #include "UtilityFunctions.hpp"
 #include "WatermarkFunctions.hpp"
-#include "UtilityFunctions.hpp"
 #include "cimg_init.h"
 #include "INIReader.h"
 #include <iostream>
 #include <iomanip>
 #include <af/opencl.h>
 #include <vector>
+#include <cstdlib>
 
 using std::cout;
 using std::string;
@@ -312,6 +312,6 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 
 		UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
 	}
-
+	std::system("pause");
 	return 0;
 }
