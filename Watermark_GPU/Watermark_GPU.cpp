@@ -93,12 +93,12 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	float a;
 	af::array a_x;
 	//warmup for arrayfire
-	watermarkFunctions.make_and_add_watermark_custom(a);
-	watermarkFunctions.make_and_add_watermark_prediction_error(a_x, a);
+	watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::NVF);
+	watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::ME);
 
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark_custom(a);
+	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::NVF);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
@@ -106,25 +106,25 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	
 	//make ME watermark
 	timer::start();
-	af::array watermark_ME = watermarkFunctions.make_and_add_watermark_prediction_error(a_x, a);
+	af::array watermark_ME = watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::ME);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	
 	//warmup for arrayfire
-	watermarkFunctions.mask_detector_custom(watermark_NVF);
-	watermarkFunctions.mask_detector_prediction_error(watermark_ME);
+	watermarkFunctions.mask_detector(watermark_NVF, MASK_TYPE::NVF);
+	watermarkFunctions.mask_detector(watermark_ME, MASK_TYPE::ME);
 
 	//detection of NVF
 	timer::start();
-	float correlation_nvf = watermarkFunctions.mask_detector_custom(watermark_NVF);
+	float correlation_nvf = watermarkFunctions.mask_detector(watermark_NVF, MASK_TYPE::NVF);
 	timer::end();
 	cout << "Time to calculate correlation (NVF) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//detection of ME
 	timer::start();
-	float correlation_me = watermarkFunctions.mask_detector_prediction_error(watermark_ME);
+	float correlation_me = watermarkFunctions.mask_detector(watermark_ME, MASK_TYPE::ME);
 	timer::end();
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
@@ -188,21 +188,21 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
 				if (watermark_by_two_frames == true) {
 					if (i % 2 != 0)
-						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, a));
+						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME));
 					else {
-						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(coefficients[counter], a));
+						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(coefficients[counter], a, MASK_TYPE::ME));
 						counter++;
 					}
 				}
 				else
-					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, a));
+					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME));
 			}
 		}
 		else {
 			//add the watermark only in the first frame
 			//copy from CImg to arrayfire
 			watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(0)));
-			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark_prediction_error(dummy_a_x, a));
+			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME));
 			//rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
 			//with compression, the watermark is "kept alive" in (some) subsequent frames, only then it makes sense to use this method!
@@ -273,7 +273,7 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 					counter++;
 				}
 				else {
-					correlations[i] = watermarkFunctions.mask_detector_prediction_error(watermarked_frames[i]);
+					correlations[i] = watermarkFunctions.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
 					timer::end();
 					cout << "Watermark detection secs passed: " << timer::secs_passed() << "\n";
 				}

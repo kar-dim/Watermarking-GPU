@@ -56,7 +56,7 @@ void UtilityFunctions::realtime_detection(WatermarkFunctions& watermarkFunctions
 	float time_diff;
 	for (int i = 0; i < frames; i++) {
 		timer::start();
-		correlations[i] = watermarkFunctions.mask_detector_prediction_error(watermarked_frames[i]);
+		correlations[i] = watermarkFunctions.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
 		timer::end();
 		const float watermark_time_secs = timer::secs_passed();
 		cout << "Watermark detection seconds passed: " << watermark_time_secs << "\n";

@@ -123,30 +123,19 @@ std::pair<af::array, af::array> WatermarkFunctions::correlation_arrays_transform
 	return std::make_pair(Rx, rx);
 }
 
-af::array WatermarkFunctions::make_and_add_watermark(float& a, const std::function<void(const af::array&, af::array&, af::array&)>& compute_mask)
+af::array WatermarkFunctions::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type)
 {
 	af::array m, error_sequence;
-	compute_mask(image, m, error_sequence);
+	if (mask_type == MASK_TYPE::ME) {
+		compute_prediction_error_mask(image, m, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
+	}
+	else {
+		compute_custom_mask(image, m);
+	}
 	const af::array u = m * w;
 	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
 	return image + (a * u);
-}
-
-//public method called from host to apply the custom mask and return the watermarked image
-af::array WatermarkFunctions::make_and_add_watermark_custom(float& a)
-{
-	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
-		compute_custom_mask(image, m);
-	});
-}
-
-//public method called from host to apply the prediction error mask and return the watermarked image
-af::array WatermarkFunctions::make_and_add_watermark_prediction_error(af::array& coefficients, float& a)
-{
-	return make_and_add_watermark(a, [&](const af::array& image, af::array& m, af::array& error_sequence) {
-		compute_prediction_error_mask(image, m, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
-	});
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
@@ -192,12 +181,6 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, c
 	m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 }
 
-//fast prediction error sequence calculation by using a supplied prediction filter (calls helper method)
-af::array WatermarkFunctions::compute_error_sequence(const af::array& u, const af::array& coefficients)
-{
-	return calculate_error_sequence(u, coefficients);
-}
-
 //helper method used in detectors
 float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::array& e_z) {
 	float dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
@@ -207,10 +190,10 @@ float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::
 }
 
 //the main mask detector function
-float WatermarkFunctions::mask_detector(const af::array& image, bool custom_mask)
+float WatermarkFunctions::mask_detector(const af::array& image, MASK_TYPE mask_type)
 {
 	af::array m, e_z, a_z;
-	if (custom_mask == CUSTOM_MASK_CALCULATION_REQUIRED_YES) {
+	if (mask_type == MASK_TYPE::NVF) {
 		compute_prediction_error_mask(image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
 		compute_custom_mask(image, m);
 	}
@@ -218,7 +201,7 @@ float WatermarkFunctions::mask_detector(const af::array& image, bool custom_mask
 		compute_prediction_error_mask(image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
 	}
 	const af::array u = m * w;
-	const af::array e_u = compute_error_sequence(u, a_z);
+	const af::array e_u = calculate_error_sequence(u, a_z);
 	return calculate_correlation(e_u, e_z);
 }
 
@@ -230,16 +213,6 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 	const af::array u = m_e * w;
 	compute_prediction_error_mask(u, m_eu, e_u, a_u, ME_MASK_CALCULATION_REQUIRED_NO);
 	return calculate_correlation(e_u, e_z);
-}
-
-//calls main mask detector for custom masks
-float WatermarkFunctions::mask_detector_custom(const af::array& watermarked_image) {
-	return mask_detector(watermarked_image, CUSTOM_MASK_CALCULATION_REQUIRED_YES);
-}
-
-//calls main mask detector for prediction error mask
-float WatermarkFunctions::mask_detector_prediction_error(const af::array& watermarked_image) {
-	return mask_detector(watermarked_image, CUSTOM_MASK_CALCULATION_REQUIRED_NO);
 }
 
 //helper method to display an af::array in a window
