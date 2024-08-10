@@ -6,13 +6,15 @@
 #include "WatermarkFunctions.cuh"
 
 using namespace cimg_library;
+using std::string;
+
 /*!
  *  \brief  Helper methods for testing the watermark algorithms
  *  \author Dimitris Karatzas
  */
 class UtilityFunctions {
 public:
-	static string add_suffix_before_extension(const std::string& file, const std::string& suffix);
+	static string add_suffix_before_extension(const string& file, const string& suffix);
 	static void accurate_timer_sleep(double seconds);
 	template<typename T>
 	static af::array cimg_yuv_to_afarray(const CImg<T>& cimg_image) {
