@@ -36,12 +36,12 @@ void WatermarkFunctions::load_image(const af::array& image) {
 void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 	std::ifstream w_stream(w_file_path.c_str(), std::ios::binary);
 	if (!w_stream.is_open())
-		throw std::runtime_error(string("Error opening '" + w_file_path + "' file for Random noise W array"));
+		throw std::runtime_error(string("Error opening '" + w_file_path + "' file for Random noise W array\n"));
 	w_stream.seekg(0, std::ios::end);
 	const auto total_bytes = w_stream.tellg();
 	w_stream.seekg(0, std::ios::beg);
 	if (rows * cols * sizeof(float) != total_bytes)
-		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows)));
+		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
 	w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[0]), total_bytes);
 	w = af::transpose(af::array(cols, rows, w_ptr.get()));
