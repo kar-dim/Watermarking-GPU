@@ -59,9 +59,10 @@ int main(void)
 
 	//test algorithms
 	try {
-		inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ?
+		const int code = inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ?
 			test_for_video(inir, properties, p, psnr) :
 			test_for_image(inir, properties, p, psnr);
+		exit_program(code);
 	}
 	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
@@ -81,12 +82,12 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	cout << "Time to load and tranfer RGB image from disk to VRAM: " << timer::secs_passed() << "\n";
 	if (cols <= 64 || rows <= 16) {
 		cout << "Image dimensions too low\n";
-		return -1;
+		return EXIT_FAILURE;
 	}
 
 	if (cols > static_cast<dim_t>(properties.maxTexture2D[0]) || cols > 7680 || rows > static_cast<dim_t>(properties.maxTexture2D[1]) || rows > 4320) {
 		cout << "Image dimensions too high for this GPU\n";
-		return -1;
+		return EXIT_FAILURE;
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
@@ -130,7 +131,7 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
 	cout << "Correlation [ME]: " << std::fixed << std::setprecision(16) << correlation_me << "\n";
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
@@ -143,19 +144,19 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 	const bool display_frames = inir.GetBoolean("parameters_video", "display_frames", false);
 	if (rows <= 64 || cols <= 64) {
 		cout << "Video dimensions too low\n";
-		return -1;
+		return EXIT_FAILURE;
 	}
 	if (rows > static_cast<dim_t>(properties.maxTexture2D[1]) || cols > static_cast<dim_t>(properties.maxTexture2D[0])) {
 		cout << "Video dimensions too high for this GPU\n";
-		return -1;
+		return EXIT_FAILURE;
 	}
 	if (fps <= 15 || fps > 60) {
 		cout << "Video FPS is too low or too high\n";
-		return -1;
+		return EXIT_FAILURE;
 	}
 	if (frames <= 1) {
 		cout << "Frame count too low\n";
-		return -1;
+		return EXIT_FAILURE;
 	}
 
 	CImgList<unsigned char> video_cimg;
@@ -293,7 +294,7 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 
 		UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
 	}
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 void exit_program(const int exit_code) {
