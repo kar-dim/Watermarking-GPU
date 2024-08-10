@@ -10,6 +10,7 @@
 #include <vector>
 #include <cstdlib>
 #include <stdexcept>
+#include <exception>
 
 using std::cout;
 using std::string;
@@ -62,7 +63,7 @@ int main(void)
 			test_for_video(inir, properties, p, psnr) :
 			test_for_image(inir, properties, p, psnr);
 	}
-	catch (const std::runtime_error& ex) {
+	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
 		exit_program(EXIT_FAILURE);
 	}
