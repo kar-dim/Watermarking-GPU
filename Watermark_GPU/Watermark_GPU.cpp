@@ -10,6 +10,7 @@
 #include <af/opencl.h>
 #include <vector>
 #include <cstdlib>
+#include <stdexcept>
 
 using std::cout;
 using std::string;
@@ -58,9 +59,9 @@ int main(void)
 	//compile opencl kernels
 	cl::Program program_nvf, program_me;
 	try {
-		std::string program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
+		string program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
 		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
-		const std::string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
+		const string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
 		program_nvf.build({ device }, nvf_buildFlags.c_str());
 		program_data = UtilityFunctions::loadProgram("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
@@ -75,6 +76,10 @@ int main(void)
 			cout << program_me.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
 		exit_program(EXIT_FAILURE);
 	}
+	catch (const std::runtime_error& ex) {
+		cout << ex.what() << "\n";
+		exit_program(EXIT_FAILURE);
+	}
 
 	//test algorithms
 	try {
@@ -82,7 +87,7 @@ int main(void)
 			test_for_video(device, program_nvf, program_me, inir, p, psnr) :
 			test_for_image(device, program_nvf, program_me, inir, p, psnr);
 	}
-	catch (const std::exception& ex) {
+	catch (const std::runtime_error& ex) {
 		cout << ex.what() << "\n";
 		exit_program(EXIT_FAILURE);
 	}

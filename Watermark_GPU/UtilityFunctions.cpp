@@ -9,19 +9,18 @@
 #include <arrayfire.h>
 #include <thread>
 #include <cmath>
+#include <stdexcept>
 
 using namespace cimg_library;
+using std::string;
 using std::cout;
 
-std::string UtilityFunctions::loadProgram(const std::string input)
+string UtilityFunctions::loadProgram(const string& input)
 {
 	std::ifstream stream(input.c_str());
-	if (!stream.is_open()) {
-		std::string error_str("Could not load Program: " + input);
-		throw std::exception(error_str.c_str());
-	}
-	std::string s(std::istreambuf_iterator<char>(stream), (std::istreambuf_iterator<char>()));
-	return s;
+	if (!stream.is_open())
+		throw std::runtime_error("Could not load Program: " + input + "\n");
+	return string(std::istreambuf_iterator<char>(stream), (std::istreambuf_iterator<char>()));
 }
 
 namespace timer {

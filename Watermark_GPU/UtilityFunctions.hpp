@@ -6,13 +6,15 @@
 #include <vector>
 
 using namespace cimg_library;
+using std::string;
+
 /*!
  *  \brief  Helper methods for testing the watermark algorithms
  *  \author Dimitris Karatzas
  */
 class UtilityFunctions {
 public:
-	static std::string loadProgram(const std::string input);
+	static string loadProgram(const string& input);
 	static void accurate_timer_sleep(double seconds);
 	template<typename T>
 	static af::array cimg_yuv_to_afarray(const CImg<T> &cimg_image) {

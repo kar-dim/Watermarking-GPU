@@ -6,47 +6,45 @@
 #include <af/opencl.h>
 #include <cmath>
 #include <memory>
+#include <stdexcept>
 
 using std::cout;
+using std::string;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
-WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const std::string custom_kernel_name)
+WatermarkFunctions::WatermarkFunctions(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
 		:p(p), p_squared(p*p), p_squared_minus_one(p_squared-1), p_squared_minus_one_squared(p_squared_minus_one * p_squared_minus_one), pad(p/2), psnr(psnr), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), program_me(prog_me), program_custom(prog_custom) {
-	this->rows = -1;
-	this->cols = -1;
+	rows = -1;
+	cols = -1;
 }
 
 //full constructor
-WatermarkFunctions::WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name)
+WatermarkFunctions::WatermarkFunctions(const af::array& image, const string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const string &custom_kernel_name)
 		:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr, program_me, program_custom, custom_kernel_name) {
 	load_image(image);
-	load_W(this->rows, this->cols);
+	load_W(rows, cols);
 }
 
 //supply the input image to apply watermarking and detection
 void WatermarkFunctions::load_image(const af::array& image) {
 	this->image = image;
-	this->rows = image.dims(0);
-	this->cols = image.dims(1);
+	rows = image.dims(0);
+	cols = image.dims(1);
 }
 
 //helper method to load the random noise matrix W from the file specified.
 void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
-	std::ifstream w_stream(this->w_file_path.c_str(), std::ios::binary);
-	if (!w_stream.is_open()) {
-		std::string error_str("Error opening '" + this->w_file_path + "' file for Random noise W array");
-		throw std::exception(error_str.c_str());
-	}
+	std::ifstream w_stream(w_file_path.c_str(), std::ios::binary);
+	if (!w_stream.is_open())
+		throw std::runtime_error(string("Error opening '" + w_file_path + "' file for Random noise W array"));
 	w_stream.seekg(0, std::ios::end);
 	const auto total_bytes = w_stream.tellg();
 	w_stream.seekg(0, std::ios::beg);
-	if (rows * cols * sizeof(float) != total_bytes) {
-		std::string error_str("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + std::string(", Image width: ") + std::to_string(cols) + std::string(", Image height: ") + std::to_string(rows));
-		throw std::exception(error_str.c_str());
-	}
+	if (rows * cols * sizeof(float) != total_bytes)
+		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows)));
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
 	w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[0]), total_bytes);
-	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
+	w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
 //helper method to copy an OpenCL buffer into an OpenCL Image (fast copy that happens in the device)
@@ -82,8 +80,7 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 		image_transpose.unlock();
 	}
 	catch (const cl::Error& ex) {
-		std::string error_str("ERROR in compute_nvf_mask(): " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
-		throw std::exception(error_str.c_str());
+		throw std::runtime_error(string("ERROR in compute_nvf_mask(): " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n"));
 	}
 }
 
@@ -157,9 +154,8 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
 		}
 	}
-	catch (const cl::Error &ex) {
-		std::string error_str("ERROR in compute_me_mask(): " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
-		throw std::exception(error_str.c_str());
+	catch (const cl::Error& ex) {
+		throw std::runtime_error(string("ERROR in compute_me_mask(): " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n"));
 	}
 }
 
