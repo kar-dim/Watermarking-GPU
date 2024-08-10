@@ -11,6 +11,7 @@
 #include <vector>
 #include <cstdlib>
 #include <stdexcept>
+#include <exception>
 
 using std::cout;
 using std::string;
@@ -76,7 +77,7 @@ int main(void)
 			cout << program_me.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
 		exit_program(EXIT_FAILURE);
 	}
-	catch (const std::runtime_error& ex) {
+	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
 		exit_program(EXIT_FAILURE);
 	}
@@ -87,7 +88,7 @@ int main(void)
 			test_for_video(device, program_nvf, program_me, inir, p, psnr) :
 			test_for_image(device, program_nvf, program_me, inir, p, psnr);
 	}
-	catch (const std::runtime_error& ex) {
+	catch (const std::exception& ex) {
 		cout << ex.what() << "\n";
 		exit_program(EXIT_FAILURE);
 	}
