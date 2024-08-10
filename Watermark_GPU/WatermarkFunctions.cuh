@@ -7,9 +7,14 @@
 
 using std::string;
 
-enum MASK_TYPE{
+enum MASK_TYPE {
 	ME,
 	NVF
+};
+
+enum IMAGE_TYPE {
+	RGB,
+	GRAYSCALE
 };
 
 #define ME_MASK_CALCULATION_REQUIRED_NO false
@@ -24,7 +29,7 @@ private:
 	const string w_file_path;
 	const int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
 	const float psnr;
-	af::array image, w;
+	af::array rgb_image, image, w;
 	dim_t rows, cols;
 	cudaStream_t af_cuda_stream, custom_kernels_stream;
 
@@ -38,12 +43,12 @@ private:
 	void synchronize_and_cleanup_texture_data(const std::pair<cudaTextureObject_t, cudaArray*>& texture_data, const af::array& array_to_unlock);
 	std::pair<cudaTextureObject_t, cudaArray*> copy_array_to_texture_data(const af::array &image, const unsigned int rows, const unsigned int cols);
 public:
-	WatermarkFunctions(const af::array& image, const string &w_file_path, const int p, const float psnr);
+	WatermarkFunctions(const af::array& rgb_image, const af::array& image, const string& w_file_path, const int p, const float psnr);
 	WatermarkFunctions(const string &w_file_path, const int p, const float psnr);
 	~WatermarkFunctions();
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
-	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE type);
+	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE type, IMAGE_TYPE image_type);
 	float mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type);
 	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients);
 	static void display_array(const af::array& array, const int width = 1600, const int height = 900);

@@ -23,16 +23,17 @@ WatermarkFunctions::WatermarkFunctions(const string &w_file_path, const int p, c
 	cols = -1;
 }
 
+//full constructor
+WatermarkFunctions::WatermarkFunctions(const af::array &rgb_image, const af::array& image, const string &w_file_path, const int p, const float psnr)
+	:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr) {
+	this->rgb_image = rgb_image;
+	load_image(image);
+	load_W(rows, cols);
+}
+
 WatermarkFunctions::~WatermarkFunctions()
 {
 	cudaStreamDestroy(custom_kernels_stream);
-}
-
-//full constructor
-WatermarkFunctions::WatermarkFunctions(const af::array& image, const string &w_file_path, const int p, const float psnr)
-	:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr) {
-	load_image(image);
-	load_W(rows, cols);
 }
 
 //supply the input image to apply watermarking and detection
@@ -120,19 +121,17 @@ std::pair<af::array, af::array> WatermarkFunctions::correlation_arrays_transform
 	return std::make_pair(Rx, rx);
 }
 
-af::array WatermarkFunctions::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type)
+af::array WatermarkFunctions::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type)
 {
 	af::array m, error_sequence;
-	if (mask_type == MASK_TYPE::ME) {
+	if (mask_type == MASK_TYPE::ME)
 		compute_prediction_error_mask(image, m, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
-	}
-	else {
+	else
 		compute_custom_mask(image, m);
-	}
 	const af::array u = m * w;
 	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
-	return image + (a * u);
+	return image_type == IMAGE_TYPE::RGB ? (rgb_image + af::tile((u * a), 1, 1, image.dims(2))) : image + (u * a);
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.

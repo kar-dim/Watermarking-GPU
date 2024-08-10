@@ -25,6 +25,11 @@ namespace timer {
 	}
 }
 
+string UtilityFunctions::add_suffix_before_extension(const std::string& file, const std::string& suffix) {
+	auto dot = file.find_last_of('.');
+	return dot == string::npos ? file + suffix : file.substr(0, dot) + suffix + file.substr(dot);
+}
+
 //see https://blog.bearcats.nl/accurate-sleep-function/
 void UtilityFunctions::accurate_timer_sleep(double seconds) {
 	double estimate = 5e-3, mean = 5e-3, m2 = 0;
