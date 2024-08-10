@@ -102,7 +102,6 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
-
 	
 	//make ME watermark
 	timer::start();
@@ -110,7 +109,6 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
-
 	
 	//warmup for arrayfire
 	watermarkFunctions.mask_detector(watermark_NVF, MASK_TYPE::NVF);

@@ -5,6 +5,8 @@
 #include <string>
 #include <utility>
 
+using std::string;
+
 enum MASK_TYPE{
 	ME,
 	NVF
@@ -19,7 +21,7 @@ enum MASK_TYPE{
  */
 class WatermarkFunctions {
 private:
-	const std::string w_file_path;
+	const string w_file_path;
 	const int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
 	const float psnr;
 	af::array image, w;
@@ -36,8 +38,8 @@ private:
 	void synchronize_and_cleanup_texture_data(const std::pair<cudaTextureObject_t, cudaArray*>& texture_data, const af::array& array_to_unlock);
 	std::pair<cudaTextureObject_t, cudaArray*> copy_array_to_texture_data(const af::array &image, const unsigned int rows, const unsigned int cols);
 public:
-	WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr);
-	WatermarkFunctions(const std::string w_file_path, const int p, const float psnr);
+	WatermarkFunctions(const af::array& image, const string &w_file_path, const int p, const float psnr);
+	WatermarkFunctions(const string &w_file_path, const int p, const float psnr);
 	~WatermarkFunctions();
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);

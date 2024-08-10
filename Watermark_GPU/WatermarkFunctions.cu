@@ -10,15 +10,16 @@
 #include <cuda_runtime.h>
 #include "cuda_utils.hpp"
 
+using std::string;
 using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
-WatermarkFunctions::WatermarkFunctions(const std::string w_file_path, const int p, const float psnr)
+WatermarkFunctions::WatermarkFunctions(const string &w_file_path, const int p, const float psnr)
 	:p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr), w_file_path(w_file_path) {
-	this->af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
+	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 	cudaStreamCreate(&custom_kernels_stream);
-	this->rows = -1;
-	this->cols = -1;
+	rows = -1;
+	cols = -1;
 }
 
 WatermarkFunctions::~WatermarkFunctions()
@@ -27,10 +28,10 @@ WatermarkFunctions::~WatermarkFunctions()
 }
 
 //full constructor
-WatermarkFunctions::WatermarkFunctions(const af::array& image, const std::string w_file_path, const int p, const float psnr)
+WatermarkFunctions::WatermarkFunctions(const af::array& image, const string &w_file_path, const int p, const float psnr)
 	:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr) {
 	load_image(image);
-	load_W(this->rows, this->cols);
+	load_W(rows, cols);
 }
 
 //supply the input image to apply watermarking and detection
@@ -42,16 +43,16 @@ void WatermarkFunctions::load_image(const af::array& image) {
 
 //helper method to load the random noise matrix W from the file specified.
 void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
-	std::ifstream w_stream(this->w_file_path.c_str(), std::ios::binary);
+	std::ifstream w_stream(w_file_path.c_str(), std::ios::binary);
 	if (!w_stream.is_open()) {
-		std::string error_str("Error opening '" + this->w_file_path + "' file for Random noise W array");
+		string error_str("Error opening '" + w_file_path + "' file for Random noise W array");
 		throw std::exception(error_str.c_str());
 	}
 	w_stream.seekg(0, std::ios::end);
 	const auto total_bytes = w_stream.tellg();
 	w_stream.seekg(0, std::ios::beg);
 	if (rows * cols * sizeof(float) != total_bytes) {
-		std::string error_str("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + std::string(", Image width: ") + std::to_string(cols) + std::string(", Image height: ") + std::to_string(rows));
+		string error_str("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows));
 		throw std::exception(error_str.c_str());
 	}
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
