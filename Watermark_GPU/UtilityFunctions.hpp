@@ -15,6 +15,7 @@ using std::string;
 class UtilityFunctions {
 public:
 	static string loadProgram(const string& input);
+	static string add_suffix_before_extension(const string& file, const string& suffix);
 	static void accurate_timer_sleep(double seconds);
 	template<typename T>
 	static af::array cimg_yuv_to_afarray(const CImg<T> &cimg_image) {

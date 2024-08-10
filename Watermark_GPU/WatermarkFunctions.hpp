@@ -10,6 +10,11 @@ enum MASK_TYPE {
 	NVF
 };
 
+enum IMAGE_TYPE {
+	RGB,
+	GRAYSCALE
+};
+
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true
 
@@ -36,7 +41,7 @@ private:
 	const string w_file_path, custom_kernel_name;
 	const int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
 	const float psnr;
-	af::array image, w;
+	af::array rgb_image, image, w;
 	dim_t rows, cols;
 
 	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad);
@@ -48,11 +53,11 @@ private:
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	cl::Image2D copyBufferToImage(const cl_mem* image_buff, const dim_t rows, const dim_t cols);
 public:
-	WatermarkFunctions(const af::array &image, const string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const string &custom_kernel_name);
+	WatermarkFunctions(const af::array& rgb_image, const af::array &image, const string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const string &custom_kernel_name);
 	WatermarkFunctions(const string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const string custom_kernel_name);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
-	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type);
+	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type);
 	float mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type);
 	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients);
 	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
