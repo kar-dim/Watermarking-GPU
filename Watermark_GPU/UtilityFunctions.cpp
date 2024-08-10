@@ -23,7 +23,7 @@ string UtilityFunctions::loadProgram(const string& input)
 	return string(std::istreambuf_iterator<char>(stream), (std::istreambuf_iterator<char>()));
 }
 
-string UtilityFunctions::add_suffix_before_extension(const std::string& file, const std::string& suffix) {
+string UtilityFunctions::add_suffix_before_extension(const string& file, const string& suffix) {
 	auto dot = file.find_last_of('.');
 	return dot == string::npos ? file + suffix : file.substr(0, dot) + suffix + file.substr(dot);
 }
