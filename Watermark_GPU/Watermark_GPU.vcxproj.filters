@@ -21,10 +21,10 @@
     <ClCompile Include="Watermark_GPU.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UtilityFunctions.cpp">
+    <ClCompile Include="Utilities.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WatermarkFunctions.cpp">
+    <ClCompile Include="Watermark.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,10 +32,10 @@
     <ClInclude Include="INIReader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="UtilityFunctions.hpp">
+    <ClInclude Include="Utilities.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WatermarkFunctions.hpp">
+    <ClInclude Include="Watermark.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Watermark_GPU.hpp">

@@ -1,6 +1,6 @@
 ﻿#pragma warning(disable:4996)
-#include "UtilityFunctions.hpp"
-#include "WatermarkFunctions.hpp"
+#include "Utilities.hpp"
+#include "Watermark.hpp"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -15,7 +15,7 @@ using namespace cimg_library;
 using std::string;
 using std::cout;
 
-string UtilityFunctions::loadProgram(const string& input)
+string Utilities::loadProgram(const string& input)
 {
 	std::ifstream stream(input.c_str());
 	if (!stream.is_open())
@@ -23,7 +23,7 @@ string UtilityFunctions::loadProgram(const string& input)
 	return string(std::istreambuf_iterator<char>(stream), (std::istreambuf_iterator<char>()));
 }
 
-string UtilityFunctions::add_suffix_before_extension(const string& file, const string& suffix) {
+string Utilities::add_suffix_before_extension(const string& file, const string& suffix) {
 	auto dot = file.find_last_of('.');
 	return dot == string::npos ? file + suffix : file.substr(0, dot) + suffix + file.substr(dot);
 }
@@ -41,7 +41,7 @@ namespace timer {
 }
 
 //see https://blog.bearcats.nl/accurate-sleep-function/
-void UtilityFunctions::accurate_timer_sleep(double seconds) {
+void Utilities::accurate_timer_sleep(double seconds) {
 	double estimate = 5e-3, mean = 5e-3, m2 = 0;
 	int64_t count = 1;
 	while (seconds > estimate) {
@@ -63,7 +63,7 @@ void UtilityFunctions::accurate_timer_sleep(double seconds) {
 }
 
 //main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
-void UtilityFunctions::realtime_detection(WatermarkFunctions& watermarkFunctions, const std::vector<af::array> &watermarked_frames, const int frames, const bool display_frames, const float frame_period) {
+void Utilities::realtime_detection(Watermark& watermarkFunctions, const std::vector<af::array> &watermarked_frames, const int frames, const bool display_frames, const float frame_period) {
 	std::vector<float> correlations(frames);
 	CImgDisplay window;
 	const auto rows = static_cast<unsigned int>(watermarked_frames[1].dims(0));

@@ -22,7 +22,7 @@ enum IMAGE_TYPE {
  *  \brief  Functions for watermark computation and detection
  *  \author Dimitris Karatzas
  */
-class WatermarkFunctions {
+class Watermark {
 
 private:
 	static constexpr int Rx_mappings[64]{
@@ -53,8 +53,8 @@ private:
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	cl::Image2D copyBufferToImage(const cl_mem* image_buff, const dim_t rows, const dim_t cols);
 public:
-	WatermarkFunctions(const af::array& rgb_image, const af::array &image, const string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const string &custom_kernel_name);
-	WatermarkFunctions(const string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const string custom_kernel_name);
+	Watermark(const af::array& rgb_image, const af::array &image, const string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const string &custom_kernel_name);
+	Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const string custom_kernel_name);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
 	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type);

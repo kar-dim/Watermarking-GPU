@@ -1,8 +1,8 @@
 ﻿#pragma warning(disable:4996)
 #include "Watermark_GPU.hpp"
 #include "opencl_init.h"
-#include "UtilityFunctions.hpp"
-#include "WatermarkFunctions.hpp"
+#include "Utilities.hpp"
+#include "Watermark.hpp"
 #include "cimg_init.h"
 #include "INIReader.h"
 #include <iostream>
@@ -10,7 +10,6 @@
 #include <af/opencl.h>
 #include <vector>
 #include <cstdlib>
-#include <stdexcept>
 #include <exception>
 
 #define R_WEIGHT 0.299f
@@ -63,11 +62,11 @@ int main(void)
 	//compile opencl kernels
 	cl::Program program_nvf, program_me;
 	try {
-		string program_data = UtilityFunctions::loadProgram("kernels/nvf.cl");
+		string program_data = Utilities::loadProgram("kernels/nvf.cl");
 		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
 		const string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
 		program_nvf.build({ device }, nvf_buildFlags.c_str());
-		program_data = UtilityFunctions::loadProgram("kernels/me_p3.cl");
+		program_data = Utilities::loadProgram("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
 		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
 	}
@@ -120,24 +119,24 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	WatermarkFunctions watermarkFunctions(rgb_image, image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	Watermark watermark_obj(rgb_image, image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
 
 	float a;
 	af::array a_x;
 	//warmup for arrayfire
-	watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
-	watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
+	watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
+	watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
 
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
+	af::array watermark_NVF = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ME = watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
+	af::array watermark_ME = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
@@ -145,18 +144,18 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	const af::array watermarked_NVF_gray = af::rgb2gray(watermark_NVF, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	const af::array watermarked_ME_gray = af::rgb2gray(watermark_ME, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	//warmup for arrayfire
-	watermarkFunctions.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
-	watermarkFunctions.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
+	watermark_obj.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
+	watermark_obj.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
 
 	//detection of NVF
 	timer::start();
-	float correlation_nvf = watermarkFunctions.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
+	float correlation_nvf = watermark_obj.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
 	timer::end();
 	cout << "Time to calculate correlation (NVF) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//detection of ME
 	timer::start();
-	float correlation_me = watermarkFunctions.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
+	float correlation_me = watermark_obj.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
 	timer::end();
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
@@ -168,9 +167,9 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 #pragma omp parallel sections
 		{
 #pragma omp section
-			af::saveImageNative(UtilityFunctions::add_suffix_before_extension(image_file, "_W_NVF").c_str(), watermark_NVF.as(af::dtype::u8));
+			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_NVF").c_str(), watermark_NVF.as(af::dtype::u8));
 #pragma omp section
-			af::saveImageNative(UtilityFunctions::add_suffix_before_extension(image_file, "_W_ME").c_str(), watermark_ME.as(af::dtype::u8));
+			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_ME").c_str(), watermark_ME.as(af::dtype::u8));
 		}
 		cout << "Successully saved to disk\n";
 	}
@@ -216,8 +215,8 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 
 	//initialize watermark functions class
 	af::array dummy_a_x;
-	WatermarkFunctions watermarkFunctions(inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
-	watermarkFunctions.load_W(rows, cols);
+	Watermark watermark_obj(inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	watermark_obj.load_W(rows, cols);
 
 	//realtime watermarking of raw video
 	const bool make_watermark = inir.GetBoolean("parameters_video", "watermark_make", false);
@@ -229,29 +228,29 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 			int counter = 0;
 			for (int i = 0; i < frames; i++) {
 				//copy from CImg to arrayfire
-				watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)));
+				watermark_obj.load_image(Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)));
 				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
 				if (watermark_by_two_frames == true) {
 					if (i % 2 != 0)
-						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+						watermarked_frames.push_back(watermark_obj.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
 					else {
-						watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(coefficients[counter], a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+						watermarked_frames.push_back(watermark_obj.make_and_add_watermark(coefficients[counter], a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
 						counter++;
 					}
 				}
 				else
-					watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+					watermarked_frames.push_back(watermark_obj.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
 			}
 		}
 		else {
 			//add the watermark only in the first frame
 			//copy from CImg to arrayfire
-			watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(0)));
-			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+			watermark_obj.load_image(Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(0)));
+			watermarked_frames.push_back(watermark_obj.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
 			//rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
 			for (int i = 1; i < frames; i++)
-				watermarked_frames.push_back(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)).as(af::dtype::f32));
+				watermarked_frames.push_back(Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)).as(af::dtype::f32));
 		}
 	}
 
@@ -284,7 +283,7 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 					window.display(video_cimg_watermarked.at(i).get_channel(0));
 					timer::end();
 					if ((time_diff = frame_period - timer::secs_passed()) > 0) {
-						UtilityFunctions::accurate_timer_sleep(time_diff);
+						Utilities::accurate_timer_sleep(time_diff);
 					}
 				}
 			}
@@ -297,7 +296,7 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 		if (make_watermark == false)
 			cout << "Please set 'watermark_make' to true in settins file, in order to be able to detect the watermark.\n";
 		else
-			UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
+			Utilities::realtime_detection(watermark_obj, watermarked_frames, frames, display_frames, frame_period);
 	}
 
 	//realtime watermarked video detection by two frames
@@ -311,13 +310,13 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 			for (int i = 0; i < frames; i++) {
 				timer::start();
 				if (i % 2 != 0) {
-					correlations[i] = watermarkFunctions.mask_detector_prediction_error_fast(watermarked_frames[i], coefficients[counter]);
+					correlations[i] = watermark_obj.mask_detector_prediction_error_fast(watermarked_frames[i], coefficients[counter]);
 					timer::end();
 					cout << "Watermark detection (fast) secs passed: " << timer::secs_passed() << "\n";
 					counter++;
 				}
 				else {
-					correlations[i] = watermarkFunctions.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
+					correlations[i] = watermark_obj.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
 					timer::end();
 					cout << "Watermark detection secs passed: " << timer::secs_passed() << "\n";
 				}
@@ -333,10 +332,10 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 		std::vector<af::array> watermarked_frames(frames);
 #pragma omp parallel for
 		for (int i = 0; i < frames; i++) {
-			watermarked_frames[i] = UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg_w.at(i));
+			watermarked_frames[i] = Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg_w.at(i));
 		}
 
-		UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
+		Utilities::realtime_detection(watermark_obj, watermarked_frames, frames, display_frames, frame_period);
 	}
 	return EXIT_SUCCESS;
 }
