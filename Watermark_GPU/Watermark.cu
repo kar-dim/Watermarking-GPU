@@ -1,4 +1,4 @@
-#include "WatermarkFunctions.cuh"
+#include "Watermark.cuh"
 #include "kernels.cuh"
 #include <fstream>
 #include <arrayfire.h>
@@ -15,7 +15,7 @@ using std::string;
 using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
-WatermarkFunctions::WatermarkFunctions(const string &w_file_path, const int p, const float psnr)
+Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
 	:p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr), w_file_path(w_file_path) {
 	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 	cudaStreamCreate(&custom_kernels_stream);
@@ -24,27 +24,27 @@ WatermarkFunctions::WatermarkFunctions(const string &w_file_path, const int p, c
 }
 
 //full constructor
-WatermarkFunctions::WatermarkFunctions(const af::array &rgb_image, const af::array& image, const string &w_file_path, const int p, const float psnr)
-	:WatermarkFunctions::WatermarkFunctions(w_file_path, p, psnr) {
+Watermark::Watermark(const af::array &rgb_image, const af::array& image, const string &w_file_path, const int p, const float psnr)
+	:Watermark::Watermark(w_file_path, p, psnr) {
 	this->rgb_image = rgb_image;
 	load_image(image);
 	load_W(rows, cols);
 }
 
-WatermarkFunctions::~WatermarkFunctions()
+Watermark::~Watermark()
 {
 	cudaStreamDestroy(custom_kernels_stream);
 }
 
 //supply the input image to apply watermarking and detection
-void WatermarkFunctions::load_image(const af::array& image) {
+void Watermark::load_image(const af::array& image) {
 	this->image = image;
 	this->rows = image.dims(0);
 	this->cols = image.dims(1);
 }
 
 //helper method to load the random noise matrix W from the file specified.
-void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
+void Watermark::load_W(const dim_t rows, const dim_t cols) {
 	std::ifstream w_stream(w_file_path.c_str(), std::ios::binary);
 	if (!w_stream.is_open())
 		throw std::runtime_error(string("Error opening '" + w_file_path + "' file for Random noise W array\n"));
@@ -59,7 +59,7 @@ void WatermarkFunctions::load_W(const dim_t rows, const dim_t cols) {
 }
 
 //helper method to copy an arrayfire cuda buffer into a cuda Texture Object Image (fast copy that happens in the device)
-std::pair<cudaTextureObject_t, cudaArray*> WatermarkFunctions::copy_array_to_texture_data(const af::array & array, const unsigned int rows, const unsigned int cols) {
+std::pair<cudaTextureObject_t, cudaArray*> Watermark::copy_array_to_texture_data(const af::array & array, const unsigned int rows, const unsigned int cols) {
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
 	cudaArray* cuArray;
 	cudaMallocArray(&cuArray, &channelDesc, cols, rows);
@@ -81,7 +81,7 @@ std::pair<cudaTextureObject_t, cudaArray*> WatermarkFunctions::copy_array_to_tex
 }
 
 //helper method for cleanup and to execute common tasks after the masking kernels are executed
-void WatermarkFunctions::synchronize_and_cleanup_texture_data(const std::pair<cudaTextureObject_t, cudaArray*> &texture_data, const af::array &array_to_unlock) {
+void Watermark::synchronize_and_cleanup_texture_data(const std::pair<cudaTextureObject_t, cudaArray*> &texture_data, const af::array &array_to_unlock) {
 	cudaDeviceSynchronize();
 	cudaDestroyTextureObject(texture_data.first);
 	cudaFreeArray(texture_data.second);
@@ -89,7 +89,7 @@ void WatermarkFunctions::synchronize_and_cleanup_texture_data(const std::pair<cu
 }
 
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
-void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& m)
+void Watermark::compute_custom_mask(const af::array& image, af::array& m)
 {
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
@@ -103,14 +103,14 @@ void WatermarkFunctions::compute_custom_mask(const af::array& image, af::array& 
 }
 
 //helper method to calculate the neighbors ("x_" array)
-af::array WatermarkFunctions::calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) {
+af::array Watermark::calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) {
 	af::array array_unwrapped = af::unwrap(array, p, p, 1, 1, pad, pad, false);
 	return af::join(1, array_unwrapped(af::span, af::seq(0, (p_squared / 2) - 1)), array_unwrapped(af::span, af::seq((p_squared / 2) + 1, af::end)));
 }
 
 //helper method to sum the incomplete Rx_partial and rx_partial arrays which were produced from the custom kernel
 //and to transform them to the correct size, so that they can be used by the system solver
-std::pair<af::array, af::array> WatermarkFunctions::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols) {
+std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols) {
 	af::array Rx_partial_sums = af::moddims(Rx_partial, p_squared_minus_one_squared, (padded_cols * rows) / p_squared_minus_one_squared);
 	af::array rx_partial_sums = af::moddims(rx_partial, p_squared_minus_one, (padded_cols * rows) / p_squared_minus_one);
 	//reduction sum of blocks
@@ -121,7 +121,7 @@ std::pair<af::array, af::array> WatermarkFunctions::correlation_arrays_transform
 	return std::make_pair(Rx, rx);
 }
 
-af::array WatermarkFunctions::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type)
+af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type)
 {
 	af::array m, error_sequence;
 	if (mask_type == MASK_TYPE::ME)
@@ -138,7 +138,7 @@ af::array WatermarkFunctions::make_and_add_watermark(af::array& coefficients, fl
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
 //can also calculate error sequence and prediction error filter
-void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
+void Watermark::compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
 {
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
@@ -167,12 +167,12 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, a
 }
 
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
-af::array WatermarkFunctions::calculate_error_sequence(const af::array& u, const af::array& coefficients) {
+af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) {
 	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p_squared, pad)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
-void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, const af::array& coeficcients, af::array& m_e, af::array& error_sequence)
+void Watermark::compute_prediction_error_mask(const af::array& image, const af::array& coeficcients, af::array& m_e, af::array& error_sequence)
 {
 	error_sequence = calculate_error_sequence(image, coeficcients);
 	const af::array error_sequence_abs = af::abs(error_sequence);
@@ -180,7 +180,7 @@ void WatermarkFunctions::compute_prediction_error_mask(const af::array& image, c
 }
 
 //helper method used in detectors
-float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::array& e_z) {
+float Watermark::calculate_correlation(const af::array& e_u, const af::array& e_z) {
 	float dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
 	float d_ez = static_cast<float>(af::norm(e_z));
 	float d_eu = static_cast<float>(af::norm(e_u));
@@ -188,7 +188,7 @@ float WatermarkFunctions::calculate_correlation(const af::array& e_u, const af::
 }
 
 //the main mask detector function
-float WatermarkFunctions::mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type)
+float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type)
 {
 	af::array m, e_z, a_z;
 	if (mask_type == MASK_TYPE::NVF) {
@@ -204,7 +204,7 @@ float WatermarkFunctions::mask_detector(const af::array& watermarked_image, MASK
 }
 
 //fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
-float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients)
+float Watermark::mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients)
 {
 	af::array m_e, e_z, m_eu, e_u, a_u;
 	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
@@ -214,7 +214,7 @@ float WatermarkFunctions::mask_detector_prediction_error_fast(const af::array& w
 }
 
 //helper method to display an af::array in a window
-void WatermarkFunctions::display_array(const af::array& array, const int width, const int height) {
+void Watermark::display_array(const af::array& array, const int width, const int height) {
 	af::Window window(width, height);
 	while (!window.close())
 		window.image(array);

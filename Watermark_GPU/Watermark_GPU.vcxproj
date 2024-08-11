@@ -93,10 +93,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="kernels.cu" />
-    <CudaCompile Include="WatermarkFunctions.cu" />
+    <CudaCompile Include="Watermark.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="UtilityFunctions.cpp" />
+    <ClCompile Include="Utilities.cpp" />
     <ClCompile Include="Watermark_GPU.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -104,8 +104,8 @@
     <ClInclude Include="cuda_utils.hpp" />
     <ClInclude Include="INIReader.h" />
     <ClInclude Include="kernels.cuh" />
-    <ClInclude Include="UtilityFunctions.hpp" />
-    <ClInclude Include="WatermarkFunctions.cuh" />
+    <ClInclude Include="Utilities.hpp" />
+    <ClInclude Include="Watermark.cuh" />
     <ClInclude Include="Watermark_GPU.hpp" />
   </ItemGroup>
   <ItemGroup>

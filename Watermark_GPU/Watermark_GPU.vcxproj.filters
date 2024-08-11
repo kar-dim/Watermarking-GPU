@@ -12,7 +12,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="WatermarkFunctions.cu">
+    <CudaCompile Include="Watermark.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="kernels.cu">
@@ -23,7 +23,7 @@
     <ClCompile Include="Watermark_GPU.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UtilityFunctions.cpp">
+    <ClCompile Include="Utilities.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -37,10 +37,7 @@
     <ClInclude Include="cimg_init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="UtilityFunctions.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="WatermarkFunctions.cuh">
+    <ClInclude Include="Watermark.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="kernels.cuh">
@@ -49,6 +46,7 @@
     <ClInclude Include="cuda_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Utilities.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

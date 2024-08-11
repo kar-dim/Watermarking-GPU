@@ -1,7 +1,7 @@
 #pragma warning(disable:4996)
 #include "Watermark_GPU.hpp"
-#include "WatermarkFunctions.cuh"
-#include "UtilityFunctions.hpp"
+#include "Watermark.cuh"
+#include "Utilities.hpp"
 #include <cuda_runtime.h>
 #include "INIReader.h"
 #include <iostream>
@@ -97,24 +97,24 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	WatermarkFunctions watermarkFunctions(rgb_image, image, inir.Get("paths", "w_path", "w.txt"), p, psnr);
+	Watermark watermark_obj(rgb_image, image, inir.Get("paths", "w_path", "w.txt"), p, psnr);
 
 	float a;
 	af::array a_x;
 	//warmup for arrayfire
-	watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
-	watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
+	watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
+	watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
 
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
+	af::array watermark_NVF = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ME = watermarkFunctions.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
+	af::array watermark_ME = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
 	timer::end();
 	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
 	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
@@ -122,18 +122,18 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	const af::array watermarked_NVF_gray = af::rgb2gray(watermark_NVF, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	const af::array watermarked_ME_gray = af::rgb2gray(watermark_ME, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	//warmup for arrayfire
-	watermarkFunctions.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
-	watermarkFunctions.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
+	watermark_obj.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
+	watermark_obj.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
 
 	//detection of NVF
 	timer::start();
-	float correlation_nvf = watermarkFunctions.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
+	float correlation_nvf = watermark_obj.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
 	timer::end();
 	cout << "Time to calculate correlation (NVF) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 
 	//detection of ME
 	timer::start();
-	float correlation_me = watermarkFunctions.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
+	float correlation_me = watermark_obj.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
 	timer::end();
 	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
@@ -145,9 +145,9 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 #pragma omp parallel sections
 		{
 #pragma omp section
-			af::saveImageNative(UtilityFunctions::add_suffix_before_extension(image_file, "_W_NVF").c_str(), watermark_NVF.as(af::dtype::u8));
+			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_NVF").c_str(), watermark_NVF.as(af::dtype::u8));
 #pragma omp section
-			af::saveImageNative(UtilityFunctions::add_suffix_before_extension(image_file, "_W_ME").c_str(), watermark_ME.as(af::dtype::u8));
+			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_ME").c_str(), watermark_ME.as(af::dtype::u8));
 		}
 		cout << "Successully saved to disk\n";
 	}
@@ -192,7 +192,7 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 
 	//initialize watermark functions class
 	af::array dummy_a_x;
-	WatermarkFunctions watermarkFunctions(inir.Get("paths", "w_path", "w.txt"), p, psnr);
+	Watermark watermarkFunctions(inir.Get("paths", "w_path", "w.txt"), p, psnr);
 	watermarkFunctions.load_W(rows, cols);
 
 	//realtime watermarking of raw video
@@ -205,7 +205,7 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 			int counter = 0;
 			for (int i = 0; i < frames; i++) {
 				//copy from CImg to arrayfire
-				watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)));
+				watermarkFunctions.load_image(Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)));
 				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
 				if (watermark_by_two_frames == true) {
 					if (i % 2 != 0)
@@ -222,12 +222,12 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 		else {
 			//add the watermark only in the first frame
 			//copy from CImg to arrayfire
-			watermarkFunctions.load_image(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(0)));
+			watermarkFunctions.load_image(Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(0)));
 			watermarked_frames.push_back(watermarkFunctions.make_and_add_watermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
 			//rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
 			for (int i = 1; i < frames; i++)
-				watermarked_frames.push_back(UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)).as(af::dtype::f32));
+				watermarked_frames.push_back(Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg.at(i)).as(af::dtype::f32));
 		}
 	}
 
@@ -259,9 +259,8 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 					timer::start();
 					window.display(video_cimg_watermarked.at(i).get_channel(0));
 					timer::end();
-					if ((time_diff = frame_period - timer::secs_passed()) > 0) {
-						UtilityFunctions::accurate_timer_sleep(time_diff);
-					}
+					if ((time_diff = frame_period - timer::secs_passed()) > 0)
+						Utilities::accurate_timer_sleep(time_diff);
 				}
 			}
 		}
@@ -273,7 +272,7 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 		if (make_watermark == false)
 			cout << "Please set 'watermark_make' to true in settins file, in order to be able to detect the watermark.\n";
 		else
-			UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
+			Utilities::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
 	}
 
 	//realtime watermarked video detection by two frames
@@ -309,10 +308,10 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 		std::vector<af::array> watermarked_frames(frames);
 #pragma omp parallel for
 		for (int i = 0; i < frames; i++) {
-			watermarked_frames[i] = UtilityFunctions::cimg_yuv_to_afarray<unsigned char>(video_cimg_w.at(i));
+			watermarked_frames[i] = Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg_w.at(i));
 		}
 
-		UtilityFunctions::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
+		Utilities::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
 	}
 	return EXIT_SUCCESS;
 }
