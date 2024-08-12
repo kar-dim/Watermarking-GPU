@@ -3,8 +3,6 @@
 #include <af/opencl.h>
 #include <string>
 
-using std::string;
-
 enum MASK_TYPE {
 	ME,
 	NVF
@@ -14,9 +12,6 @@ enum IMAGE_TYPE {
 	RGB,
 	GRAYSCALE
 };
-
-#define ME_MASK_CALCULATION_REQUIRED_NO false
-#define ME_MASK_CALCULATION_REQUIRED_YES true
 
 /*!
  *  \brief  Functions for watermark computation and detection
@@ -38,7 +33,7 @@ private:
 	const cl::Context context{ afcl::getContext(true) };
 	const cl::CommandQueue queue{ afcl::getQueue(true) };
 	const cl::Program program_me, program_custom;
-	const string w_file_path, custom_kernel_name;
+	const std::string w_file_path, custom_kernel_name;
 	const int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
 	const float psnr;
 	af::array rgb_image, image, w;
@@ -53,8 +48,8 @@ private:
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients);
 	cl::Image2D copyBufferToImage(const cl_mem* image_buff, const dim_t rows, const dim_t cols);
 public:
-	Watermark(const af::array& rgb_image, const af::array &image, const string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const string &custom_kernel_name);
-	Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const string custom_kernel_name);
+	Watermark(const af::array& rgb_image, const af::array &image, const std::string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string &custom_kernel_name);
+	Watermark(const std::string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
 	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type);
