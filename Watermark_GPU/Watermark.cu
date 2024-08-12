@@ -11,6 +11,9 @@
 #include "cuda_utils.hpp"
 #include <stdexcept>
 
+#define ME_MASK_CALCULATION_REQUIRED_NO false
+#define ME_MASK_CALCULATION_REQUIRED_YES true
+
 using std::string;
 using std::cout;
 

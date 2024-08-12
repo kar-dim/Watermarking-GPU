@@ -54,7 +54,7 @@ void Utilities::accurate_timer_sleep(double seconds) {
 }
 
 //main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
-void Utilities::realtime_detection(Watermark& watermarkFunctions, const std::vector<af::array>& watermarked_frames, const int frames, const bool display_frames, const float frame_period) {
+void Utilities::realtime_detection(Watermark& watermark_obj, const std::vector<af::array>& watermarked_frames, const int frames, const bool display_frames, const float frame_period) {
 	std::vector<float> correlations(frames);
 	CImgDisplay window;
 	const auto rows = static_cast<unsigned int>(watermarked_frames[1].dims(0));
@@ -62,7 +62,7 @@ void Utilities::realtime_detection(Watermark& watermarkFunctions, const std::vec
 	float time_diff;
 	for (int i = 0; i < frames; i++) {
 		timer::start();
-		correlations[i] = watermarkFunctions.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
+		correlations[i] = watermark_obj.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
 		timer::end();
 		const float watermark_time_secs = timer::secs_passed();
 		cout << "Watermark detection seconds passed: " << watermark_time_secs << "\n";
