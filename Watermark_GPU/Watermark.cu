@@ -134,9 +134,9 @@ af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, M
 	const af::array u = m * w;
 	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
-	return image_type == IMAGE_TYPE::RGB ? 
-		(rgb_image + af::tile((u * a), 1, 1, static_cast<unsigned int>(image.dims(2)))) : 
-		image + (u * a);
+	return image_type == IMAGE_TYPE::RGB ?
+		af::clamp(rgb_image + af::tile((u * a), 1, 1, static_cast<unsigned int>(image.dims(2))), 0, 255) :
+		af::clamp(image + (u * a), 0, 255);
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
