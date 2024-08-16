@@ -184,10 +184,8 @@ void Watermark::compute_prediction_error_mask(const af::array& image, const af::
 
 //helper method used in detectors
 float Watermark::calculate_correlation(const af::array& e_u, const af::array& e_z) {
-	float dot_ez_eu = af::dot<float>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
-	float d_ez = static_cast<float>(af::norm(e_z));
-	float d_eu = static_cast<float>(af::norm(e_u));
-	return dot_ez_eu / (d_ez * d_eu);
+	double dot_ez_eu = af::dot<double>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
+	return static_cast<float>(dot_ez_eu / (af::norm(e_z) * af::norm(e_u)));
 }
 
 //the main mask detector function

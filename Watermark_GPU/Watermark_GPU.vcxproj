@@ -50,15 +50,19 @@
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/wd4275 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;$(AF_PATH)\lib\afcuda.lib;$(OPENCV_DIR)\lib\opencv_world452d.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions>-diag-suppress 1388 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
     </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452d.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
@@ -74,6 +78,7 @@
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/wd4275 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -82,10 +87,13 @@
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;$(AF_PATH)\lib\afcuda.lib;$(OPENCV_DIR)\lib\opencv_world452.lib;$(ProjectDir)libs\zlib\lib\zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <FastMath>true</FastMath>
+      <AdditionalOptions>-diag-suppress 1388 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
     </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
