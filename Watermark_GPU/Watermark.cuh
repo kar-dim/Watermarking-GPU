@@ -1,7 +1,8 @@
 #pragma once
-#include <cuda_runtime.h>
 #include <arrayfire.h>
+#include <cuda_runtime.h>
 #include <string>
+#include <utility>
 
 enum MASK_TYPE {
 	ME,

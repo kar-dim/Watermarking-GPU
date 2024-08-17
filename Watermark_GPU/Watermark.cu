@@ -1,15 +1,17 @@
-#include "Watermark.cuh"
-#include "kernels.cuh"
-#include <fstream>
-#include <arrayfire.h>
-#include <iostream>
-#include <string>
-#include <af/cuda.h>
-#include <cmath>
-#include <memory>
-#include <cuda_runtime.h>
 #include "cuda_utils.hpp"
+#include "kernels.cuh"
+#include "Watermark.cuh"
+#include <af/cuda.h>
+#include <arrayfire.h>
+#include <cmath>
+#include <cstring>
+#include <cuda_runtime.h>
+#include <fstream>
+#include <iostream>
+#include <memory>
 #include <stdexcept>
+#include <string>
+#include <utility>
 
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true

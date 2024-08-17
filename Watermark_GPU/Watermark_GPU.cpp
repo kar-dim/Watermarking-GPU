@@ -1,16 +1,18 @@
 #pragma warning(disable:4996)
-#include "Watermark_GPU.hpp"
-#include "Watermark.cuh"
-#include "Utilities.hpp"
-#include <cuda_runtime.h>
-#include "INIReader.h"
-#include <iostream>
-#include <iomanip>
 #include "cimg_init.h"
-#include <vector>
+#include "INIReader.h"
+#include "Utilities.hpp"
+#include "Watermark.cuh"
+#include "Watermark_GPU.hpp"
 #include <cstdlib>
-#include <stdexcept>
+#include <cstring>
+#include <cuda_runtime.h>
 #include <exception>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <vector>
 
 using std::cout;
 using std::string;
@@ -63,7 +65,7 @@ int main(void)
 
 	//test algorithms
 	try {
-		const int code = inir.GetInteger("parameters_video", "test_for_video", -1) == 1 ?
+		const int code = inir.GetBoolean("parameters_video", "test_for_video", false) == true ?
 			test_for_video(inir, properties, p, psnr) :
 			test_for_image(inir, properties, p, psnr);
 		exit_program(code);
@@ -77,6 +79,7 @@ int main(void)
 
 int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
 	const string image_file = inir.Get("paths", "image", "NO_IMAGE");
+	const bool show_fps = inir.GetBoolean("options", "execution_time_in_fps", false);
 	//load image from disk into an arrayfire array
 	timer::start();
 	const af::array rgb_image = af::loadImage(image_file.c_str(), true);
@@ -85,7 +88,7 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	timer::end();
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
-	cout << "Time to load and tranfer RGB image from disk to VRAM: " << timer::secs_passed() << "\n";
+	cout << "Time to load and transfer RGB image from disk to VRAM: " << timer::secs_passed() << "\n\n";
 	if (cols <= 64 || rows <= 16) {
 		cout << "Image dimensions too low\n";
 		return EXIT_FAILURE;
@@ -109,15 +112,13 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	timer::start();
 	af::array watermark_NVF = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
 	timer::end();
-	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
-	cout << "Time to calculate NVF mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
+	cout << "Watermark strength (parameter a): " << a << "\nCalculation of NVF mask with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
 
 	//make ME watermark
 	timer::start();
 	af::array watermark_ME = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
 	timer::end();
-	cout << "a: " << std::fixed << std::setprecision(8) << a << "\n";
-	cout << "Time to calculate ME mask of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
+	cout << "Watermak strength (parameter a): " << a << "\nCalculation of ME mask with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
 
 	const af::array watermarked_NVF_gray = af::rgb2gray(watermark_NVF, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	const af::array watermarked_ME_gray = af::rgb2gray(watermark_ME, R_WEIGHT, G_WEIGHT, B_WEIGHT);
@@ -129,13 +130,14 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	timer::start();
 	float correlation_nvf = watermark_obj.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
 	timer::end();
-	cout << "Time to calculate correlation (NVF) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
+	cout << "Calculation of the watermark correlation (NVF) of an image with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
 
 	//detection of ME
 	timer::start();
 	float correlation_me = watermark_obj.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
 	timer::end();
-	cout << "Time to calculate correlation (ME) of an image of " << rows << " rows and " << cols << " columns with parameters:\np= " << p << "\tPSNR(dB)= " << psnr << "\n" << timer::secs_passed() << " seconds.\n\n";
+	cout << "Calculation of the watermark correlation (ME) of an image with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
+	
 	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
 	cout << "Correlation [ME]: " << std::fixed << std::setprecision(16) << correlation_me << "\n";
 
@@ -157,6 +159,7 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
+	const bool show_fps = inir.GetBoolean("options", "execution_time_in_fps", false);
 	const int frames = inir.GetInteger("parameters_video", "frames", -1);
 	const float fps = (float)inir.GetReal("parameters_video", "fps", -1);
 	const bool watermark_first_frame_only = inir.GetBoolean("parameters_video", "watermark_first_frame_only", false);
@@ -272,7 +275,7 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 		if (make_watermark == false)
 			cout << "Please set 'watermark_make' to true in settins file, in order to be able to detect the watermark.\n";
 		else
-			Utilities::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
+			realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period, show_fps);
 	}
 
 	//realtime watermarked video detection by two frames
@@ -288,13 +291,13 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 				if (i % 2 != 0) {
 					correlations[i] = watermarkFunctions.mask_detector_prediction_error_fast(watermarked_frames[i], coefficients[counter]);
 					timer::end();
-					cout << "Watermark detection (fast) secs passed: " << timer::secs_passed() << "\n";
+					cout << "Watermark detection execution time (fast): " << execution_time(show_fps, timer::secs_passed()) << "\n";
 					counter++;
 				}
 				else {
 					correlations[i] = watermarkFunctions.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
 					timer::end();
-					cout << "Watermark detection secs passed: " << timer::secs_passed() << "\n";
+					cout << "Watermark detection execution time: " << execution_time(show_fps, timer::secs_passed()) << "\n";
 				}
 				cout << "Correlation of " << i + 1 << " frame: " << correlations[i] << "\n\n";
 			}
@@ -311,9 +314,43 @@ int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int 
 			watermarked_frames[i] = Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg_w.at(i));
 		}
 
-		Utilities::realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period);
+		realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period, show_fps);
 	}
 	return EXIT_SUCCESS;
+}
+
+std::string execution_time(bool show_fps, double seconds) {
+	return string(show_fps ? std::to_string(1 / seconds) + " FPS." : std::to_string(seconds) + " seconds.");
+}
+
+//main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
+void realtime_detection(Watermark& watermarkFunctions, const std::vector<af::array>& watermarked_frames, const int frames, const bool display_frames, const float frame_period, const bool show_fps) {
+	std::vector<float> correlations(frames);
+	CImgDisplay window;
+	const auto rows = static_cast<unsigned int>(watermarked_frames[1].dims(0));
+	const auto cols = static_cast<unsigned int>(watermarked_frames[0].dims(1));
+	float time_diff;
+	for (int i = 0; i < frames; i++) {
+		timer::start();
+		correlations[i] = watermarkFunctions.mask_detector(watermarked_frames[i], MASK_TYPE::ME);
+		timer::end();
+		const float watermark_time_secs = timer::secs_passed();
+		cout << "Watermark detection execution time: " << execution_time(show_fps, watermark_time_secs) << "\n";
+		if (display_frames) {
+			timer::start();
+			af::array clamped = af::clamp(watermarked_frames[i], 0, 255);
+			unsigned char* watermarked_frames_ptr = af::clamp(clamped.T(), 0, 255).as(af::dtype::u8).host<unsigned char>();
+			CImg<unsigned char> cimg_watermarked(cols, rows);
+			std::memcpy(cimg_watermarked.data(), watermarked_frames_ptr, rows * cols * sizeof(unsigned char));
+			af::freeHost(watermarked_frames_ptr);
+			watermarked_frames_ptr = NULL;
+			timer::end();
+			if ((time_diff = frame_period - (watermark_time_secs + timer::secs_passed())) > 0)
+				Utilities::accurate_timer_sleep(time_diff);
+			window.display(cimg_watermarked);
+		}
+		cout << "Correlation of " << i + 1 << " frame: " << correlations[i] << "\n\n";
+	}
 }
 
 void exit_program(const int exit_code) {
