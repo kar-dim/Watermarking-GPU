@@ -1,12 +1,13 @@
 ﻿#include "Watermark.hpp"
-#include <fstream>
-#include <arrayfire.h>
-#include <iostream>
-#include <string>
 #include <af/opencl.h>
+#include <arrayfire.h>
 #include <cmath>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <string>
+#include <utility>
 
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true

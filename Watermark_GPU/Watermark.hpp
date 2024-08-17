@@ -2,6 +2,7 @@
 #include "opencl_init.h"
 #include <af/opencl.h>
 #include <string>
+#include <utility>
 
 enum MASK_TYPE {
 	ME,
