@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "cimg_init.h"
-#include "Watermark.hpp"
 #include <arrayfire.h>
 #include <chrono>
 #include <string>

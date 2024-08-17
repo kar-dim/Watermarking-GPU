@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
-#include <iostream>
 #include <iterator>
 #include <stdexcept>
 #include <string>
@@ -11,7 +10,6 @@
 
 using namespace cimg_library;
 using std::string;
-using std::cout;
 
 string Utilities::loadProgram(const string& input)
 {
