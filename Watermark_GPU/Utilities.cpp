@@ -2,13 +2,11 @@
 #include "Utilities.hpp"
 #include <chrono>
 #include <cmath>
-#include <iostream>
 #include <string>
 #include <thread>
 
 using namespace cimg_library;
 using std::string;
-using std::cout;
 
 namespace timer {
 	void start() {
