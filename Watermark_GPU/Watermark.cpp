@@ -17,7 +17,7 @@ using std::string;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
-		:p(p), p_squared(p*p), p_squared_minus_one(p_squared-1), p_squared_minus_one_squared(p_squared_minus_one * p_squared_minus_one), pad(p/2), psnr(psnr), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), program_me(prog_me), program_custom(prog_custom) {
+		:program_me(prog_me), program_custom(prog_custom), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr) {
 	rows = -1;
 	cols = -1;
 }
