@@ -21,11 +21,12 @@ using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
-	:p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr), w_file_path(w_file_path) {
-	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
-	cudaStreamCreate(&custom_kernels_stream);
+	:w_file_path(w_file_path), p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr) {
 	rows = -1;
 	cols = -1;
+	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
+	cudaStreamCreate(&custom_kernels_stream);
+
 }
 
 //full constructor
