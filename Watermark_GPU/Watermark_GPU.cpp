@@ -1,4 +1,3 @@
-#pragma warning(disable:4996)
 #include "cimg_init.h"
 #include "INIReader.h"
 #include "Utilities.hpp"
