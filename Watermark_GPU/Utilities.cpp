@@ -1,5 +1,4 @@
-﻿#pragma warning(disable:4996)
-#include "Utilities.hpp"
+﻿#include "Utilities.hpp"
 #include <chrono>
 #include <cmath>
 #include <fstream>
