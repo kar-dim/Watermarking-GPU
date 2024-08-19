@@ -1,4 +1,5 @@
 #include "cimg_init.h"
+#include "cuda_utils.hpp"
 #include "INIReader.h"
 #include "Utilities.hpp"
 #include "Watermark.cuh"
@@ -30,7 +31,7 @@ using namespace cimg_library;
 int main(void)
 {
 	//open parameters file
-	INIReader inir("settings.ini");
+	const INIReader inir("settings.ini");
 	if (inir.ParseError() < 0) {
 		cout << "Could not load CUDA configuration file\n";
 		exit_program(EXIT_FAILURE);
@@ -57,10 +58,7 @@ int main(void)
 		exit_program(EXIT_FAILURE);
 	}
 
-	int device;
-	cudaGetDevice(&device);
-	cudaDeviceProp properties;
-	cudaGetDeviceProperties(&properties, device);
+	cudaDeviceProp properties = cuda_utils::getDeviceProperties();
 
 	//test algorithms
 	try {
@@ -76,7 +74,7 @@ int main(void)
 	exit_program(EXIT_SUCCESS);
 }
 
-int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
+int test_for_image(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr) {
 	const string image_file = inir.Get("paths", "image", "NO_IMAGE");
 	const bool show_fps = inir.GetBoolean("options", "execution_time_in_fps", false);
 	//load image from disk into an arrayfire array
@@ -109,13 +107,13 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 
 	//make NVF watermark
 	timer::start();
-	af::array watermark_NVF = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
+	const af::array watermark_NVF = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
 	timer::end();
 	cout << "Watermark strength (parameter a): " << a << "\nCalculation of NVF mask with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
 
 	//make ME watermark
 	timer::start();
-	af::array watermark_ME = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
+	const af::array watermark_ME = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
 	timer::end();
 	cout << "Watermak strength (parameter a): " << a << "\nCalculation of ME mask with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
 
@@ -155,7 +153,7 @@ int test_for_image(const INIReader& inir, cudaDeviceProp& properties, const int 
 	return EXIT_SUCCESS;
 }
 
-int test_for_video(const INIReader& inir, cudaDeviceProp& properties, const int p, const float psnr) {
+int test_for_video(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr) {
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const bool show_fps = inir.GetBoolean("options", "execution_time_in_fps", false);

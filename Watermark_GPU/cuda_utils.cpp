@@ -49,4 +49,12 @@ namespace cuda_utils {
         cudaCreateTextureObject(&texObj, &pResDesc, &pTexDesc, NULL);
         return texObj;
     }
+
+    cudaDeviceProp getDeviceProperties() {
+        int device;
+        cudaGetDevice(&device);
+        cudaDeviceProp properties;
+        cudaGetDeviceProperties(&properties, device);
+        return properties;
+    }
 }
