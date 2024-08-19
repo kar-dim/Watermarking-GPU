@@ -187,9 +187,8 @@ float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mas
 		compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
 		mask = compute_custom_mask(watermarked_image);
 	}
-	else {
+	else
 		mask = compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
-	}
 	const af::array u = mask * w;
 	const af::array e_u = calculate_error_sequence(u, a_z);
 	return calculate_correlation(e_u, e_z);
