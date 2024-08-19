@@ -343,7 +343,7 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 	return EXIT_SUCCESS;
 }
 
-std::string execution_time(bool show_fps, double seconds) {
+std::string execution_time(const bool show_fps, const double seconds) {
 	return string(show_fps ? std::to_string(1 / seconds) + " FPS." : std::to_string(seconds) + " seconds.");
 }
 

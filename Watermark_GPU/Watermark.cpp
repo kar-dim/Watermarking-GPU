@@ -62,7 +62,7 @@ cl::Image2D Watermark::copyBufferToImage(const cl_mem *image_buff, const dim_t r
 }
 
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
-void Watermark::compute_custom_mask(const af::array& image, af::array& m)
+af::array Watermark::compute_custom_mask(const af::array& image)
 {
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
@@ -81,8 +81,8 @@ void Watermark::compute_custom_mask(const af::array& image, af::array& m)
 		kernel.setArg(3, pad);
 		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
-		m = afcl::array(rows, cols, buff(), af::dtype::f32, true);
 		image_transpose.unlock();
+		return afcl::array(rows, cols, buff(), af::dtype::f32, true);
 	}
 	catch (const cl::Error& ex) {
 		throw std::runtime_error(string("ERROR in compute_nvf_mask(): " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n"));
@@ -112,9 +112,9 @@ af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, M
 {
 	af::array m, error_sequence;
 	if (mask_type == MASK_TYPE::ME)
-		compute_prediction_error_mask(image, m, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
+		m = compute_prediction_error_mask(image, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
 	else
-		compute_custom_mask(image, m);
+		m = compute_custom_mask(image);
 	const af::array u = m * w;
 	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
@@ -125,7 +125,7 @@ af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, M
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
 //can also calculate error sequence and prediction error filter
-void Watermark::compute_prediction_error_mask(const af::array& image, af::array& m_e, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
+af::array Watermark::compute_prediction_error_mask(const af::array& image, af::array& error_sequence, af::array& coefficients, const bool mask_needed)
 {
 	const unsigned int rows = static_cast<unsigned int>(image.dims(0));
 	const unsigned int cols = static_cast<unsigned int>(image.dims(1));
@@ -156,8 +156,9 @@ void Watermark::compute_prediction_error_mask(const af::array& image, af::array&
 		error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 		if (mask_needed) {
 			af::array error_sequence_abs = af::abs(error_sequence);
-			m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
+			return error_sequence_abs / af::max<float>(error_sequence_abs);
 		}
+		return af::array();
 	}
 	catch (const cl::Error& ex) {
 		throw std::runtime_error(string("ERROR in compute_me_mask(): " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n"));
@@ -170,11 +171,11 @@ af::array Watermark::calculate_error_sequence(const af::array& u, const af::arra
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
-void Watermark::compute_prediction_error_mask(const af::array& image, const af::array& coeficcients, af::array& m_e, af::array& error_sequence)
+af::array Watermark::compute_prediction_error_mask(const af::array& image, const af::array& coeficcients, af::array& error_sequence)
 {
 	error_sequence = calculate_error_sequence(image, coeficcients);
 	const af::array error_sequence_abs = af::abs(error_sequence);
-	m_e = error_sequence_abs / af::max<float>(error_sequence_abs);
+	return error_sequence_abs / af::max<float>(error_sequence_abs);
 }
 
 //helper method used in detectors
@@ -188,11 +189,11 @@ float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mas
 {
 	af::array m, e_z, a_z;
 	if (mask_type == MASK_TYPE::NVF) {
-		compute_prediction_error_mask(watermarked_image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
-		compute_custom_mask(watermarked_image, m);
+		compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
+		m = compute_custom_mask(watermarked_image);
 	}
 	else {
-		compute_prediction_error_mask(watermarked_image, m, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
+		m = compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
 	}
 	const af::array u = m * w;
 	const af::array e_u = calculate_error_sequence(u, a_z);
@@ -202,10 +203,10 @@ float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mas
 //fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
 float Watermark::mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients)
 {
-	af::array m_e, e_z, m_eu, e_u, a_u;
-	compute_prediction_error_mask(watermarked_image, coefficients, m_e, e_z);
+	af::array m_e, e_z, e_u, a_u;
+	m_e = compute_prediction_error_mask(watermarked_image, coefficients, e_z);
 	const af::array u = m_e * w;
-	compute_prediction_error_mask(u, m_eu, e_u, a_u, ME_MASK_CALCULATION_REQUIRED_NO);
+	compute_prediction_error_mask(u, e_u, a_u, ME_MASK_CALCULATION_REQUIRED_NO);
 	return calculate_correlation(e_u, e_z);
 }
 
