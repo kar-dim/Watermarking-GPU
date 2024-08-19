@@ -104,6 +104,7 @@
     <CudaCompile Include="Watermark.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cuda_utils.cpp" />
     <ClCompile Include="Utilities.cpp" />
     <ClCompile Include="Watermark_GPU.cpp" />
   </ItemGroup>

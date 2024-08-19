@@ -4,7 +4,6 @@
 #include <af/cuda.h>
 #include <arrayfire.h>
 #include <cmath>
-#include <cstring>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <iostream>
@@ -66,23 +65,12 @@ void Watermark::load_W(const dim_t rows, const dim_t cols) {
 
 //helper method to copy an arrayfire cuda buffer into a cuda Texture Object Image (fast copy that happens in the device)
 std::pair<cudaTextureObject_t, cudaArray*> Watermark::copy_array_to_texture_data(const af::array & array, const unsigned int rows, const unsigned int cols) {
-	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
-	cudaArray* cuArray;
-	cudaMallocArray(&cuArray, &channelDesc, cols, rows);
+	
+	cudaArray* cuArray = cuda_utils::cudaMallocArray(cols, rows);
 	cudaMemcpy2DToArray(cuArray, 0, 0, array.device<float>(), cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
-	struct cudaResourceDesc resDesc;
-	memset(&resDesc, 0, sizeof(resDesc));
-	resDesc.resType = cudaResourceTypeArray;
-	resDesc.res.array.array = cuArray;
-	struct cudaTextureDesc texDesc;
-	memset(&texDesc, 0, sizeof(texDesc));
-	texDesc.addressMode[0] = cudaAddressModeBorder;
-	texDesc.addressMode[1] = cudaAddressModeBorder;
-	texDesc.filterMode = cudaFilterModePoint;
-	texDesc.readMode = cudaReadModeElementType;
-	texDesc.normalizedCoords = 0;
-	cudaTextureObject_t texObj = 0;
-	cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+	cudaResourceDesc resDesc = cuda_utils::createResourceDescriptor(cuArray);
+	cudaTextureDesc texDesc = cuda_utils::createTextureDescriptor();
+	cudaTextureObject_t texObj = cuda_utils::createTextureObject(resDesc, texDesc);
 	return std::make_pair(texObj, cuArray);
 }
 
@@ -101,7 +89,7 @@ void Watermark::compute_custom_mask(const af::array& image, af::array& m)
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
 	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
-	float* mask_output = cuda_utils::cudaMallocPtr<float>(rows * cols);
+	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
 	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(16, 16), rows, cols), dim3(16, 16));
 	nvf <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
 	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
@@ -152,14 +140,13 @@ void Watermark::compute_prediction_error_mask(const af::array& image, af::array&
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	//copy arrayfire array from device to device's texture cache and allocate Rx,rx buffers
 	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
-	float* Rx_buff = cuda_utils::cudaMallocPtr<float>(rows * padded_cols);
-	float* rx_buff = cuda_utils::cudaMallocPtr<float>(rows * padded_cols);
+	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
+	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	//call custom kernel to fill Rx and rx partial sums (in different stream than arrayfire, may help)
 	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
 	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
-	//calculate the neighbors "x_" array
+	//calculate the neighbors "x_" array and wait for custom kernel to finish and release texture memory
 	af::array x_ = calculate_neighbors_array(image, p, p_squared, pad);
-	//wait for custom kernel to finish and release texture memory
 	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
 	//transform the partial Rx,rx arrays by summing and changing their dimensions
 	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols, rows, rx_buff, afDevice), padded_cols);

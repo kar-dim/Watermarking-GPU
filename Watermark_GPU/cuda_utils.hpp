@@ -2,16 +2,11 @@
 #include <cuda_runtime.h>
 
 namespace cuda_utils {
-
-    template <typename T>
-    T* cudaMallocPtr(std::size_t count)
-    {
-        T* ptr = nullptr;
-        cudaMalloc(&ptr, count * sizeof(T));
-        return ptr;
-    }
-
-    inline dim3 grid_size_calculate(const dim3 blockSize, const int rows, const int cols) {
-        return dim3 ((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
-    }
+   
+    float* cudaMallocPtr(const std::size_t count);
+    dim3 grid_size_calculate(const dim3 blockSize, const int rows, const int cols);
+    cudaArray* cudaMallocArray(const std::size_t cols, const std::size_t rows);
+    cudaResourceDesc createResourceDescriptor(cudaArray* cuArray);
+    cudaTextureDesc createTextureDescriptor();
+    cudaTextureObject_t createTextureObject(const cudaResourceDesc& pResDesc, const cudaTextureDesc& pTexDesc);
 }
