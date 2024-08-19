@@ -110,12 +110,12 @@ std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(con
 
 af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type)
 {
-	af::array m, error_sequence;
+	af::array mask, error_sequence;
 	if (mask_type == MASK_TYPE::ME)
-		m = compute_prediction_error_mask(image, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
+		mask = compute_prediction_error_mask(image, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
 	else
-		m = compute_custom_mask(image);
-	const af::array u = m * w;
+		mask = compute_custom_mask(image);
+	const af::array u = mask * w;
 	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
  	return image_type == IMAGE_TYPE::RGB ? 
@@ -187,15 +187,14 @@ float Watermark::calculate_correlation(const af::array& e_u, const af::array& e_
 //the main mask detector function
 float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type)
 {
-	af::array m, e_z, a_z;
+	af::array mask, e_z, a_z;
 	if (mask_type == MASK_TYPE::NVF) {
 		compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
-		m = compute_custom_mask(watermarked_image);
+		mask = compute_custom_mask(watermarked_image);
 	}
-	else {
-		m = compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
-	}
-	const af::array u = m * w;
+	else
+		mask = compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
+	const af::array u = mask * w;
 	const af::array e_u = calculate_error_sequence(u, a_z);
 	return calculate_correlation(e_u, e_z);
 }
