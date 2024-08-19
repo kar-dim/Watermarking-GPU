@@ -90,7 +90,7 @@ void Watermark::compute_custom_mask(const af::array& image, af::array& m)
 	const af::array image_transpose = image.T();
 	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
 	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
-	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(16, 16), rows, cols), dim3(16, 16));
+	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(32, 32), rows, cols), dim3(32, 32));
 	nvf <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
 	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
 	m = af::array(rows, cols, mask_output, afDevice);
