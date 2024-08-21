@@ -38,6 +38,7 @@ Watermark::Watermark(const af::array &rgb_image, const af::array& image, const s
 	w = load_W(rows, cols);
 }
 
+//destructor, only custom kernels cuda stream must be destroyed
 Watermark::~Watermark()
 {
 	cudaStreamDestroy(custom_kernels_stream);
@@ -122,6 +123,7 @@ std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(con
 	return std::make_pair(Rx, rx);
 }
 
+//Main watermark embedding method
 af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type) const
 {
 	af::array mask, error_sequence;
