@@ -20,7 +20,8 @@ using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
-	:w_file_path(w_file_path), p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr) {
+	:w_file_path(w_file_path), p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr) 
+{
 	rows = -1;
 	cols = -1;
 	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
@@ -30,10 +31,11 @@ Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
 
 //full constructor
 Watermark::Watermark(const af::array &rgb_image, const af::array& image, const string &w_file_path, const int p, const float psnr)
-	:Watermark::Watermark(w_file_path, p, psnr) {
+	:Watermark::Watermark(w_file_path, p, psnr) 
+{
 	this->rgb_image = rgb_image;
 	load_image(image);
-	load_W(rows, cols);
+	w = load_W(rows, cols);
 }
 
 Watermark::~Watermark()
@@ -45,12 +47,12 @@ Watermark::~Watermark()
 void Watermark::load_image(const af::array& image) 
 {
 	this->image = image;
-	this->rows = image.dims(0);
-	this->cols = image.dims(1);
+	rows = image.dims(0);
+	cols = image.dims(1);
 }
 
 //helper method to load the random noise matrix W from the file specified.
-void Watermark::load_W(const dim_t rows, const dim_t cols) 
+af::array Watermark::load_W(const dim_t rows, const dim_t cols) const 
 {
 	std::ifstream w_stream(w_file_path.c_str(), std::ios::binary);
 	if (!w_stream.is_open())
@@ -62,7 +64,7 @@ void Watermark::load_W(const dim_t rows, const dim_t cols)
 		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
 	w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[0]), total_bytes);
-	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
+	return af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
 //helper method to copy an arrayfire cuda buffer into a cuda Texture Object Image (fast copy that happens in the device)

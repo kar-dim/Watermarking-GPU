@@ -278,7 +278,7 @@ int test_for_video(const INIReader& inir, const cudaDeviceProp& properties, cons
 	//realtime watermarked video detection by two frames
 	if (inir.GetBoolean("parameters_video", "watermark_detection_by_two_frames", false) == true) {
 		if (make_watermark == false) {
-			cout << "Please set 'watermark_make' to true in settins file, in order to be able to detect the watermark.\n";
+			cout << "Please set 'watermark_make' to true in settings file, in order to be able to detect the watermark.\n";
 		}
 		else {
 			std::vector<float> correlations(frames);
