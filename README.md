@@ -14,7 +14,7 @@ Libraries used:
 - [inih](https://github.com/jtilly/inih)
     
 For building the project, the below must be installed:
-- OpenCL implementation: AMD APP SDK 3.0 (or Nvidia CUDA Toolkit which includes OpenCL support for NVIDIA GPUs). Must be included in default include path. If AMD APP SDK 3.0 is used, occurrences of "cl.hpp" in code should be replaced with "cl2.hpp"
+- OpenCL implementation: AMD APP SDK 3.0 (or Nvidia CUDA Toolkit which includes OpenCL support for NVIDIA GPUs). Must be included in default include path. If AMD APP SDK 3.0 is used, the preprocessor macro `__NVIDIA__` should be removed.
 - CUDA implementation: NVIDIA CUDA Toolkit.
 - LibPNG (can be installed from Visual Studio marketplace).
 - ArrayFire should be installed globally, with default installation options. Environment Variable "AF_PATH" will be defined automatically.
