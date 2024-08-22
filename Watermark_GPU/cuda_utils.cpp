@@ -4,6 +4,7 @@
 
 namespace cuda_utils {
 
+    //Simple wrapper of cudaMalloc for float data to reduce boilerplate
     float* cudaMallocPtr(const std::size_t count)
     {
         float* ptr = nullptr;
@@ -11,18 +12,21 @@ namespace cuda_utils {
         return ptr;
     }
 
-    dim3 grid_size_calculate(const dim3 blockSize, const int rows, const int cols) {
+    //Helper method to calculate kernel grid and block size from given 2D dimensions
+    dim3 grid_size_calculate(const dim3 blockSize, const int rows, const int cols) 
+    {
         return dim3((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
     }
 
+    //Simple wrapper of cudaMallocArray to reduce boilerplate
     cudaArray* cudaMallocArray(const std::size_t cols, const std::size_t rows)
     {
-        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
         cudaArray* cuArray;
-        cudaMallocArray(&cuArray, &channelDesc, cols, rows);
+        cudaMallocArray(&cuArray, &cudaCreateChannelDesc<float>(), cols, rows);
         return cuArray;
     }
 
+    //Creates a cudaResourceDesc from a specified cudaArray
     cudaResourceDesc createResourceDescriptor(cudaArray* cuArray)
     {
         struct cudaResourceDesc resDesc;
@@ -32,6 +36,8 @@ namespace cuda_utils {
         return resDesc;
     }
 
+    //creates a cudaTextureDesc with these properties:
+    //Border addressing mode, point filtering mode, element read mode, non-normalized coords
     cudaTextureDesc createTextureDescriptor()
     {
         struct cudaTextureDesc texDesc;
@@ -43,6 +49,8 @@ namespace cuda_utils {
         texDesc.normalizedCoords = 0;
         return texDesc;
     }
+
+    //creates a texture object from the given cuda resource and cuda texture descriptors
     cudaTextureObject_t createTextureObject(const cudaResourceDesc& pResDesc, const cudaTextureDesc& pTexDesc)
     {
         cudaTextureObject_t texObj = 0;
@@ -50,7 +58,9 @@ namespace cuda_utils {
         return texObj;
     }
 
-    cudaDeviceProp getDeviceProperties() {
+    //get a cudaDeviceProp handle to query for various device information
+    cudaDeviceProp getDeviceProperties() 
+    {
         int device;
         cudaGetDevice(&device);
         cudaDeviceProp properties;
