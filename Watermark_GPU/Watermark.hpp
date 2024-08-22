@@ -51,7 +51,7 @@ private:
 public:
 	Watermark(const af::array& rgb_image, const af::array &image, const std::string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string &custom_kernel_name);
 	Watermark(const std::string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
-	af::array load_W(const dim_t rows, const dim_t cols) const;
+	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
 	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type) const;
 	float mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type) const;

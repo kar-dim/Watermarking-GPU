@@ -29,7 +29,7 @@ Watermark::Watermark(const af::array &rgb_image, const af::array& image, const s
 {
 	this->rgb_image = rgb_image;
 	load_image(image);
-	w = load_W(rows, cols);
+	load_W(rows, cols);
 }
 
 //supply the input image to apply watermarking and detection
@@ -41,7 +41,7 @@ void Watermark::load_image(const af::array& image)
 }
 
 //helper method to load the random noise matrix W from the file specified.
-af::array Watermark::load_W(const dim_t rows, const dim_t cols) const
+void Watermark::load_W(const dim_t rows, const dim_t cols)
 {
 	std::ifstream w_stream(w_file_path.c_str(), std::ios::binary);
 	if (!w_stream.is_open())
@@ -53,7 +53,7 @@ af::array Watermark::load_W(const dim_t rows, const dim_t cols) const
 		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
 	w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[0]), total_bytes);
-	return af::transpose(af::array(cols, rows, w_ptr.get()));
+	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
 //helper method to copy an OpenCL buffer into an OpenCL Image (fast copy that happens in the device)
