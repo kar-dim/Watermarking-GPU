@@ -40,6 +40,7 @@ int main(void)
 	af::info();
 	cout << "\n";
 
+	af::setDevice(inir.GetInteger("options", "opencl_device", 0));
 	const cl::Context context(afcl::getContext(true));
 	const cl::Device device({ afcl::getDeviceId() });
 

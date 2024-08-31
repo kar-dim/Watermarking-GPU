@@ -7,9 +7,5 @@
 #ifdef __APPLE__
 #include <OpenCL/cl.hpp>
 #else
-#ifdef __NVIDIA__
-#include <CL/cl.hpp>
-#else
-#include <CL/cl2.hpp>
-#endif
+#include <CL/opencl.hpp>
 #endif
