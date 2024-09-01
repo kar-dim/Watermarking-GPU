@@ -1,6 +1,6 @@
+#include "Watermark.cuh"
 #include "cuda_utils.hpp"
 #include "kernels.cuh"
-#include "Watermark.cuh"
 #include <af/cuda.h>
 #include <arrayfire.h>
 #include <cmath>
