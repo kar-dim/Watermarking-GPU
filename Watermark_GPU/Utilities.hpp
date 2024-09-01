@@ -10,7 +10,7 @@
  */
 class Utilities {
 public:
-	static std::string loadProgram(const std::string& input);
+	static std::string load_file_as_string(const std::string& input);
 	static std::string add_suffix_before_extension(const std::string& file, const std::string& suffix);
 	static void accurate_timer_sleep(double seconds);
 	template<typename T>

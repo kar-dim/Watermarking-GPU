@@ -10,7 +10,7 @@
 using namespace cimg_library;
 using std::string;
 
-string Utilities::loadProgram(const string& input)
+string Utilities::load_file_as_string(const string& input)
 {
 	std::ifstream stream(input.c_str());
 	if (!stream.is_open())

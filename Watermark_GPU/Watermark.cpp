@@ -1,6 +1,8 @@
 ﻿#include "Watermark.hpp"
-#include <af/opencl.h>
+#include "opencl_utils.hpp"
+#include <CL/opencl.hpp>
 #include <arrayfire.h>
+#include <af/opencl.h>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -56,16 +58,6 @@ void Watermark::load_W(const dim_t rows, const dim_t cols)
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
-//helper method to copy an OpenCL buffer into an OpenCL Image (fast copy that happens in the device)
-cl::Image2D Watermark::copyBufferToImage(const cl_mem *image_buff, const dim_t rows, const dim_t cols) const
-{
-	cl::Image2D image2d(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL);
-	const size_t orig[] = { 0,0,0 };
-	const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };
-	clEnqueueCopyBufferToImage(queue(), *image_buff, image2d(), 0, orig, des, NULL, NULL, NULL);
-	return image2d;
-}
-
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
 af::array Watermark::compute_custom_mask(const af::array& image) const
 {
@@ -77,14 +69,11 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const af::array image_transpose = image.T();
 	try {
 		cl_mem *image_buff = image_transpose.device<cl_mem>();
-		cl::Image2D image2d = copyBufferToImage(image_buff, rows, cols);
+		cl::Image2D image2d = cl_utils::copyBufferToImage(context, queue, image_buff, rows, cols);
 		cl::Buffer buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * rows * cols, NULL);
-		cl::Kernel kernel = cl::Kernel(program_custom, custom_kernel_name.c_str());
-		kernel.setArg(0, image2d);
-		kernel.setArg(1, buff);
-		kernel.setArg(2, p);
-		kernel.setArg(3, pad);
-		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
+		cl_utils::KernelBuilder kernel_builder(program_custom, custom_kernel_name.c_str());
+		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff, p, pad).build(), 
+			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
 		image_transpose.unlock();
 		return afcl::array(rows, cols, buff(), af::dtype::f32, true);
@@ -142,18 +131,14 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	cl_int err;
 	try {
 		cl_mem *buffer = image_transpose.device<cl_mem>();
-		cl::Image2D image2d = copyBufferToImage(buffer, rows, cols);
+		cl::Image2D image2d = cl_utils::copyBufferToImage(context, queue, buffer, rows, cols);
 		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
 		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
 		cl::Buffer Rx_mappings_buff(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void *)Rx_mappings, &err);
-		cl::Kernel kernel = cl::Kernel(program_me, "me", &err);
-		kernel.setArg(0, image2d);
-		kernel.setArg(1, Rx_buff);
-		kernel.setArg(2, rx_buff);
-		kernel.setArg(3, Rx_mappings_buff);
-		kernel.setArg(4, cl::Local(sizeof(float) * 2304));
-		kernel.setArg(5, cl::Local(sizeof(float) * 512));
-		queue.enqueueNDRangeKernel(kernel, cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
+		cl_utils::KernelBuilder kernel_builder(program_me, "me");
+		queue.enqueueNDRangeKernel(
+			kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512)).build(),
+			cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
 		af::array x_ = calculate_neighbors_array(image, p, p_squared, pad);
 		queue.finish(); 

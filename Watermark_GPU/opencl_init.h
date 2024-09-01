@@ -4,8 +4,4 @@
 #define CL_HPP_ENABLE_EXCEPTIONS
 #undef max
 #undef min
-#ifdef __APPLE__
-#include <OpenCL/cl.hpp>
-#else
 #include <CL/opencl.hpp>
-#endif

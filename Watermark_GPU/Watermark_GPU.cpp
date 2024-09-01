@@ -65,11 +65,11 @@ int main(void)
 	//compile opencl kernels
 	cl::Program program_nvf, program_me;
 	try {
-		string program_data = Utilities::loadProgram("kernels/nvf.cl");
+		string program_data = Utilities::load_file_as_string("kernels/nvf.cl");
 		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
 		const string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
 		program_nvf.build({ device }, nvf_buildFlags.c_str());
-		program_data = Utilities::loadProgram("kernels/me_p3.cl");
+		program_data = Utilities::load_file_as_string("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
 		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
 	}
