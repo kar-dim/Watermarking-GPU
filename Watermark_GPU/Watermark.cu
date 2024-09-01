@@ -68,37 +68,18 @@ void Watermark::load_W(const dim_t rows, const dim_t cols)
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
-//helper method to copy an arrayfire cuda buffer into a cuda Texture Object Image (fast copy that happens in the device)
-std::pair<cudaTextureObject_t, cudaArray*> Watermark::copy_array_to_texture_data(const af::array & array, const unsigned int rows, const unsigned int cols) const 
-{
-	cudaArray* cuArray = cuda_utils::cudaMallocArray(cols, rows);
-	cudaMemcpy2DToArray(cuArray, 0, 0, array.device<float>(), cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
-	cudaResourceDesc resDesc = cuda_utils::createResourceDescriptor(cuArray);
-	cudaTextureDesc texDesc = cuda_utils::createTextureDescriptor();
-	cudaTextureObject_t texObj = cuda_utils::createTextureObject(resDesc, texDesc);
-	return std::make_pair(texObj, cuArray);
-}
-
-//helper method for cleanup and to execute common tasks after the masking kernels are executed
-void Watermark::synchronize_and_cleanup_texture_data(const std::pair<cudaTextureObject_t, cudaArray*> &texture_data, const af::array &array_to_unlock) const 
-{
-	cudaDestroyTextureObject(texture_data.first);
-	cudaFreeArray(texture_data.second);
-	array_to_unlock.unlock();
-	cudaStreamSynchronize(custom_kernels_stream);
-}
-
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
 af::array Watermark::compute_custom_mask(const af::array& image) const
 {
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
+	auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
 	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(32, 32), rows, cols), dim3(32, 32));
 	nvf <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
-	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
+	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
+	image_transpose.unlock();
 	return af::array(rows, cols, mask_output, afDevice);
 }
 
@@ -147,14 +128,15 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const af::array image_transpose = image.T();
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	//copy image to texture cache and call custom kernel
-	auto texture_data = copy_array_to_texture_data(image_transpose, rows, cols);
+	auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
 	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
 	af::array x_ = calculate_neighbors_array(image, p, p_squared, pad);
 	//cleanup and calculation of coefficients, error sequence and mask
-	synchronize_and_cleanup_texture_data(texture_data, image_transpose);
+	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
+	image_transpose.unlock();
 	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols, rows, rx_buff, afDevice), padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);

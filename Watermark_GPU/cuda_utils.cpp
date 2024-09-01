@@ -1,6 +1,7 @@
 #include "cuda_utils.hpp"
 #include <cuda_runtime.h>
 #include <cstring>
+#include <utility>
 
 namespace cuda_utils {
 
@@ -66,5 +67,24 @@ namespace cuda_utils {
         cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
         return properties;
+    }
+
+    //copy data from arrayfire to a cudaArray, and then create the texture object
+    std::pair<cudaTextureObject_t, cudaArray*> copy_array_to_texture_data(const float* data, const unsigned int rows, const unsigned int cols) 
+    {
+	    cudaArray* cuArray = cuda_utils::cudaMallocArray(cols, rows);
+	    cudaMemcpy2DToArray(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
+	    cudaResourceDesc resDesc = cuda_utils::createResourceDescriptor(cuArray);
+	    cudaTextureDesc texDesc = cuda_utils::createTextureDescriptor();
+	    cudaTextureObject_t texObj = cuda_utils::createTextureObject(resDesc, texDesc);
+	    return std::make_pair(texObj, cuArray);
+    }
+
+    //helper method to cleanup cuda texture data and to synchronize the stream
+    void synchronize_and_cleanup_texture_data(cudaStream_t stream, const std::pair<cudaTextureObject_t, cudaArray*>& texture_data)
+    {
+        cudaDestroyTextureObject(texture_data.first);
+        cudaFreeArray(texture_data.second);
+        cudaStreamSynchronize(stream);
     }
 }
