@@ -167,8 +167,13 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	//save watermarked images to disk
 	if (inir.GetBoolean("options", "save_watermarked_files_to_disk", false)) {
 		cout << "\nSaving watermarked files to disk...\n";
-		af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_ME").c_str(), watermark_ME.as(af::dtype::u8));
-		af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_NVF").c_str(), watermark_NVF.as(af::dtype::u8));
+#pragma omp parallel sections
+		{
+#pragma omp section
+			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_NVF").c_str(), watermark_NVF.as(af::dtype::u8));
+#pragma omp section
+			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_ME").c_str(), watermark_ME.as(af::dtype::u8));
+		}
 		cout << "Successully saved to disk\n";
 	}
 
