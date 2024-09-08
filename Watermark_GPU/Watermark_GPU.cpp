@@ -8,12 +8,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <iomanip>
-#include <ios>
+#include <format>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <format>
 
 #define R_WEIGHT 0.299f
 #define G_WEIGHT 0.587f
