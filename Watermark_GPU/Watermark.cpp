@@ -16,6 +16,8 @@
 
 using std::cout;
 using std::string;
+using std::sqrt;
+using std::pow;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
@@ -112,8 +114,8 @@ af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, M
 		compute_prediction_error_mask(image, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		compute_custom_mask(image);
 	const af::array u = mask * w;
-	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
-	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
+	const float divisor = sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
+	a = (255.0f / sqrt(pow(10.0f, psnr / 10.0f))) / divisor;
 	return af::clamp((type == IMAGE_TYPE::RGB ? rgb_image : image) + (u * a), 0, 255);
 }
 
