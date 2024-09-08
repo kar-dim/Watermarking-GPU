@@ -23,7 +23,8 @@ namespace cuda_utils {
     cudaArray* cudaMallocArray(const std::size_t cols, const std::size_t rows)
     {
         cudaArray* cuArray;
-        cudaMallocArray(&cuArray, &cudaCreateChannelDesc<float>(), cols, rows);
+        auto cudaChannelDescriptor = cudaCreateChannelDesc<float>();
+        cudaMallocArray(&cuArray, &cudaChannelDescriptor, cols, rows);
         return cuArray;
     }
 
