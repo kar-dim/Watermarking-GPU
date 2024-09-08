@@ -105,7 +105,7 @@ std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(con
 }
 
 //Main watermark embedding method
-af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type) const
+af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE type) const
 {
 	af::array mask, error_sequence;
 	mask = mask_type == MASK_TYPE::ME ? 
@@ -114,9 +114,7 @@ af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, M
 	const af::array u = mask * w;
 	const float divisor = std::sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	a = (255.0f / std::sqrt(std::pow(10.0f, psnr / 10.0f))) / divisor;
-	return image_type == IMAGE_TYPE::RGB ?
-		af::clamp(rgb_image + af::tile((u * a), 1, 1, 3), 0, 255) :
-		af::clamp(image + (u * a), 0, 255);
+	return af::clamp((type == IMAGE_TYPE::RGB ? rgb_image : image) + (u * a), 0, 255);
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
