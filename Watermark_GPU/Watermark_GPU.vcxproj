@@ -51,9 +51,10 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;$(ProjectDir)libs\opencl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/wd4275 /wd4996 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -76,8 +77,9 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(ProjectDir)libs\CImg-3.2.2;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;$(projectDir)libs\opencl\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/wd4275 /wd4996 %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

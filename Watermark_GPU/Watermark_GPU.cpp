@@ -13,6 +13,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <format>
 
 #define R_WEIGHT 0.299f
 #define G_WEIGHT 0.587f
@@ -67,8 +68,7 @@ int main(void)
 	try {
 		string program_data = Utilities::load_file_as_string("kernels/nvf.cl");
 		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
-		const string nvf_buildFlags = "-cl-fast-relaxed-math -cl-mad-enable -Dp_squared=" + std::to_string(p * p);
-		program_nvf.build({ device }, nvf_buildFlags.c_str());
+		program_nvf.build({ device }, std::format("-cl-fast-relaxed-math -cl-mad-enable -Dp_squared={}", p * p).c_str());
 		program_data = Utilities::load_file_as_string("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
 		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
@@ -135,13 +135,13 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	timer::start();
 	af::array watermark_NVF = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
 	timer::end();
-	cout << "Watermark strength (parameter a): " << a << "\nCalculation of NVF mask with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
+	cout << std::format("Watermark strength (parameter a): {}\nCalculation of NVF mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, execution_time(show_fps, timer::secs_passed()));
 
 	//make ME watermark
 	timer::start();
 	af::array watermark_ME = watermark_obj.make_and_add_watermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
 	timer::end();
-	cout << "Watermak strength (parameter a): " << a << "\nCalculation of ME mask with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
+	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, execution_time(show_fps, timer::secs_passed()));
 
 	const af::array watermarked_NVF_gray = af::rgb2gray(watermark_NVF, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	const af::array watermarked_ME_gray = af::rgb2gray(watermark_ME, R_WEIGHT, G_WEIGHT, B_WEIGHT);
@@ -153,16 +153,16 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	timer::start();
 	float correlation_nvf = watermark_obj.mask_detector(watermarked_NVF_gray, MASK_TYPE::NVF);
 	timer::end();
-	cout << "Calculation of the watermark correlation (NVF) of an image with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
+	cout << std::format("Calculation of the watermark correlation (NVF) of an image with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", rows, cols, p, psnr, execution_time(show_fps, timer::secs_passed()));
 
 	//detection of ME
 	timer::start();
 	float correlation_me = watermark_obj.mask_detector(watermarked_ME_gray, MASK_TYPE::ME);
 	timer::end();
-	cout << "Calculation of the watermark correlation (ME) of an image with " << rows << " rows and " << cols << " columns and parameters:\np = " << p << "  PSNR(dB) = " << psnr << "\n" << execution_time(show_fps, timer::secs_passed()) << "\n\n";
+	cout << std::format("Calculation of the watermark correlation (ME) of an image with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", rows, cols, p, psnr, execution_time(show_fps, timer::secs_passed()));
 	
-	cout << "Correlation [NVF]: " << std::fixed << std::setprecision(16) << correlation_nvf << "\n";
-	cout << "Correlation [ME]: " << std::fixed << std::setprecision(16) << correlation_me << "\n";
+	cout << std::format("Correlation [NVF]: {:.16f}\n", correlation_nvf);
+	cout << std::format("Correlation [ME]: {:.16f}\n", correlation_me);
 
 	//save watermarked images to disk
 	if (inir.GetBoolean("options", "save_watermarked_files_to_disk", false)) {
@@ -348,7 +348,7 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 }
 
 std::string execution_time(const bool show_fps, const double seconds) {
-	return string(show_fps ? std::to_string(1 / seconds) + " FPS." : std::to_string(seconds) + " seconds.");
+	return show_fps ? std::format("FPS: {:.2f} FPS", 1.0 / seconds) : std::format("{:.6f} seconds", seconds);
 }
 
 //main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
