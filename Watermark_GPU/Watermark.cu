@@ -22,7 +22,7 @@ using std::pow;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
-	:w_file_path(w_file_path), p(p), p_squared(p* p), p_squared_minus_one(p_squared - 1), p_squared_minus_one_squared(p_squared_minus_one* p_squared_minus_one), pad(p / 2), psnr(psnr) 
+	:w_file_path(w_file_path), p(p), pad(p / 2), psnr(psnr) 
 {
 	rows = -1;
 	cols = -1;
@@ -96,6 +96,8 @@ af::array Watermark::calculate_neighbors_array(const af::array& array, const int
 //and to transform them to the correct size, so that they can be used by the system solver
 std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols) const
 {
+	const int p_squared_minus_one = (p * p) - 1;
+	const int p_squared_minus_one_squared = p_squared_minus_one * p_squared_minus_one;
 	af::array Rx_partial_sums = af::moddims(Rx_partial, p_squared_minus_one_squared, (padded_cols * rows) / p_squared_minus_one_squared);
 	af::array rx_partial_sums = af::moddims(rx_partial, p_squared_minus_one, (padded_cols * rows) / p_squared_minus_one);
 	//reduction sum of blocks
@@ -133,7 +135,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
 	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
-	af::array x_ = calculate_neighbors_array(image, p, p_squared, pad);
+	af::array x_ = calculate_neighbors_array(image, p, p * p, pad);
 	//cleanup and calculation of coefficients, error sequence and mask
 	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
 	image_transpose.unlock();
@@ -150,7 +152,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p_squared, pad)), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p * p, pad)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
