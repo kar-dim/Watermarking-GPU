@@ -37,7 +37,7 @@ private:
 	const cl::CommandQueue queue{ afcl::getQueue(true) };
 	const cl::Program program_me, program_custom;
 	const std::string w_file_path, custom_kernel_name;
-	const int p, p_squared, p_squared_minus_one, p_squared_minus_one_squared, pad;
+	const int p, pad;
 	const float psnr;
 	af::array rgb_image, image, w;
 	dim_t rows, cols;
