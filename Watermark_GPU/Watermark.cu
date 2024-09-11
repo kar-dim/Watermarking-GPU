@@ -3,6 +3,7 @@
 #include "kernels.cuh"
 #include <af/cuda.h>
 #include <arrayfire.h>
+#include <cmath>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <iostream>
@@ -16,8 +17,6 @@
 
 using std::string;
 using std::cout;
-using std::sqrt;
-using std::pow;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
