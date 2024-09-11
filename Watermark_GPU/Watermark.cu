@@ -3,7 +3,6 @@
 #include "kernels.cuh"
 #include <af/cuda.h>
 #include <arrayfire.h>
-#include <cmath>
 #include <cuda_runtime.h>
 #include <fstream>
 #include <iostream>
