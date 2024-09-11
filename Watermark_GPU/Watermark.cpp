@@ -16,8 +16,6 @@
 
 using std::cout;
 using std::string;
-using std::sqrt;
-using std::pow;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
