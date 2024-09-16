@@ -20,7 +20,7 @@ using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
-	:w_file_path(w_file_path), p(p), pad(p / 2), psnr(psnr) 
+	:w_file_path(w_file_path), p(p), psnr(psnr) 
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
@@ -142,7 +142,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
 	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
-	af::array x_ = calculate_neighbors_array(image, p, p * p, pad);
+	af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 	//cleanup and calculation of coefficients, error sequence and mask
 	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
 	image_transpose.unlock();
@@ -159,7 +159,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p * p, pad)), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p * p, p / 2)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter

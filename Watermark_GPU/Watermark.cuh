@@ -21,7 +21,7 @@ enum IMAGE_TYPE {
 class Watermark {
 private:
 	const std::string w_file_path;
-	const int p, pad;
+	const int p;
 	const float psnr;
 	af::array rgb_image, image, w;
 	dim_t rows, cols;

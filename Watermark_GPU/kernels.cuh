@@ -14,7 +14,7 @@ __constant__ int Rx_mappings[64] = {
         7,  14, 20, 25, 29, 32, 34, 35
 };
 
-template<int p, int p_squared = p * p, int pad = (p - 1) / 2>
+template<int p, int p_squared = p * p, int pad = p / 2>
 __global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int width, const int height)
 {
 	const int x = blockIdx.y * blockDim.y + threadIdx.y;
