@@ -21,6 +21,8 @@ using std::string;
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
 		:program_me(prog_me), program_custom(prog_custom), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), p(p), psnr(psnr)
 {
+	if (p != 3 && p != 5 && p != 7 && p != 9)
+		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
 	rows = -1;
 	cols = -1;
 }
