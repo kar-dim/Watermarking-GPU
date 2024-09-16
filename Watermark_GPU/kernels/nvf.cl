@@ -5,7 +5,7 @@ __kernel void nvf(__read_only image2d_t image,
 	const int width = get_image_width(image), height = get_image_height(image);
 	const int x = get_global_id(1), y = get_global_id(0);
 	const int p_squared = p * p;
-	const int pad = (p - 1) / 2;
+	const int pad = p / 2;
 
 	if (y >= height || x >= width)
 		return;

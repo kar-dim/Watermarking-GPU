@@ -19,7 +19,7 @@ using std::string;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
-		:program_me(prog_me), program_custom(prog_custom), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), p(p), pad(p / 2), psnr(psnr)
+		:program_me(prog_me), program_custom(prog_custom), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), p(p), psnr(psnr)
 {
 	rows = -1;
 	cols = -1;
@@ -140,7 +140,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 			kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512)).build(),
 			cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
-		af::array x_ = calculate_neighbors_array(image, p, p * p, pad);
+		af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 		queue.finish(); 
 		image_transpose.unlock();
 		const auto correlation_arrays = correlation_arrays_transformation(afcl::array(padded_cols, rows, Rx_buff(), af::dtype::f32, true), afcl::array(padded_cols, rows, rx_buff(), af::dtype::f32, true), padded_cols);
@@ -160,7 +160,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p * p, pad)), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p * p, p / 2)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
