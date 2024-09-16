@@ -1,11 +1,11 @@
 __kernel void nvf(__read_only image2d_t image, 
-				  __global float* m_nvf, 
-				    const int p,
-					const int pad)
+				  __global float* m_nvf)
 {	
 	const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
 	const int width = get_image_width(image), height = get_image_height(image);
 	const int x = get_global_id(1), y = get_global_id(0);
+	const int p_squared = p * p;
+	const int pad = (p - 1) / 2;
 
 	if (y >= height || x >= width)
 		return;

@@ -51,7 +51,7 @@ int main(void)
 		cout << "For now, only p=3 is allowed\n";
 		exit_program(EXIT_FAILURE);
 	}
-	/*if (p <= 1 || p % 2 != 1 || p > 9) {
+	/*if (p != 3 && p != 5 && p != 7 && p != 9) {
 		cout << "p parameter must be a positive odd number greater than or equal to 3 and less than or equal to 9\n";
 		exit_program(EXIT_FAILURE);
 	}*/
@@ -66,7 +66,7 @@ int main(void)
 	try {
 		string program_data = Utilities::load_file_as_string("kernels/nvf.cl");
 		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
-		program_nvf.build({ device }, std::format("-cl-fast-relaxed-math -cl-mad-enable -Dp_squared={}", p * p).c_str());
+		program_nvf.build({ device }, std::format("-cl-fast-relaxed-math -cl-mad-enable -Dp={}", p).c_str());
 		program_data = Utilities::load_file_as_string("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
 		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
