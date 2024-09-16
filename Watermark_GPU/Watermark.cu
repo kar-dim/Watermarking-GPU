@@ -22,6 +22,8 @@ using std::cout;
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
 	:w_file_path(w_file_path), p(p), pad(p / 2), psnr(psnr) 
 {
+	if (p != 3 && p != 5 && p != 7 && p != 9)
+		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
 	rows = -1;
 	cols = -1;
 	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
@@ -76,8 +78,15 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const af::array image_transpose = image.T();
 	auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
-	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(32, 32), rows, cols), dim3(32, 32));
-	nvf <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, p*p, pad, cols, rows);
+	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(16, 16), rows, cols), dim3(16, 16));
+	if (p == 3)
+		nvf<3> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
+	else if (p == 5)
+		nvf<5> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
+	else if (p == 7)
+		nvf<7> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
+	else if (p == 9)
+		nvf<9> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
 	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
 	image_transpose.unlock();
 	return af::array(rows, cols, mask_output, afDevice);

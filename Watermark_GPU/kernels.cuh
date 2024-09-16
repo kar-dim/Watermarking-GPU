@@ -13,5 +13,35 @@ __constant__ int Rx_mappings[64] = {
         6,  13, 19, 24, 28, 31, 33, 34,
         7,  14, 20, 25, 29, 32, 34, 35
 };
-__global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int p_squared, const int pad, const int width, const int height);
+
+template<int p, int p_squared = p * p, int pad = (p - 1) / 2>
+__global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int width, const int height)
+{
+	const int x = blockIdx.y * blockDim.y + threadIdx.y;
+	const int y = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (x >= width || y >= height)
+		return;
+
+	int i, j, k = 0;
+	float mean = 0.0f, variance = 0.0f, local_mean_diff;
+	//maximum local values size is 81 for a 9x9 block
+	float local_values[p_squared];
+	for (j = x - pad; j <= x + pad; j++) {
+		for (i = y - pad; i <= y + pad; i++) {
+			local_values[k] = tex2D<float>(texObj, j, i);
+			mean += local_values[k];
+			k++;
+		}
+	}
+	mean /= p_squared;
+	for (i = 0; i < p_squared; i++) {
+		local_mean_diff = local_values[i] - mean;
+		variance += local_mean_diff * local_mean_diff;
+	}
+	//calculate mask and write pixel value
+	const float nvf_mask = variance / ((p_squared - 1) + variance);
+	m_nvf[(x * height) + y] = nvf_mask;
+}
+
 __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int padded_width, const int height);
