@@ -79,14 +79,12 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
 	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(16, 16), rows, cols), dim3(16, 16));
-	if (p == 3)
-		nvf<3> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
-	else if (p == 5)
-		nvf<5> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
-	else if (p == 7)
-		nvf<7> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
-	else if (p == 9)
-		nvf<9> <<<dimensions.first, dimensions.second, 0, af_cuda_stream>>> (texture_data.first, mask_output, cols, rows);
+	switch (p) {
+		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, cols, rows); break;
+		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, cols, rows); break;
+		case 7: nvf<7> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, cols, rows); break;
+		case 9: nvf<9> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, cols, rows); break;
+	}
 	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
 	image_transpose.unlock();
 	return af::array(rows, cols, mask_output, afDevice);
