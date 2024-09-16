@@ -72,7 +72,7 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 		cl::Image2D image2d = cl_utils::copyBufferToImage(context, queue, image_buff, rows, cols);
 		cl::Buffer buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * rows * cols, NULL);
 		cl_utils::KernelBuilder kernel_builder(program_custom, custom_kernel_name.c_str());
-		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff, p, pad).build(), 
+		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff).build(), 
 			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
 		image_transpose.unlock();
