@@ -19,7 +19,7 @@ using std::string;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
-		:program_me(prog_me), program_custom(prog_custom), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), p(p), psnr(psnr), strength_factor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+		:program_me(prog_me), program_custom(prog_custom), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), p(p), strength_factor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
