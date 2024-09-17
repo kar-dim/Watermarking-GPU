@@ -22,7 +22,7 @@ class Watermark {
 private:
 	const std::string w_file_path;
 	const int p;
-	const float psnr, strength_factor;
+	const float strength_factor;
 	af::array rgb_image, image, w;
 	dim_t rows, cols;
 	cudaStream_t af_cuda_stream, custom_kernels_stream;

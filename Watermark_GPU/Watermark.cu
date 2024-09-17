@@ -20,7 +20,7 @@ using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
-	:w_file_path(w_file_path), p(p), psnr(psnr), strength_factor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+	:w_file_path(w_file_path), p(p), strength_factor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
