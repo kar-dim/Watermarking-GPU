@@ -20,7 +20,7 @@ using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
-	:w_file_path(w_file_path), p(p), psnr(psnr) 
+	:w_file_path(w_file_path), p(p), psnr(psnr), strength_factor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
@@ -76,9 +76,9 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
+	const auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
-	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(16, 16), rows, cols), dim3(16, 16));
+	const auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(16, 16), rows, cols), dim3(16, 16));
 	switch (p) {
 		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, cols, rows); break;
 		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texture_data.first, mask_output, cols, rows); break;
@@ -93,7 +93,7 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 //helper method to calculate the neighbors ("x_" array)
 af::array Watermark::calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) const 
 {
-	af::array array_unwrapped = af::unwrap(array, p, p, 1, 1, pad, pad, false);
+	const af::array array_unwrapped = af::unwrap(array, p, p, 1, 1, pad, pad, false);
 	return af::join(1, array_unwrapped(af::span, af::seq(0, (p_squared / 2) - 1)), array_unwrapped(af::span, af::seq((p_squared / 2) + 1, af::end)));
 }
 
@@ -101,28 +101,25 @@ af::array Watermark::calculate_neighbors_array(const af::array& array, const int
 //and to transform them to the correct size, so that they can be used by the system solver
 std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols) const
 {
-	const int p_squared_minus_one = (p * p) - 1;
-	const int p_squared_minus_one_squared = p_squared_minus_one * p_squared_minus_one;
-	af::array Rx_partial_sums = af::moddims(Rx_partial, p_squared_minus_one_squared, (padded_cols * rows) / p_squared_minus_one_squared);
-	af::array rx_partial_sums = af::moddims(rx_partial, p_squared_minus_one, (padded_cols * rows) / p_squared_minus_one);
+	const int p_sq_minus_one = (p * p) - 1;
+	const int p_sq_minus_one_sq = p_sq_minus_one * p_sq_minus_one;
 	//reduction sum of blocks
 	//all [p^2-1,1] blocks will be summed in rx
 	//all [p^2-1, p^2-1] blocks will be summed in Rx
-	af::array Rx = af::moddims(af::sum(Rx_partial_sums, 1), p_squared_minus_one, p_squared_minus_one);
-	af::array rx = af::sum(rx_partial_sums, 1);
+	const af::array Rx = af::moddims(af::sum(af::moddims(Rx_partial, p_sq_minus_one_sq, (padded_cols * rows) / p_sq_minus_one_sq), 1), p_sq_minus_one, p_sq_minus_one);
+	const af::array rx = af::sum(af::moddims(rx_partial, p_sq_minus_one, (padded_cols * rows) / p_sq_minus_one), 1);
 	return std::make_pair(Rx, rx);
 }
 
 //Main watermark embedding method
 af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE type) const
 {
-	af::array mask, error_sequence;
-	mask = mask_type == MASK_TYPE::ME ? 
+	af::array error_sequence;
+	const af::array mask = mask_type == MASK_TYPE::ME ?
 		compute_prediction_error_mask(image, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		compute_custom_mask(image);
 	const af::array u = mask * w;
-	const float divisor = sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
-	a = (255.0f / sqrt(pow(10.0f, psnr / 10.0f))) / divisor;
+	a = strength_factor / sqrt(af::sum<float>(af::pow(u, 2)) / image.elements());
 	return af::clamp((type == IMAGE_TYPE::RGB ? rgb_image : image) + (u * a), 0, 255);
 }
 
@@ -135,12 +132,12 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const af::array image_transpose = image.T();
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	//copy image to texture cache and call custom kernel
-	auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
+	const auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
-	auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
+	const auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
 	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
-	af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
+	const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 	//cleanup and calculation of coefficients, error sequence and mask
 	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
 	image_transpose.unlock();
@@ -171,7 +168,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, const
 //helper method used in detectors
 float Watermark::calculate_correlation(const af::array& e_u, const af::array& e_z) const 
 {
-	double dot_ez_eu = af::dot<double>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
+	const double dot_ez_eu = af::dot<double>(af::flat(e_u), af::flat(e_z)); //dot() needs vectors, so we flatten the arrays
 	return static_cast<float>(dot_ez_eu / (af::norm(e_z) * af::norm(e_u)));
 }
 
@@ -193,8 +190,8 @@ float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mas
 //fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
 float Watermark::mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients) const
 {
-	af::array m_e, e_z, e_u, a_u;
-	m_e = compute_prediction_error_mask(watermarked_image, coefficients, e_z);
+	af::array e_z, e_u, a_u;
+	const af::array m_e = compute_prediction_error_mask(watermarked_image, coefficients, e_z);
 	const af::array u = m_e * w;
 	compute_prediction_error_mask(u, e_u, a_u, ME_MASK_CALCULATION_REQUIRED_NO);
 	return calculate_correlation(e_u, e_z);
