@@ -148,7 +148,7 @@
       <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
+      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
