@@ -107,7 +107,7 @@ std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(con
 	//all [p^2-1,1] blocks will be summed in rx
 	//all [p^2-1, p^2-1] blocks will be summed in Rx
 	const af::array Rx = af::moddims(af::sum(af::moddims(Rx_partial, p_sq_minus_one_sq, (padded_cols * rows) / p_sq_minus_one_sq), 1), p_sq_minus_one, p_sq_minus_one);
-	const af::array rx = af::sum(af::moddims(rx_partial, p_sq_minus_one, (padded_cols * rows) / p_sq_minus_one), 1);
+	const af::array rx = af::sum(af::moddims(rx_partial, p_sq_minus_one, (padded_cols * rows) / (8 * p_sq_minus_one)), 1);
 	return std::make_pair(Rx, rx);
 }
 
@@ -134,14 +134,14 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	//copy image to texture cache and call custom kernel
 	const auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
-	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
+	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols / 8);
 	const auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
 	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
 	const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 	//cleanup and calculation of coefficients, error sequence and mask
 	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
 	image_transpose.unlock();
-	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols, rows, rx_buff, afDevice), padded_cols);
+	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols / 8, rows, rx_buff, afDevice), padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 	if (mask_needed) {
