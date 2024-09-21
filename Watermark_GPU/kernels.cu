@@ -10,6 +10,9 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 
     __shared__ float Rx_local[64][36];
     __shared__ float rx_local[8][64];
+    //initialize rx shared memory with coalesced access
+    for (int i = 0; i < 8; i++)
+        rx_local[i][local_id] = 0.0f;
 
     if (y >= height)
         return;
@@ -51,11 +54,9 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     block_sum[local_id % 8][local_id / 8] = 0.0f;
     __syncthreads();
 
-    if (local_id < limit) {
-        for (int i = 0; i < 8; i++)
-            reduction_sum_rx += rx_local[local_id / 8][((local_id % 8) * 8) + i];
-        block_sum[local_id % 8][local_id / 8] = reduction_sum_rx;
-    }
+    for (int i = 0; i < 8; i++)
+        reduction_sum_rx += rx_local[local_id / 8][((local_id % 8) * 8) + i];
+    block_sum[local_id % 8][local_id / 8] = reduction_sum_rx;
     __syncthreads();
 
     float row_sum = 0.0f;
