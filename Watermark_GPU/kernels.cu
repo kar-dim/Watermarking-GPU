@@ -10,7 +10,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     const bool is_padded = padded_width > width;
 
     __shared__ float Rx_local[64][36];
-    __shared__ float rx_local[64][8];
+    __shared__ float rx_local[8][64];
 
     if (y >= height)
         return;
@@ -27,10 +27,10 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
         for (int i = 4; i < 8; i++)
             x_[i] = x_[i + 1];
 
-        //calculate this thread's 64 local Rx and 8 local rx values
+        //calculate this thread's 36 local Rx and 8 local rx values
         counter = 0;
         for (int i = 0; i < 8; i++) {
-            rx_local[local_id][i] = x_[i] * current_pixel;
+            rx_local[i][local_id] = x_[i] * current_pixel;
             for (int j = i; j < 8; j++)
                 Rx_local[local_id][counter++] = x_[i] * x_[j];
         }
@@ -44,10 +44,26 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
     for (int j = 0; j < limit; j++)
         reduction_sum_Rx += Rx_local[j][Rx_mappings[local_id]];
+
+    //optimized summation for rx: normally we would sum 64 values per line/thread for a total of 8 sums
+    //but this introduces heavy uncoalesced shared loads and bank conflicts, so we assign each of the 64 threads
+    //to partially sum 8 horizontal values, and then the first 8 threads will fully sum the partial sums
+    __shared__ float block_sum[8][8];
+    block_sum[local_id % 8][local_id / 8] = 0.0f;
+    __syncthreads();
+
+    if (local_id < limit) {
+        for (int i = 0; i < 8; i++) {
+            reduction_sum_rx += rx_local[local_id / 8][((local_id % 8) * 8) + i];
+        }
+        block_sum[local_id % 8][local_id / 8] = reduction_sum_rx;
+    }
+    __syncthreads();
+    float row_sum = 0.0f;
     if (local_id < 8) {
-        for (int j = 0; j < limit; j++)
-            reduction_sum_rx += rx_local[j][local_id];
-        rx[(output_index / 8) + local_id] = reduction_sum_rx;
+        for (int i = 0; i < 8; i++)
+            row_sum += block_sum[i][local_id];
+        rx[(output_index / 8) + local_id] = row_sum;
     }
     Rx[output_index] = reduction_sum_Rx;
 }
