@@ -10,6 +10,7 @@
 #include <exception>
 #include <format>
 #include <iostream>
+//#include <omp.h>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,10 @@ int main(void)
 		cout << "Could not load CUDA configuration file\n";
 		exit_program(EXIT_FAILURE);
 	}
+
+	//omp_set_num_threads(omp_get_max_threads());
+//#pragma omp parallel for
+	//for (int i = 0; i < 24; i++) { }
 
 	af::info();
 	cout << "\n";
@@ -140,13 +145,13 @@ int test_for_image(const INIReader& inir, const cudaDeviceProp& properties, cons
 	//save watermarked images to disk
 	if (inir.GetBoolean("options", "save_watermarked_files_to_disk", false)) {
 		cout << "\nSaving watermarked files to disk...\n";
-#pragma omp parallel sections
-		{
-#pragma omp section
+//#pragma omp parallel sections
+		//{
+//#pragma omp section
 			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_NVF").c_str(), watermark_NVF.as(af::dtype::u8));
-#pragma omp section
+//#pragma omp section
 			af::saveImageNative(Utilities::add_suffix_before_extension(image_file, "_W_ME").c_str(), watermark_ME.as(af::dtype::u8));
-		}
+		//}
 		cout << "Successully saved to disk\n";
 	}
 	return EXIT_SUCCESS;
@@ -308,11 +313,8 @@ int test_for_video(const INIReader& inir, const cudaDeviceProp& properties, cons
 		string video_compressed_path = inir.Get("paths", "video_compressed", "NO_VIDEO");
 		CImgList<unsigned char>video_cimg_w = CImgList<unsigned char>::get_load_video(video_compressed_path.c_str(), 0, frames - 1);
 		std::vector<af::array> watermarked_frames(frames);
-#pragma omp parallel for
-		for (int i = 0; i < frames; i++) {
+		for (int i = 0; i < frames; i++)
 			watermarked_frames[i] = Utilities::cimg_yuv_to_afarray<unsigned char>(video_cimg_w.at(i));
-		}
-
 		realtime_detection(watermarkFunctions, watermarked_frames, frames, display_frames, frame_period, show_fps);
 	}
 	return EXIT_SUCCESS;
