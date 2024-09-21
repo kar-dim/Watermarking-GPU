@@ -5,7 +5,6 @@
 #include <af/opencl.h>
 #include <cmath>
 #include <fstream>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -14,7 +13,6 @@
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true
 
-using std::cout;
 using std::string;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
@@ -102,7 +100,7 @@ std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(con
 	//all [p^2-1,1] blocks will be summed in rx
 	//all [p^2-1, p^2-1] blocks will be summed in Rx
 	const af::array Rx = af::moddims(af::sum(af::moddims(Rx_partial, p_sq_minus_one_sq, (padded_cols * rows) / p_sq_minus_one_sq), 1), p_sq_minus_one, p_sq_minus_one);
-	const af::array rx = af::sum(af::moddims(rx_partial, p_sq_minus_one, (padded_cols * rows) / p_sq_minus_one), 1);
+	const af::array rx = af::sum(af::moddims(rx_partial, p_sq_minus_one, (padded_cols * rows) / (8 * p_sq_minus_one)), 1);
 	return std::make_pair(Rx, rx);
 }
 
@@ -132,17 +130,18 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 		const cl_mem *buffer = image_transpose.device<cl_mem>();
 		const cl::Image2D image2d = cl_utils::copyBufferToImage(context, queue, buffer, rows, cols);
 		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
-		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
+		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows / 8, NULL, &err);
 		const cl::Buffer Rx_mappings_buff(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void *)Rx_mappings, &err);
 		cl_utils::KernelBuilder kernel_builder(program_me, "me");
 		queue.enqueueNDRangeKernel(
-			kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512)).build(),
-			cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
+				kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, 
+				cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512), cl::Local(sizeof(float) * 64)).build(),
+				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
 		const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 		queue.finish(); 
 		image_transpose.unlock();
-		const auto correlation_arrays = correlation_arrays_transformation(afcl::array(padded_cols, rows, Rx_buff(), af::dtype::f32, true), afcl::array(padded_cols, rows, rx_buff(), af::dtype::f32, true), padded_cols);
+		const auto correlation_arrays = correlation_arrays_transformation(afcl::array(padded_cols, rows, Rx_buff(), af::dtype::f32, true), afcl::array(padded_cols / 8, rows, rx_buff(), af::dtype::f32, true), padded_cols);
 		coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 		error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 		if (mask_needed) {

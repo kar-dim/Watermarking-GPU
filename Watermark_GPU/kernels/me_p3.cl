@@ -4,16 +4,19 @@ __kernel void me(__read_only image2d_t image,
     __global float* rx,
     __constant int* Rx_mappings,
     __local float Rx_local[64][36], //64 local threads, 36 values each
-    __local float rx_local[512]) //64 local threads, 8 values each
+    __local float rx_local[8][64],
+    __local float rx_partial[8][8]) //helper scratch memory for rx calculation
 {
     const int x = get_global_id(1), y = get_global_id(0);
     const int width = get_image_width(image);
     const int padded_width = get_global_size(1);
     const int local_id = get_local_id(1);
-    const int rx_stride = local_id * 8;
-    const int Rx_stride = local_id * 64;
     const int output_index = (y * padded_width) + x;
     const bool is_padded = padded_width > width;
+
+    //initialize rx shared memory with coalesced access
+    for (int i = 0; i < 8; i++)
+        rx_local[i][local_id] = 0.0f;
 
     //fix for OpenCL 1.2 where global size % local size should be 0, and local size is padded, a bound check is needed
     if (x < width) {
@@ -32,13 +35,9 @@ __kernel void me(__read_only image2d_t image,
         //calculate this thread's 64 local Rx and 8 local rx values
         counter = 0;
         for (int i = 0; i < 8; i++) {
-            rx_local[rx_stride + i] = x_[i] * current_pixel;
-            Rx_local[local_id][counter] = x_[i] * x_[i];
-            counter++;
-            for (int j = i + 1; j < 8; j++) {
-                Rx_local[local_id][counter] = x_[i] * x_[j];
-                counter++;
-            }
+            rx_local[i][local_id] = x_[i] * current_pixel;
+            for (int j = i; j < 8; j++)
+                Rx_local[local_id][counter++] = x_[i] * x_[j]; 
         }
     }
     //each thread will calculate the reduction sums of Rx and rx and write them to global memory
@@ -49,8 +48,25 @@ __kernel void me(__read_only image2d_t image,
     float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
     for (int j = 0; j < limit; j++)
         reduction_sum_Rx += Rx_local[j][Rx_mappings[local_id]];
-    for (int j = 0; j < (512 * limit) / 64; j += 64)
-        reduction_sum_rx += rx_local[local_id + j];
+
+
+    //optimized summation for rx: normally we would sum 64 values per line/thread for a total of 8 sums
+    //but this introduces heavy uncoalesced shared loads and bank conflicts, so we assign each of the 64 threads
+    //to partially sum 8 horizontal values, and then the first 8 threads will fully sum the partial sums
+    rx_partial[local_id % 8][local_id / 8] = 0.0f;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int i = 0; i < 8; i++) {
+        reduction_sum_rx += rx_local[local_id / 8][((local_id % 8) * 8) + i];
+    }
+    rx_partial[local_id % 8][local_id / 8] = reduction_sum_rx;
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    float row_sum = 0.0f;
+    if (local_id < 8) {
+        for (int i = 0; i < 8; i++)
+            row_sum += rx_partial[i][local_id];
+        rx[(output_index / 8) + local_id] = row_sum;
+    }
     Rx[output_index] = reduction_sum_Rx;
-    rx[output_index] = reduction_sum_rx;
 }
