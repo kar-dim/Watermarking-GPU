@@ -5,7 +5,6 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     const int x = blockIdx.y * blockDim.y + threadIdx.y;
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
 	const int local_id = threadIdx.y;
-	const int rx_stride = local_id * 8;
 	const int output_index = (y * padded_width) + x;
     const bool is_padded = padded_width > width;
 
@@ -53,12 +52,12 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     __syncthreads();
 
     if (local_id < limit) {
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++)
             reduction_sum_rx += rx_local[local_id / 8][((local_id % 8) * 8) + i];
-        }
         block_sum[local_id % 8][local_id / 8] = reduction_sum_rx;
     }
     __syncthreads();
+
     float row_sum = 0.0f;
     if (local_id < 8) {
         for (int i = 0; i < 8; i++)

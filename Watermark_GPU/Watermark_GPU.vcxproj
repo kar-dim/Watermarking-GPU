@@ -144,8 +144,9 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <FastMath>true</FastMath>
-      <AdditionalOptions>-diag-suppress 1388 -lineinfo %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-diag-suppress 1388 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
+      <GenerateLineInfo>true</GenerateLineInfo>
     </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D</Command>

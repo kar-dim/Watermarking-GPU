@@ -6,7 +6,6 @@
 #include <cmath>
 #include <cuda_runtime.h>
 #include <fstream>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -16,7 +15,6 @@
 #define ME_MASK_CALCULATION_REQUIRED_YES true
 
 using std::string;
-using std::cout;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
 Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
