@@ -133,7 +133,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const auto texture_data = cuda_utils::copy_array_to_texture_data(image_transpose.device<float>(), rows, cols);
 	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols / 8);
-	const auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
+	const auto dimensions = std::make_pair(cuda_utils::grid_size_calculate(dim3(8, 64), rows, padded_cols), dim3(8, 64));
 	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
 	const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 	//cleanup and calculation of coefficients, error sequence and mask
