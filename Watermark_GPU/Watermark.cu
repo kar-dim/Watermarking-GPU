@@ -97,7 +97,7 @@ af::array Watermark::calculate_neighbors_array(const af::array& array, const int
 
 //helper method to sum the incomplete Rx_partial and rx_partial arrays which were produced from the custom kernel
 //and to transform them to the correct size, so that they can be used by the system solver
-std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int padded_cols) const
+std::pair<af::array, af::array> Watermark::correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const
 {
 	const int p_sq_minus_one = (p * p) - 1;
 	const int p_sq_minus_one_sq = p_sq_minus_one * p_sq_minus_one;
@@ -139,7 +139,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	//cleanup and calculation of coefficients, error sequence and mask
 	cuda_utils::synchronize_and_cleanup_texture_data(custom_kernels_stream, texture_data);
 	image_transpose.unlock();
-	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols / 8, rows, rx_buff, afDevice), padded_cols);
+	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols / 8, rows, rx_buff, afDevice), rows, padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 	if (mask_needed) {
