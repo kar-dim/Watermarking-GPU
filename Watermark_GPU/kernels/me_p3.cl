@@ -17,6 +17,7 @@ __kernel void me(__read_only image2d_t image,
     //initialize rx shared memory with coalesced access
     for (int i = 0; i < 8; i++)
         rx_local[i][local_id] = 0.0f;
+    rx_partial[local_id % 8][local_id / 8] = 0.0f;
 
     //fix for OpenCL 1.2 where global size % local size should be 0, and local size is padded, a bound check is needed
     if (x < width) {
@@ -40,25 +41,21 @@ __kernel void me(__read_only image2d_t image,
                 Rx_local[local_id][counter++] = x_[i] * x_[j]; 
         }
     }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
     //each thread will calculate the reduction sums of Rx and rx and write them to global memory
     //if image is padded we don't want to sum the garbage local array values, we could zero the local array
     //but it would cost time, instead it is better to calculate what is needed directly
-    barrier(CLK_LOCAL_MEM_FENCE);
     const int limit = (is_padded && padded_width - x <= 64) ? 64 - (padded_width - width) : 64;
     float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
     for (int j = 0; j < limit; j++)
         reduction_sum_Rx += Rx_local[j][Rx_mappings[local_id]];
 
-
     //optimized summation for rx: normally we would sum 64 values per line/thread for a total of 8 sums
     //but this introduces heavy uncoalesced shared loads and bank conflicts, so we assign each of the 64 threads
     //to partially sum 8 horizontal values, and then the first 8 threads will fully sum the partial sums
-    rx_partial[local_id % 8][local_id / 8] = 0.0f;
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; i++)
         reduction_sum_rx += rx_local[local_id / 8][((local_id % 8) * 8) + i];
-    }
     rx_partial[local_id % 8][local_id / 8] = reduction_sum_rx;
     barrier(CLK_LOCAL_MEM_FENCE);
     
