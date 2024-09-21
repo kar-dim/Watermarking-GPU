@@ -10,9 +10,12 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 
     __shared__ float Rx_local[64][36];
     __shared__ float rx_local[8][64];
+    __shared__ float rx_partial[8][8];
+
     //initialize rx shared memory with coalesced access
     for (int i = 0; i < 8; i++)
         rx_local[i][local_id] = 0.0f;
+    rx_partial[local_id % 8][local_id / 8] = 0.0f;
 
     if (y >= height)
         return;
@@ -50,19 +53,15 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     //optimized summation for rx: normally we would sum 64 values per line/thread for a total of 8 sums
     //but this introduces heavy uncoalesced shared loads and bank conflicts, so we assign each of the 64 threads
     //to partially sum 8 horizontal values, and then the first 8 threads will fully sum the partial sums
-    __shared__ float block_sum[8][8];
-    block_sum[local_id % 8][local_id / 8] = 0.0f;
-    __syncthreads();
-
     for (int i = 0; i < 8; i++)
         reduction_sum_rx += rx_local[local_id / 8][((local_id % 8) * 8) + i];
-    block_sum[local_id % 8][local_id / 8] = reduction_sum_rx;
+    rx_partial[local_id % 8][local_id / 8] = reduction_sum_rx;
     __syncthreads();
 
     float row_sum = 0.0f;
     if (local_id < 8) {
         for (int i = 0; i < 8; i++)
-            row_sum += block_sum[i][local_id];
+            row_sum += rx_partial[i][local_id];
         rx[(output_index / 8) + local_id] = row_sum;
     }
     Rx[output_index] = reduction_sum_Rx;
