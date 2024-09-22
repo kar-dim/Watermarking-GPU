@@ -162,9 +162,9 @@ af::array Watermark::calculate_error_sequence(const af::array& u, const af::arra
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
-af::array Watermark::compute_prediction_error_mask(const af::array& image, const af::array& coeficcients, af::array& error_sequence) const
+af::array Watermark::compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& error_sequence) const
 {
-	error_sequence = calculate_error_sequence(image, coeficcients);
+	error_sequence = calculate_error_sequence(image, coefficients);
 	const af::array error_sequence_abs = af::abs(error_sequence);
 	return error_sequence_abs / af::max<float>(error_sequence_abs);
 }
