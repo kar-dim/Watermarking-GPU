@@ -136,7 +136,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 		queue.enqueueNDRangeKernel(
 				kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, 
 				cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512), cl::Local(sizeof(float) * 64)).build(),
-				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(8, 64));
+				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
 		const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 		queue.finish(); 
