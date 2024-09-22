@@ -14,7 +14,7 @@ namespace cuda_utils {
     }
 
     //Helper method to calculate kernel grid and block size from given 2D dimensions
-    dim3 gridSizeCalculate(const dim3 blockSize, const int rows, const int cols) 
+    dim3 gridSizeCalculate(const dim3 blockSize, const int rows, const int cols)
     {
         return dim3((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
     }
@@ -61,7 +61,7 @@ namespace cuda_utils {
     }
 
     //get a cudaDeviceProp handle to query for various device information
-    cudaDeviceProp getDeviceProperties() 
+    cudaDeviceProp getDeviceProperties()
     {
         int device;
         cudaGetDevice(&device);
@@ -70,26 +70,8 @@ namespace cuda_utils {
         return properties;
     }
 
-    //enqueue an async texture copy
-    cudaArray* copyArrayTo2DInitAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaStream_t cudaStream) 
-    {
-	    cudaArray* cuArray = cuda_utils::cudaMallocArray(cols, rows);
-	    cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice, cudaStream);
-        return cuArray;
-    }
-
-    //finalize async texture copy
-    std::pair<cudaTextureObject_t, cudaArray*> copyArrayTo2DFinalizeAsync(cudaArray* cuArray, cudaStream_t cudaStream)
-    {
-        cudaStreamSynchronize(cudaStream);
-        cudaResourceDesc resDesc = cuda_utils::createResourceDescriptor(cuArray);
-        cudaTextureDesc texDesc = cuda_utils::createTextureDescriptor();
-        cudaTextureObject_t texObj = cuda_utils::createTextureObject(resDesc, texDesc);
-        return std::make_pair(texObj, cuArray);
-    }
-
-    //non-async version, used for custom masks which don't need async
-    std::pair<cudaTextureObject_t, cudaArray*> copyArrayTo2D(const float* data, const unsigned int rows, const unsigned int cols)
+    //copy data from arrayfire to a cudaArray, and then create the texture object
+    std::pair<cudaTextureObject_t, cudaArray*> copyArrayToTexture(const float* data, const unsigned int rows, const unsigned int cols)
     {
         cudaArray* cuArray = cuda_utils::cudaMallocArray(cols, rows);
         cudaMemcpy2DToArray(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);

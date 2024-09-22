@@ -11,8 +11,6 @@ namespace cuda_utils {
     cudaTextureDesc createTextureDescriptor();
     cudaTextureObject_t createTextureObject(const cudaResourceDesc& pResDesc, const cudaTextureDesc& pTexDesc);
     cudaDeviceProp getDeviceProperties();
-    std::pair<cudaTextureObject_t, cudaArray*> copyArrayTo2D(const float* data, const unsigned int rows, const unsigned int cols);
-    cudaArray* copyArrayTo2DInitAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaStream_t cudaStream);
-    std::pair<cudaTextureObject_t, cudaArray*> copyArrayTo2DFinalizeAsync(cudaArray* cuArray, cudaStream_t cudaStream);
+    std::pair<cudaTextureObject_t, cudaArray*> copyArrayToTexture(const float* data, const unsigned int rows, const unsigned int cols);
     void synchronizeAndCleanupTexture(cudaStream_t stream, const std::pair<cudaTextureObject_t, cudaArray*>& texture_data);
 }
