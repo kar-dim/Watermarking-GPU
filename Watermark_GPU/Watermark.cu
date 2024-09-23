@@ -89,10 +89,11 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 }
 
 //helper method to calculate the neighbors ("x_" array)
-af::array Watermark::calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) const 
+af::array Watermark::calculate_neighbors_array(const af::array& array) const 
 {
-	const af::array array_unwrapped = af::unwrap(array, p, p, 1, 1, pad, pad, false);
-	return af::join(1, array_unwrapped(af::span, af::seq(0, (p_squared / 2) - 1)), array_unwrapped(af::span, af::seq((p_squared / 2) + 1, af::end)));
+	const int center = (p * p) / 2;
+	af::array unwrapped = af::unwrap(array, p, p, 1, 1, p / 2, p / 2, false);
+	return af::join(1, unwrapped(af::span, af::seq(0, center - 1)), unwrapped(af::span, af::seq(center + 1, af::end)));
 }
 
 //helper method to sum the incomplete Rx_partial and rx_partial arrays which were produced from the custom kernel
@@ -130,7 +131,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const af::array image_transpose = image.T();
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	//enqueue "x_" kernel (which is heavy)
-	const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
+	const af::array x_ = calculate_neighbors_array(image);
 	//initialize custom kernel memory
 	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols / 8);
@@ -154,7 +155,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p * p, p / 2)), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter

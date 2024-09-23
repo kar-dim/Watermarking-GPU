@@ -32,7 +32,7 @@ private:
 	af::array compute_prediction_error_mask(const af::array& image, af::array& error_sequence, af::array& coefficients, const bool mask_needed) const;
 	af::array compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& error_sequence) const;
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients) const;
-	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) const;
+	af::array calculate_neighbors_array(const af::array& array) const;
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const;
 public:
 	Watermark(const af::array& rgb_image, const af::array& image, const std::string& w_file_path, const int p, const float psnr);
