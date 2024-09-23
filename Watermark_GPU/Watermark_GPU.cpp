@@ -41,7 +41,13 @@ int main(void)
 //#pragma omp parallel for
 	//for (int i = 0; i < 24; i++) { }
 
-	af::setDevice(inir.GetInteger("options", "opencl_device", 0));
+	try {
+		af::setDevice(inir.GetInteger("options", "opencl_device", 0));
+	}
+	catch (const std::exception&) {
+		cout << "NOTE: Invalid OpenCL device specified, using default 0" << "\n";
+		af::setDevice(0);
+	}
 	af::info();
 	cout << "\n";
 
