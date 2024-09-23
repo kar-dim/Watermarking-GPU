@@ -127,6 +127,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const af::array image_transpose = image.T();
 	cl_int err;
 	try {
+		const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 		const cl_mem *buffer = image_transpose.device<cl_mem>();
 		const cl::Image2D image2d = cl_utils::copyBufferToImage(context, queue, buffer, rows, cols);
 		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
@@ -138,7 +139,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 				cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512), cl::Local(sizeof(float) * 64)).build(),
 				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
-		const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
+
 		queue.finish(); 
 		image_transpose.unlock();
 		const auto correlation_arrays = correlation_arrays_transformation(afcl::array(padded_cols, rows, Rx_buff(), af::dtype::f32, true), afcl::array(padded_cols / 8, rows, rx_buff(), af::dtype::f32, true), rows, padded_cols);
