@@ -26,7 +26,6 @@ Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
 	cols = -1;
 	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 	cudaStreamCreate(&custom_kernels_stream);
-
 }
 
 //full constructor
@@ -42,14 +41,23 @@ Watermark::Watermark(const af::array &rgb_image, const af::array& image, const s
 Watermark::~Watermark()
 {
 	cudaStreamDestroy(custom_kernels_stream);
+	cudaDestroyTextureObject(texObj);
+	cudaFreeArray(texArray);
 }
 
-//supply the input image to apply watermarking and detection
+//supply the input image to apply watermarking and detection, and initialize texture data
 void Watermark::load_image(const af::array& image) 
 {
 	this->image = image;
 	rows = image.dims(0);
 	cols = image.dims(1);
+	//initialize texture objects only once
+	if (texObj == 0) {
+		auto texture_data = cuda_utils::createTextureData(
+			static_cast<unsigned int>(rows), static_cast<unsigned int>(cols));
+		texObj = texture_data.first;
+		texArray = texture_data.second;
+	}
 }
 
 //helper method to load the random noise matrix W from the file specified.
@@ -74,16 +82,17 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	const auto texture_data = cuda_utils::copyArrayToTexture(image_transpose.device<float>(), rows, cols);
+	cuda_utils::copyDataToCudaArrayAsync(image_transpose.device<float>(), rows, cols, texArray, custom_kernels_stream);
 	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
 	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(16, 16), rows, cols), dim3(16, 16));
+	cudaStreamSynchronize(custom_kernels_stream);
 	switch (p) {
-		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texture_data.first, mask_output, cols, rows); break;
-		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texture_data.first, mask_output, cols, rows); break;
-		case 7: nvf<7> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texture_data.first, mask_output, cols, rows); break;
-		case 9: nvf<9> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texture_data.first, mask_output, cols, rows); break;
+		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
+		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
+		case 7: nvf<7> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
+		case 9: nvf<9> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
 	}
-	cuda_utils::synchronizeAndCleanupTexture(custom_kernels_stream, texture_data);
+	cudaStreamSynchronize(custom_kernels_stream);
 	image_transpose.unlock();
 	return af::array(rows, cols, mask_output, afDevice);
 }
@@ -126,22 +135,31 @@ af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, M
 //can also calculate error sequence and prediction error filter
 af::array Watermark::compute_prediction_error_mask(const af::array& image, af::array& error_sequence, af::array& coefficients, const bool mask_needed) const
 {
+	//constant data
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
+
+	//do a texture copy (for custom kernel)
+	cuda_utils::copyDataToCudaArrayAsync(image_transpose.device<float>(), rows, cols, texArray, custom_kernels_stream);
+
 	//enqueue "x_" kernel (which is heavy)
 	const af::array x_ = calculate_neighbors_array(image);
+	
 	//initialize custom kernel memory
 	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
 	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols / 8);
-	//do a texture copy (for custom kernel)
-	const auto texture_data = cuda_utils::copyArrayToTexture(image_transpose.device<float>(), rows, cols);
-	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
-	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texture_data.first, Rx_buff, rx_buff, cols, padded_cols, rows);
-	//cleanup and calculation of coefficients, error sequence and mask
-	cuda_utils::synchronizeAndCleanupTexture(custom_kernels_stream, texture_data);
+	//call prediction error mask kernel
+	cudaStreamSynchronize(custom_kernels_stream); //wait for input data (copy operations, mallocs) to complete
+	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texObj, Rx_buff, rx_buff, cols, padded_cols, rows);
+
+	cudaStreamSynchronize(custom_kernels_stream);
+	af::sync();
+
 	image_transpose.unlock();
+	//calculation of coefficients, error sequence and mask
 	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols / 8, rows, rx_buff, afDevice), rows, padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);

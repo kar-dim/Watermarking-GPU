@@ -70,22 +70,17 @@ namespace cuda_utils {
         return properties;
     }
 
-    //copy data from arrayfire to a cudaArray, and then create the texture object
-    std::pair<cudaTextureObject_t, cudaArray*> copyArrayToTexture(const float* data, const unsigned int rows, const unsigned int cols)
+    //create the cudaArray and the textureObject binded to this array.
+    std::pair<cudaTextureObject_t, cudaArray*> createTextureData(const unsigned int rows, const unsigned int cols)
     {
         cudaArray* cuArray = cuda_utils::cudaMallocArray(cols, rows);
-        cudaMemcpy2DToArray(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
         cudaResourceDesc resDesc = cuda_utils::createResourceDescriptor(cuArray);
         cudaTextureDesc texDesc = cuda_utils::createTextureDescriptor();
         cudaTextureObject_t texObj = cuda_utils::createTextureObject(resDesc, texDesc);
         return std::make_pair(texObj, cuArray);
     }
 
-    //helper method to cleanup cuda texture data and to synchronize the stream
-    void synchronizeAndCleanupTexture(cudaStream_t stream, const std::pair<cudaTextureObject_t, cudaArray*>& texture_data)
-    {
-        cudaDestroyTextureObject(texture_data.first);
-        cudaFreeArray(texture_data.second);
-        cudaStreamSynchronize(stream);
+    void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray *cuArray, cudaStream_t stream) {
+        cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice, stream);
     }
 }

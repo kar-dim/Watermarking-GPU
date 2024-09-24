@@ -114,6 +114,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg452_64.dll" "$(SolutionDir)x64\Deb
       <FastMath>true</FastMath>
       <AdditionalOptions>-diag-suppress 1388 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
+      <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release\" /y /D
