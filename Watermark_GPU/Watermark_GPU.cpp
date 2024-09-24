@@ -245,7 +245,7 @@ int test_for_video(const INIReader& inir, const cudaDeviceProp& properties, cons
 		}
 		else {
 			CImgList<unsigned char> video_cimg_watermarked(frames, cols, rows, 1, 3);
-#pragma omp parallel for
+//#pragma omp parallel for
 			for (int i = 0; i < frames; i++) {
 				unsigned char* watermarked_frames_ptr = af::clamp(watermarked_frames[i].T(), 0, 255).as(af::dtype::u8).host<unsigned char>();
 				CImg<unsigned char> cimg_Y(cols, rows);
