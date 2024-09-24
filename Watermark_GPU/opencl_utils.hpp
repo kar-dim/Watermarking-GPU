@@ -23,5 +23,5 @@ namespace cl_utils {
     };
 
     //helper method to copy an OpenCL buffer into an OpenCL Image (fast copy that happens in the device)
-    cl::Image2D copyBufferToImage(const cl::Context& context, const cl::CommandQueue& queue, const cl_mem* image_buff, const long long rows, const  long long cols);
+    void copyBufferToImage(const cl::CommandQueue& queue, const cl::Image2D& image2d, const cl_mem* image_buff, const long long rows, const  long long cols);
 }

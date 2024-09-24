@@ -40,6 +40,8 @@ void Watermark::load_image(const af::array& image)
 	this->image = image;
 	rows = image.dims(0);
 	cols = image.dims(1);
+	if (!image2d())
+		image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL);
 }
 
 //helper method to load the random noise matrix W from the file specified.
@@ -68,9 +70,9 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const auto pad_cols = (cols % 16 == 0) ? cols : cols + 16 - (cols % 16);
 	const af::array image_transpose = image.T();
 	try {
-		const cl_mem *image_buff = image_transpose.device<cl_mem>();
-		const cl::Image2D image2d = cl_utils::copyBufferToImage(context, queue, image_buff, rows, cols);
-		cl::Buffer buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * rows * cols, NULL);
+		const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
+		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
+		cl::Buffer buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * rows * cols);
 		cl_utils::KernelBuilder kernel_builder(program_custom, custom_kernel_name.c_str());
 		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff).build(), 
 			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
@@ -125,23 +127,28 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	//fix for OpenCL 1.2 limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (cols)
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	const af::array image_transpose = image.T();
-	cl_int err;
+	const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
+
 	try {
+		//do a texture copy (for custom kernel)
+		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
+
+		//enqueue "x_" kernel (which is heavy)
 		const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
-		const cl_mem *buffer = image_transpose.device<cl_mem>();
-		const cl::Image2D image2d = cl_utils::copyBufferToImage(context, queue, buffer, rows, cols);
-		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows, NULL, &err);
-		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows / 8, NULL, &err);
-		const cl::Buffer Rx_mappings_buff(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void *)Rx_mappings, &err);
+		//initialize custom kernel memory
+		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows);
+		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows / 8);
 		cl_utils::KernelBuilder kernel_builder(program_me, "me");
+		//call prediction error mask kernel
 		queue.enqueueNDRangeKernel(
 				kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, 
 				cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512), cl::Local(sizeof(float) * 64)).build(),
 				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
-		//enqueue the calculation of neighbors (x_) array before waiting "me" kernel to finish, may help a bit
 
-		queue.finish(); 
+		queue.finish();
 		image_transpose.unlock();
+
+		//calculation of coefficients, error sequence and mask
 		const auto correlation_arrays = correlation_arrays_transformation(afcl::array(padded_cols, rows, Rx_buff(), af::dtype::f32, true), afcl::array(padded_cols / 8, rows, rx_buff(), af::dtype::f32, true), rows, padded_cols);
 		coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 		error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
