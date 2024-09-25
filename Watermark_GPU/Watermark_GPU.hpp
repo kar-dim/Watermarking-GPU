@@ -1,8 +1,8 @@
 #pragma once
-#include "INIReader.h"
 #include "Watermark.cuh"
 #include <arrayfire.h>
 #include <driver_types.h>
+#include <INIReader.h>
 #include <string>
 #include <vector>
 

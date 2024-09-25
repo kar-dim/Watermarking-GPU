@@ -4,12 +4,14 @@
 #include <string>
 #include <utility>
 
-enum MASK_TYPE {
+enum MASK_TYPE 
+{
 	ME,
 	NVF
 };
 
-enum IMAGE_TYPE {
+enum IMAGE_TYPE 
+{
 	RGB,
 	GRAYSCALE
 };
@@ -18,7 +20,8 @@ enum IMAGE_TYPE {
  *  \brief  Functions for watermark computation and detection
  *  \author Dimitris Karatzas
  */
-class Watermark {
+class Watermark 
+{
 private:
 	const std::string w_file_path;
 	const int p;

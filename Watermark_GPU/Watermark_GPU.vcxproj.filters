@@ -34,9 +34,6 @@
     <ClInclude Include="Watermark_GPU.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="INIReader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="cimg_init.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -3,8 +3,8 @@
 #include <cstring>
 #include <utility>
 
-namespace cuda_utils {
-
+namespace cuda_utils 
+{
     //Helper method to calculate kernel grid and block size from given 2D dimensions
     dim3 gridSizeCalculate(const dim3 blockSize, const int rows, const int cols)
     {
@@ -73,12 +73,14 @@ namespace cuda_utils {
     }
 
     //copy Device data to Device Array
-    void copyDataToCudaArray(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray) {
+    void copyDataToCudaArray(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray) 
+    {
         cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
     }
 
     //async version of copy Device data to Device Array
-    void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray *cuArray, cudaStream_t stream) {
+    void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray *cuArray, cudaStream_t stream) 
+    {
         cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice, stream);
     }
 }

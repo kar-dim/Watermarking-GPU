@@ -48,14 +48,16 @@ void Watermark::load_image(const af::array& image)
 {
 	this->image = image;
 	//initialize texture objects only once
-	if (texObj == 0) {
+	if (texObj == 0) 
+	{
 		auto texture_data = cuda_utils::createTextureData(
 			static_cast<unsigned int>(image.dims(0)), static_cast<unsigned int>(image.dims(1)));
 		texObj = texture_data.first;
 		texArray = texture_data.second;
 	}
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) {
+	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) 
+	{
 		const auto rows = static_cast<unsigned int>(image.dims(0));
 		const auto cols = static_cast<unsigned int>(image.dims(1));
 		const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
@@ -90,7 +92,8 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
 	float* mask_output = custom_mask.device<float>();
 	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(16, 16), rows, cols), dim3(16, 16));
-	switch (p) {
+	switch (p) 
+	{
 		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
 		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
 		case 7: nvf<7> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
@@ -167,7 +170,8 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const auto correlation_arrays = correlation_arrays_transformation(Rx_partial, rx_partial, rows, padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
-	if (mask_needed) {
+	if (mask_needed) 
+	{
 		const af::array error_sequence_abs = af::abs(error_sequence);
 		return error_sequence_abs / af::max<float>(error_sequence_abs);
 	}
@@ -198,7 +202,8 @@ float Watermark::calculate_correlation(const af::array& e_u, const af::array& e_
 float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type) const
 {
 	af::array mask, e_z, a_z;
-	if (mask_type == MASK_TYPE::NVF) {
+	if (mask_type == MASK_TYPE::NVF) 
+	{
 		compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
 		mask = compute_custom_mask(watermarked_image);
 	}
