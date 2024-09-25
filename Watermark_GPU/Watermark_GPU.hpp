@@ -1,8 +1,8 @@
 ﻿#pragma once
-#include "INIReader.h"
 #include "opencl_init.h"
 #include "Watermark.hpp"
 #include <arrayfire.h>
+#include <INIReader.h>
 #include <string>
 #include <vector>
 

@@ -1,17 +1,18 @@
 ﻿#pragma once
 #include "opencl_init.h"
-#include "CL/opencl.hpp"
 #include "arrayfire.h"
 #include <af/opencl.h>
 #include <string>
 #include <utility>
 
-enum MASK_TYPE {
+enum MASK_TYPE 
+{
 	ME,
 	NVF
 };
 
-enum IMAGE_TYPE {
+enum IMAGE_TYPE 
+{
 	RGB,
 	GRAYSCALE
 };
@@ -23,7 +24,8 @@ enum IMAGE_TYPE {
 class Watermark {
 
 private:
-	static constexpr int Rx_mappings[64]{
+	static constexpr int Rx_mappings[64]
+	{
 		0,  1,  2,  3,  4,  5,  6,  7,
 		1,  8,  9,  10, 11, 12, 13, 14,
 		2,  9,  15, 16, 17, 18, 19, 20,

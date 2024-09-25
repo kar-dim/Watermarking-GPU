@@ -8,11 +8,12 @@ namespace cl_utils {
         arg_counter = 0;
     }
 
-    cl::Kernel KernelBuilder::build() const {
+    cl::Kernel KernelBuilder::build() const 
+    {
         return kernel;
     }
 
-    void cl_utils::copyBufferToImage(const cl::CommandQueue& queue, const cl::Image2D& image2d, const cl_mem* image_buff, const long long rows, const  long long cols)
+    void cl_utils::copyBufferToImage(const cl::CommandQueue& queue, const cl::Image2D& image2d, const cl_mem* image_buff, const long long rows, const long long cols)
     {
         const size_t orig[] = { 0,0,0 };
         const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };

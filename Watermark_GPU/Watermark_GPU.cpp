@@ -1,5 +1,4 @@
 ﻿#include "cimg_init.h"
-#include "INIReader.h"
 #include "opencl_init.h"
 #include "Utilities.hpp"
 #include "Watermark.hpp"
@@ -9,6 +8,7 @@
 #include <cstring>
 #include <exception>
 #include <format>
+#include <INIReader.h>
 #include <iostream>
 //#include <omp.h>
 #include <string>

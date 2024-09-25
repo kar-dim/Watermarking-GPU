@@ -1,9 +1,10 @@
 #pragma once
 #include "opencl_init.h"
-#include "CL/opencl.hpp"
 
-namespace cl_utils {
-    class KernelBuilder {
+namespace cl_utils 
+{
+    class KernelBuilder 
+    {
     private:
         cl::Kernel kernel;
         int arg_counter;

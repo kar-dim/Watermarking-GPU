@@ -1,8 +1,7 @@
-﻿#include "Watermark.hpp"
+﻿#include "opencl_init.h"
 #include "opencl_utils.hpp"
-#include <CL/opencl.hpp>
+#include "Watermark.hpp"
 #include <arrayfire.h>
-#include <af/opencl.h>
 #include <cmath>
 #include <fstream>
 #include <memory>
@@ -41,7 +40,8 @@ void Watermark::load_image(const af::array& image)
 		image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), image.dims(1), image.dims(0), 0, NULL);
 	
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) {
+	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) 
+	{
 		const auto rows = static_cast<unsigned int>(image.dims(0));
 		const auto cols = static_cast<unsigned int>(image.dims(1));
 		const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
@@ -199,7 +199,8 @@ float Watermark::calculate_correlation(const af::array& e_u, const af::array& e_
 float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type) const
 {
 	af::array mask, e_z, a_z;
-	if (mask_type == MASK_TYPE::NVF) {
+	if (mask_type == MASK_TYPE::NVF) 
+	{
 		compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
 		mask = compute_custom_mask(watermarked_image);
 	}
