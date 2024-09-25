@@ -88,17 +88,21 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 {
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
+	const dim3 blockSize(16, 16);
+	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols);
+	//transfer ownership from arrayfire and copy data to cuda array
 	const af::array image_transpose = image.T();
 	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
 	float* mask_output = custom_mask.device<float>();
-	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(16, 16), rows, cols), dim3(16, 16));
+	
 	switch (p) 
 	{
-		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
-		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
-		case 7: nvf<7> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
-		case 9: nvf<9> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
+		case 3: nvf<3> <<<gridSize, blockSize, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
+		case 5: nvf<5> <<<gridSize, blockSize, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
+		case 7: nvf<7> <<<gridSize, blockSize, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
+		case 9: nvf<9> <<<gridSize, blockSize, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
 	}
+	//transfer ownership to arrayfire and return mask
 	image_transpose.unlock();
 	custom_mask.unlock();
 	return custom_mask;
@@ -150,7 +154,8 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	float* rx_ptr = rx_partial.device<float>();
 	af::sync();
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
+	const dim3 blockSize(1, 64);
+	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, padded_cols);
 
 	//enqueue a texture copy (for custom kernel)
 	cuda_utils::copyDataToCudaArrayAsync(image_transpose.device<float>(), rows, cols, texArray, custom_kernels_stream);
@@ -158,7 +163,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const af::array x_ = calculate_neighbors_array(image);
 	//call prediction error mask kernel
 	cudaStreamSynchronize(custom_kernels_stream); //wait for input data (copy operations, mallocs) to complete
-	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texObj, Rx_ptr, rx_ptr, cols, padded_cols, rows);
+	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (texObj, Rx_ptr, rx_ptr, cols, padded_cols, rows);
 	//wait for both streams to finish
 	cudaStreamSynchronize(custom_kernels_stream);
 	cudaStreamSynchronize(af_cuda_stream);
