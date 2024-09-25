@@ -5,14 +5,6 @@
 
 namespace cuda_utils {
 
-    //Simple wrapper of cudaMalloc for float data to reduce boilerplate
-    float* cudaMallocPtr(const std::size_t count)
-    {
-        float* ptr = nullptr;
-        cudaMalloc(&ptr, count * sizeof(float));
-        return ptr;
-    }
-
     //Helper method to calculate kernel grid and block size from given 2D dimensions
     dim3 gridSizeCalculate(const dim3 blockSize, const int rows, const int cols)
     {
@@ -80,6 +72,12 @@ namespace cuda_utils {
         return std::make_pair(texObj, cuArray);
     }
 
+    //copy Device data to Device Array
+    void copyDataToCudaArray(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray) {
+        cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
+    }
+
+    //async version of copy Device data to Device Array
     void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray *cuArray, cudaStream_t stream) {
         cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice, stream);
     }

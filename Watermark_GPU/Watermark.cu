@@ -22,8 +22,6 @@ Watermark::Watermark(const string &w_file_path, const int p, const float psnr)
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
-	rows = -1;
-	cols = -1;
 	af_cuda_stream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 	cudaStreamCreate(&custom_kernels_stream);
 }
@@ -34,7 +32,7 @@ Watermark::Watermark(const af::array &rgb_image, const af::array& image, const s
 {
 	this->rgb_image = rgb_image;
 	load_image(image);
-	load_W(rows, cols);
+	load_W(image.dims(0), image.dims(1));
 }
 
 //destructor, only custom kernels cuda stream must be destroyed
@@ -45,18 +43,25 @@ Watermark::~Watermark()
 	cudaFreeArray(texArray);
 }
 
-//supply the input image to apply watermarking and detection, and initialize texture data
+//supply the input image to apply watermarking and detection, and initialize texture and global data
 void Watermark::load_image(const af::array& image) 
 {
 	this->image = image;
-	rows = image.dims(0);
-	cols = image.dims(1);
 	//initialize texture objects only once
 	if (texObj == 0) {
 		auto texture_data = cuda_utils::createTextureData(
-			static_cast<unsigned int>(rows), static_cast<unsigned int>(cols));
+			static_cast<unsigned int>(image.dims(0)), static_cast<unsigned int>(image.dims(1)));
 		texObj = texture_data.first;
 		texArray = texture_data.second;
+	}
+	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
+	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) {
+		const auto rows = static_cast<unsigned int>(image.dims(0));
+		const auto cols = static_cast<unsigned int>(image.dims(1));
+		const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+		Rx_partial = af::array(rows, padded_cols);
+		rx_partial = af::array(rows, padded_cols / 8);
+		custom_mask = af::array(rows, cols);
 	}
 }
 
@@ -72,7 +77,7 @@ void Watermark::load_W(const dim_t rows, const dim_t cols)
 	if (rows * cols * sizeof(float) != total_bytes)
 		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
-	w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[0]), total_bytes);
+	w_stream.read(reinterpret_cast<char*>(w_ptr.get()), total_bytes);
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
@@ -82,19 +87,18 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
-	cuda_utils::copyDataToCudaArrayAsync(image_transpose.device<float>(), rows, cols, texArray, custom_kernels_stream);
-	float* mask_output = cuda_utils::cudaMallocPtr(rows * cols);
+	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
+	float* mask_output = custom_mask.device<float>();
 	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(16, 16), rows, cols), dim3(16, 16));
-	cudaStreamSynchronize(custom_kernels_stream);
 	switch (p) {
-		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
-		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
-		case 7: nvf<7> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
-		case 9: nvf<9> <<<dimensions.first, dimensions.second, 0, custom_kernels_stream >>> (texObj, mask_output, cols, rows); break;
+		case 3: nvf<3> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
+		case 5: nvf<5> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
+		case 7: nvf<7> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
+		case 9: nvf<9> <<<dimensions.first, dimensions.second, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
 	}
-	cudaStreamSynchronize(custom_kernels_stream);
 	image_transpose.unlock();
-	return af::array(rows, cols, mask_output, afDevice);
+	custom_mask.unlock();
+	return custom_mask;
 }
 
 //helper method to calculate the neighbors ("x_" array)
@@ -139,28 +143,28 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const af::array image_transpose = image.T();
+	float* Rx_ptr = Rx_partial.device<float>();
+	float* rx_ptr = rx_partial.device<float>();
+	af::sync();
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	const auto dimensions = std::make_pair(cuda_utils::gridSizeCalculate(dim3(1, 64), rows, padded_cols), dim3(1, 64));
 
-	//do a texture copy (for custom kernel)
+	//enqueue a texture copy (for custom kernel)
 	cuda_utils::copyDataToCudaArrayAsync(image_transpose.device<float>(), rows, cols, texArray, custom_kernels_stream);
-
 	//enqueue "x_" kernel (which is heavy)
 	const af::array x_ = calculate_neighbors_array(image);
-	
-	//initialize custom kernel memory
-	float* Rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols);
-	float* rx_buff = cuda_utils::cudaMallocPtr(rows * padded_cols / 8);
 	//call prediction error mask kernel
 	cudaStreamSynchronize(custom_kernels_stream); //wait for input data (copy operations, mallocs) to complete
-	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texObj, Rx_buff, rx_buff, cols, padded_cols, rows);
-
+	me_p3 <<<dimensions.first, dimensions.second, 0, custom_kernels_stream>>> (texObj, Rx_ptr, rx_ptr, cols, padded_cols, rows);
+	//wait for both streams to finish
 	cudaStreamSynchronize(custom_kernels_stream);
-	af::sync();
+	cudaStreamSynchronize(af_cuda_stream);
 
 	image_transpose.unlock();
+	Rx_partial.unlock();
+	rx_partial.unlock();
 	//calculation of coefficients, error sequence and mask
-	const auto correlation_arrays = correlation_arrays_transformation(af::array(padded_cols, rows, Rx_buff, afDevice), af::array(padded_cols / 8, rows, rx_buff, afDevice), rows, padded_cols);
+	const auto correlation_arrays = correlation_arrays_transformation(Rx_partial, rx_partial, rows, padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 	if (mask_needed) {

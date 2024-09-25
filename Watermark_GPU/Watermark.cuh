@@ -24,10 +24,10 @@ private:
 	const int p;
 	const float strength_factor;
 	af::array rgb_image, image, w;
-	dim_t rows, cols;
 	cudaStream_t af_cuda_stream, custom_kernels_stream;
 	cudaTextureObject_t texObj = 0;
 	cudaArray* texArray = nullptr;
+	af::array Rx_partial, rx_partial, custom_mask;
 
 	float calculate_correlation(const af::array& e_u, const af::array& e_z) const;
 	af::array compute_custom_mask(const af::array& image) const;
