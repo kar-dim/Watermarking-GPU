@@ -56,7 +56,7 @@ void Watermark::load_image(const af::array& image)
 		texArray = texture_data.second;
 	}
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) 
+	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0 || neighbors.bytes() == 0)
 	{
 		const auto rows = static_cast<unsigned int>(image.dims(0));
 		const auto cols = static_cast<unsigned int>(image.dims(1));
@@ -64,6 +64,7 @@ void Watermark::load_image(const af::array& image)
 		Rx_partial = af::array(rows, padded_cols);
 		rx_partial = af::array(rows, padded_cols / 8);
 		custom_mask = af::array(rows, cols);
+		neighbors = af::array((p * p) - 1, rows * cols);
 	}
 }
 
@@ -109,11 +110,17 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 }
 
 //helper method to calculate the neighbors ("x_" array)
-af::array Watermark::calculate_neighbors_array(const af::array& array) const 
+af::array Watermark::calculate_neighbors_array(const unsigned int rows, const unsigned int cols) const 
 {
-	const int center = (p * p) / 2;
-	af::array unwrapped = af::unwrap(array, p, p, 1, 1, p / 2, p / 2, false);
-	return af::join(1, unwrapped(af::span, af::seq(0, center - 1)), unwrapped(af::span, af::seq(center + 1, af::end)));
+	const dim3 blockSize(16, 16);
+	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols);
+	//transfer ownership from arrayfire
+	float* neighbors_output = neighbors.device<float>();
+	af::sync();
+	calculate_neighbors_p3<< <gridSize, blockSize, 0, af_cuda_stream >> > (texObj, neighbors_output, cols, rows);
+	//transfer ownership to arrayfire and return x_ array
+	neighbors.unlock();
+	return neighbors;
 }
 
 //helper method to sum the incomplete Rx_partial and rx_partial arrays which were produced from the custom kernel
@@ -157,12 +164,11 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const dim3 blockSize(1, 64);
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, padded_cols);
 
-	//enqueue a texture copy (for custom kernel)
-	cuda_utils::copyDataToCudaArrayAsync(image_transpose.device<float>(), rows, cols, texArray, custom_kernels_stream);
-	//enqueue "x_" kernel (which is heavy)
-	const af::array x_ = calculate_neighbors_array(image);
-	//call prediction error mask kernel
-	cudaStreamSynchronize(custom_kernels_stream); //wait for input data (copy operations, mallocs) to complete
+	//do a texture copy (for custom kernel)
+	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
+	//enqueue "x_" kernel
+	const af::array x_ = calculate_neighbors_array(rows, cols);
+	//enqueue prediction error mask kernel
 	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (texObj, Rx_ptr, rx_ptr, cols, padded_cols, rows);
 	//wait for both streams to finish
 	cudaStreamSynchronize(custom_kernels_stream);
@@ -174,7 +180,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	//calculation of coefficients, error sequence and mask
 	const auto correlation_arrays = correlation_arrays_transformation(Rx_partial, rx_partial, rows, padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
-	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
+	error_sequence = af::moddims(af::flat(image).T() - af::matmulTN(coefficients, x_), rows, cols);
 	if (mask_needed) 
 	{
 		const af::array error_sequence_abs = af::abs(error_sequence);
@@ -186,7 +192,12 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u)), u.dims(0), u.dims(1));
+	const af::array u_transpose = u.T();
+	af::sync();
+	cuda_utils::copyDataToCudaArray(u_transpose.device<float>(), u.dims(0), u.dims(1), texArray);
+	af::array error_sequence = af::moddims(af::flat(u).T() - af::matmulTN(coefficients, calculate_neighbors_array(u.dims(0), u.dims(1))), u.dims(0), u.dims(1));
+	u_transpose.unlock();
+	return error_sequence;
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter

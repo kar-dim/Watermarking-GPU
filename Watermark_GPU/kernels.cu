@@ -66,3 +66,23 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     }
     Rx[output_index] = reduction_sum_Rx;
 }
+
+__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height)
+{
+    const int x = blockIdx.y * blockDim.y + threadIdx.y;
+    const int y = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (x >= width || y >= height)
+        return;
+
+    const int output_index = (x * height + y) * 8;
+    x_[output_index] = tex2D<float>(texObj, x - 1, y - 1);
+    x_[output_index + 1] = tex2D<float>(texObj, x - 1, y);
+    x_[output_index + 2] = tex2D<float>(texObj, x - 1, y + 1);
+    x_[output_index + 3] = tex2D<float>(texObj, x, y - 1);
+    x_[output_index + 4] = tex2D<float>(texObj, x, y + 1);
+    x_[output_index + 5] = tex2D<float>(texObj, x + 1, y - 1);
+    x_[output_index + 6] = tex2D<float>(texObj, x + 1, y);
+    x_[output_index + 7] = tex2D<float>(texObj, x + 1, y + 1);
+
+}

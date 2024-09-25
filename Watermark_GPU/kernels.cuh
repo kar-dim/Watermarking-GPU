@@ -46,3 +46,4 @@ __global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int width, c
 }
 
 __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int padded_width, const int height);
+__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height);
