@@ -40,9 +40,9 @@ private:
 	const int p;
 	const float strength_factor;
 	af::array rgb_image, image, w;
-	dim_t rows, cols;
 	cl::Image2D image2d;
 	const cl::Buffer Rx_mappings_buff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)Rx_mappings, NULL };
+	af::array Rx_partial, rx_partial, custom_mask;
 
 	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) const;
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const;

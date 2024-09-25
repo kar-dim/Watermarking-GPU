@@ -21,8 +21,6 @@ Watermark::Watermark(const string &w_file_path, const int p, const float psnr, c
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
-	rows = -1;
-	cols = -1;
 }
 
 //full constructor
@@ -31,17 +29,26 @@ Watermark::Watermark(const af::array &rgb_image, const af::array& image, const s
 {
 	this->rgb_image = rgb_image;
 	load_image(image);
-	load_W(rows, cols);
+	load_W(image.dims(0), image.dims(1));
 }
 
 //supply the input image to apply watermarking and detection
 void Watermark::load_image(const af::array& image) 
 {
 	this->image = image;
-	rows = image.dims(0);
-	cols = image.dims(1);
+	//initialize texture only once so that we won't deallocate textures for each call
 	if (!image2d())
-		image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL);
+		image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), image.dims(1), image.dims(0), 0, NULL);
+	
+	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
+	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) {
+		const auto rows = static_cast<unsigned int>(image.dims(0));
+		const auto cols = static_cast<unsigned int>(image.dims(1));
+		const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+		Rx_partial = af::array(rows, padded_cols);
+		rx_partial = af::array(rows, padded_cols / 8);
+		custom_mask = af::array(rows, cols);
+	}
 }
 
 //helper method to load the random noise matrix W from the file specified.
@@ -56,7 +63,7 @@ void Watermark::load_W(const dim_t rows, const dim_t cols)
 	if (rows * cols * sizeof(float) != total_bytes)
 		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
-	w_stream.read(reinterpret_cast<char*>(&w_ptr.get()[0]), total_bytes);
+	w_stream.read(reinterpret_cast<char*>(w_ptr.get()), total_bytes);
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
@@ -69,16 +76,18 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const auto pad_rows = (rows % 16 == 0) ? rows : rows + 16 - (rows % 16);
 	const auto pad_cols = (cols % 16 == 0) ? cols : cols + 16 - (cols % 16);
 	const af::array image_transpose = image.T();
+	const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
+	const std::unique_ptr<cl_mem> custom_mask_mem(custom_mask.device<cl_mem>());
 	try {
-		const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
 		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
-		cl::Buffer buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * rows * cols);
+		cl::Buffer buff(*custom_mask_mem.get(), true);
 		cl_utils::KernelBuilder kernel_builder(program_custom, custom_kernel_name.c_str());
 		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff).build(), 
 			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
 		image_transpose.unlock();
-		return afcl::array(rows, cols, buff(), af::dtype::f32, true);
+		custom_mask.unlock();
+		return custom_mask;
 	}
 	catch (const cl::Error& ex) {
 		throw std::runtime_error(string("ERROR in compute_nvf_mask(): " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n"));
@@ -128,7 +137,8 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	const af::array image_transpose = image.T();
 	const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
-
+	const std::unique_ptr<cl_mem> Rx_partial_mem(Rx_partial.device<cl_mem>());
+	const std::unique_ptr<cl_mem> rx_partial_mem(rx_partial.device<cl_mem>());
 	try {
 		//do a texture copy (for custom kernel)
 		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
@@ -136,20 +146,22 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 		//enqueue "x_" kernel (which is heavy)
 		const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
 		//initialize custom kernel memory
-		cl::Buffer Rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows);
-		cl::Buffer rx_buff(context, CL_MEM_WRITE_ONLY, sizeof(float) * padded_cols * rows / 8);
+		cl::Buffer Rx_buff(*Rx_partial_mem.get(), true);
+		cl::Buffer rx_buff(*rx_partial_mem.get(), true);
 		cl_utils::KernelBuilder kernel_builder(program_me, "me");
 		//call prediction error mask kernel
 		queue.enqueueNDRangeKernel(
 				kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, 
 				cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512), cl::Local(sizeof(float) * 64)).build(),
 				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
-
+		//finish and return memory to arrayfire
 		queue.finish();
 		image_transpose.unlock();
+		Rx_partial.unlock();
+		rx_partial.unlock();
 
 		//calculation of coefficients, error sequence and mask
-		const auto correlation_arrays = correlation_arrays_transformation(afcl::array(padded_cols, rows, Rx_buff(), af::dtype::f32, true), afcl::array(padded_cols / 8, rows, rx_buff(), af::dtype::f32, true), rows, padded_cols);
+		const auto correlation_arrays = correlation_arrays_transformation(Rx_partial, rx_partial, rows, padded_cols);
 		coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 		error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 		if (mask_needed) {
