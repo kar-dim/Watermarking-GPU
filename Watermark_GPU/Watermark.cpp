@@ -4,6 +4,7 @@
 #include <arrayfire.h>
 #include <cmath>
 #include <fstream>
+#include <initializer_list>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -15,16 +16,16 @@
 using std::string;
 
 //constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
-Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const cl::Program& prog_me, const cl::Program& prog_custom, const string custom_kernel_name)
-		:program_me(prog_me), program_custom(prog_custom), w_file_path(w_file_path), custom_kernel_name(custom_kernel_name), p(p), strength_factor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+Watermark::Watermark(const string &w_file_path, const int p, const float psnr, const std::vector<cl::Program>& progs)
+		:programs(progs), w_file_path(w_file_path), p(p), strength_factor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
 }
 
 //full constructor
-Watermark::Watermark(const af::array &rgb_image, const af::array& image, const string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const string &custom_kernel_name)
-		:Watermark::Watermark(w_file_path, p, psnr, program_me, program_custom, custom_kernel_name) 
+Watermark::Watermark(const af::array &rgb_image, const af::array& image, const string &w_file_path, const int p, const float psnr, const std::vector<cl::Program>& programs)
+		:Watermark::Watermark(w_file_path, p, psnr, programs) 
 {
 	this->rgb_image = rgb_image;
 	load_image(image);
@@ -40,7 +41,7 @@ void Watermark::load_image(const af::array& image)
 		image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), image.dims(1), image.dims(0), 0, NULL);
 	
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0) 
+	if (Rx_partial.bytes() == 0 || rx_partial.bytes() == 0 || custom_mask.bytes() == 0 || neighbors.bytes() == 0)
 	{
 		const auto rows = static_cast<unsigned int>(image.dims(0));
 		const auto cols = static_cast<unsigned int>(image.dims(1));
@@ -48,6 +49,7 @@ void Watermark::load_image(const af::array& image)
 		Rx_partial = af::array(rows, padded_cols);
 		rx_partial = af::array(rows, padded_cols / 8);
 		custom_mask = af::array(rows, cols);
+		neighbors = af::array(rows * cols, (p * p) - 1);
 	}
 }
 
@@ -67,38 +69,33 @@ void Watermark::load_W(const dim_t rows, const dim_t cols)
 	this->w = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
-//compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
-af::array Watermark::compute_custom_mask(const af::array& image) const
+//can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
+af::array Watermark::execute_texture_kernel(const af::array& image, const cl::Program& program, const string kernel_name, const af::array& output, const unsigned int local_mem_elements) const
 {
-	const auto rows = image.dims(0);
-	const auto cols = image.dims(1);
-	//fix for OpenCL 1.2 limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (cols and rows)
+	const auto rows = static_cast<unsigned int>(image.dims(0));
+	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const auto pad_rows = (rows % 16 == 0) ? rows : rows + 16 - (rows % 16);
 	const auto pad_cols = (cols % 16 == 0) ? cols : cols + 16 - (cols % 16);
 	const af::array image_transpose = image.T();
 	const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
-	const std::unique_ptr<cl_mem> custom_mask_mem(custom_mask.device<cl_mem>());
+	const std::unique_ptr<cl_mem> output_ptr(output.device<cl_mem>());
+
 	try {
 		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
-		cl::Buffer buff(*custom_mask_mem.get(), true);
-		cl_utils::KernelBuilder kernel_builder(program_custom, custom_kernel_name.c_str());
-		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff).build(), 
-			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
+		cl::Buffer buff(*output_ptr.get(), true);
+		cl_utils::KernelBuilder kernel_builder(program, kernel_name.c_str());
+		if (local_mem_elements != 0)
+			kernel_builder.args(image2d, buff, cl::Local(sizeof(float) * local_mem_elements));
+		else
+			kernel_builder.args(image2d, buff);
+		queue.enqueueNDRangeKernel(kernel_builder.build(), cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
-		image_transpose.unlock();
-		custom_mask.unlock();
-		return custom_mask;
+		unlock_arrays(image_transpose, output);
+		return output;
 	}
 	catch (const cl::Error& ex) {
-		throw std::runtime_error(string("ERROR in compute_nvf_mask(): " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n"));
+		throw std::runtime_error("ERROR in " + kernel_name + ": " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
 	}
-}
-
-//helper method to calculate the neighbors ("x_" array)
-af::array Watermark::calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) const 
-{
-	const af::array array_unwrapped = af::unwrap(array, p, p, 1, 1, pad, pad, false);
-	return af::join(1, array_unwrapped(af::span, af::seq(0, (p_squared / 2) - 1)), array_unwrapped(af::span, af::seq((p_squared / 2) + 1, af::end)));
 }
 
 //helper method to sum the incomplete Rx_partial and rx_partial arrays which were produced from the custom kernel
@@ -121,7 +118,7 @@ af::array Watermark::make_and_add_watermark(af::array& coefficients, float& a, M
 	af::array error_sequence;
 	const af::array mask = mask_type == MASK_TYPE:: ME ? 
 		compute_prediction_error_mask(image, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		compute_custom_mask(image);
+		execute_texture_kernel(image, programs[0], "nvf", custom_mask);
 	const af::array u = mask * w;
 	a = strength_factor / sqrt(af::sum<float>(af::pow(u, 2)) / (image.elements()));
 	return af::clamp((type == IMAGE_TYPE::RGB ? rgb_image : image) + (u * a), 0, 255);
@@ -135,20 +132,15 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const unsigned int cols = static_cast<unsigned int>(image.dims(1));
 	//fix for OpenCL 1.2 limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (cols)
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-	const af::array image_transpose = image.T();
-	const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
 	const std::unique_ptr<cl_mem> Rx_partial_mem(Rx_partial.device<cl_mem>());
 	const std::unique_ptr<cl_mem> rx_partial_mem(rx_partial.device<cl_mem>());
 	try {
-		//do a texture copy (for custom kernel)
-		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
-
 		//enqueue "x_" kernel (which is heavy)
-		const af::array x_ = calculate_neighbors_array(image, p, p * p, p / 2);
+		const af::array x_ = execute_texture_kernel(image, programs[2], "calculate_neighbors_p3", neighbors, 2048);
 		//initialize custom kernel memory
 		cl::Buffer Rx_buff(*Rx_partial_mem.get(), true);
 		cl::Buffer rx_buff(*rx_partial_mem.get(), true);
-		cl_utils::KernelBuilder kernel_builder(program_me, "me");
+		cl_utils::KernelBuilder kernel_builder(programs[1], "me");
 		//call prediction error mask kernel
 		queue.enqueueNDRangeKernel(
 				kernel_builder.args(image2d, Rx_buff, rx_buff, Rx_mappings_buff, 
@@ -156,9 +148,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//finish and return memory to arrayfire
 		queue.finish();
-		image_transpose.unlock();
-		Rx_partial.unlock();
-		rx_partial.unlock();
+		unlock_arrays(Rx_partial, rx_partial);
 
 		//calculation of coefficients, error sequence and mask
 		const auto correlation_arrays = correlation_arrays_transformation(Rx_partial, rx_partial, rows, padded_cols);
@@ -178,7 +168,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u, p, p * p, p / 2)), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, execute_texture_kernel(u, programs[2], "calculate_neighbors_p3", neighbors, 2048)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
@@ -202,7 +192,7 @@ float Watermark::mask_detector(const af::array& watermarked_image, MASK_TYPE mas
 	if (mask_type == MASK_TYPE::NVF) 
 	{
 		compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
-		mask = compute_custom_mask(watermarked_image);
+		mask = execute_texture_kernel(watermarked_image, programs[0], "nvf", custom_mask);
 	}
 	else
 		mask = compute_prediction_error_mask(watermarked_image, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);

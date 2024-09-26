@@ -1,7 +1,8 @@
 ﻿#pragma once
-#include "opencl_init.h"
 #include "arrayfire.h"
+#include "opencl_init.h"
 #include <af/opencl.h>
+#include <concepts>
 #include <string>
 #include <utility>
 
@@ -37,29 +38,31 @@ private:
 	};
 	const cl::Context context{ afcl::getContext(true) };
 	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
-	const cl::Program program_me, program_custom;
-	const std::string w_file_path, custom_kernel_name;
+	const std::vector<cl::Program> programs;
+	const std::string w_file_path;
 	const int p;
 	const float strength_factor;
 	af::array rgb_image, image, w;
 	cl::Image2D image2d;
 	const cl::Buffer Rx_mappings_buff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)Rx_mappings, NULL };
-	af::array Rx_partial, rx_partial, custom_mask;
+	af::array Rx_partial, rx_partial, custom_mask, neighbors;
 
-	af::array calculate_neighbors_array(const af::array& array, const int p, const int p_squared, const int pad) const;
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const;
 	float calculate_correlation(const af::array& e_u, const af::array& e_z) const;
-	af::array compute_custom_mask(const af::array &image) const;
+	af::array execute_texture_kernel(const af::array& image, const cl::Program& program, const std::string kernel_name, const af::array& output, const unsigned int local_mem_elements = 0) const;
 	af::array compute_prediction_error_mask(const af::array& image, af::array& error_sequence, af::array& coefficients, const bool mask_needed) const;
 	af::array compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& error_sequence) const;
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients) const;
+	template<std::same_as<af::array>... Args>
+	static void unlock_arrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
-	Watermark(const af::array& rgb_image, const af::array &image, const std::string &w_file_path, const int p, const float psnr, const cl::Program &program_me, const cl::Program &program_custom, const std::string &custom_kernel_name);
-	Watermark(const std::string &w_file_path, const int p, const float psnr, const cl::Program& program_me, const cl::Program& program_custom, const std::string custom_kernel_name);
+	Watermark(const af::array& rgb_image, const af::array &image, const std::string &w_file_path, const int p, const float psnr, const std::vector<cl::Program> &programs);
+	Watermark(const std::string &w_file_path, const int p, const float psnr, const std::vector<cl::Program>&programs);
 	void load_W(const dim_t rows, const dim_t cols);
 	void load_image(const af::array& image);
 	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type) const;
 	float mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type) const;
 	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients) const;
 	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
+	
 };

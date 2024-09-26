@@ -59,5 +59,8 @@
       <Filter>Kernels</Filter>
     </None>
     <None Include="packages.config" />
+    <None Include="kernels\calculate_neighbors_p3.cl">
+      <Filter>Kernels</Filter>
+    </None>
   </ItemGroup>
 </Project>

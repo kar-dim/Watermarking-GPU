@@ -73,14 +73,19 @@ int main(void)
 	}
 
 	//compile opencl kernels
-	cl::Program program_nvf, program_me;
+	std::vector<cl::Program> programs;
+	cl::Program program_nvf, program_me, program_neighbors;
 	try {
 		string program_data = Utilities::load_file_as_string("kernels/nvf.cl");
-		program_nvf = cl::Program(cl::Context{ afcl::getContext()}, program_data);
+		program_nvf = cl::Program(context, program_data);
 		program_nvf.build({ device }, std::format("-cl-fast-relaxed-math -cl-mad-enable -Dp={}", p).c_str());
 		program_data = Utilities::load_file_as_string("kernels/me_p3.cl");
 		program_me = cl::Program(context, program_data);
 		program_me.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
+		program_data = Utilities::load_file_as_string("kernels/calculate_neighbors_p3.cl");
+		program_neighbors = cl::Program(context, program_data);
+		program_neighbors.build({ device }, "-cl-mad-enable");
+		programs = { program_nvf, program_me, program_neighbors };
 	}
 	catch (cl::Error& e) {
 		cout << "Could not build a kernel, Reason:\n\n";
@@ -89,6 +94,8 @@ int main(void)
 			cout << program_nvf.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
 		if (program_me.get() != NULL)
 			cout << program_me.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
+		if (program_neighbors.get() != NULL)
+			cout << program_neighbors.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
 		exit_program(EXIT_FAILURE);
 	}
 	catch (const std::exception& ex) {
@@ -99,8 +106,8 @@ int main(void)
 	//test algorithms
 	try {
 		const int code = inir.GetBoolean("parameters_video", "test_for_video", false) == true ?
-			test_for_video(device, program_nvf, program_me, inir, p, psnr) :
-			test_for_image(device, program_nvf, program_me, inir, p, psnr);
+			test_for_video(device, programs, inir, p, psnr) :
+			test_for_image(device, programs, inir, p, psnr);
 		exit_program(code);
 	}
 	catch (const std::exception& ex) {
@@ -110,7 +117,7 @@ int main(void)
 	exit_program(EXIT_SUCCESS);
 }
 
-int test_for_image(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
+int test_for_image(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr) {
 	const string image_file = inir.Get("paths", "image", "NO_IMAGE");
 	const bool show_fps = inir.GetBoolean("options", "execution_time_in_fps", false);
 	//load image from disk into an arrayfire array
@@ -132,7 +139,7 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	Watermark watermark_obj(rgb_image, image, inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	Watermark watermark_obj(rgb_image, image, inir.Get("paths", "w_path", "w.txt"), p, psnr, programs);
 
 	float a;
 	af::array a_x;
@@ -188,7 +195,7 @@ int test_for_image(const cl::Device& device, const cl::Program& program_nvf, con
 	return EXIT_SUCCESS;
 }
 
-int test_for_video(const cl::Device& device, const cl::Program& program_nvf, const cl::Program& program_me, const INIReader& inir, const int p, const float psnr) {
+int test_for_video(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr) {
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const bool show_fps = inir.GetBoolean("options", "execution_time_in_fps", false);
@@ -228,7 +235,7 @@ int test_for_video(const cl::Device& device, const cl::Program& program_nvf, con
 
 	//initialize watermark functions class
 	af::array dummy_a_x;
-	Watermark watermark_obj(inir.Get("paths", "w_path", "w.txt"), p, psnr, program_me, program_nvf, "nvf");
+	Watermark watermark_obj(inir.Get("paths", "w_path", "w.txt"), p, psnr, programs);
 	watermark_obj.load_W(rows, cols);
 
 	//realtime watermarking of raw video
