@@ -4,7 +4,6 @@
 #include <arrayfire.h>
 #include <cmath>
 #include <fstream>
-#include <initializer_list>
 #include <memory>
 #include <stdexcept>
 #include <string>
