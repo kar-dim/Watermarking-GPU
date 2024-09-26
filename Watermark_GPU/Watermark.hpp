@@ -49,7 +49,7 @@ private:
 
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const;
 	float calculate_correlation(const af::array& e_u, const af::array& e_z) const;
-	af::array execute_texture_kernel(const af::array& image, const cl::Program& program, const std::string kernel_name, const af::array& output, const unsigned int local_mem_elements = 0) const;
+	af::array execute_texture_kernel(const af::array& image, const cl::Program& program, const std::string kernel_name, const af::array& output) const;
 	af::array compute_prediction_error_mask(const af::array& image, af::array& error_sequence, af::array& coefficients, const bool mask_needed) const;
 	af::array compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& error_sequence) const;
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients) const;

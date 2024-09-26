@@ -19,7 +19,8 @@ __kernel void me(__read_only image2d_t image,
     rx_partial[local_id % 8][local_id / 8] = 0.0f;
 
     //fix for OpenCL 1.2 where global size % local size should be 0, and local size is padded, a bound check is needed
-    if (x < width) {
+    if (x < width) 
+    {
         const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
         int counter = 0;
         float x_[9];
@@ -59,7 +60,8 @@ __kernel void me(__read_only image2d_t image,
     barrier(CLK_LOCAL_MEM_FENCE);
     
     float row_sum = 0.0f;
-    if (local_id < 8) {
+    if (local_id < 8) 
+    {
         for (int i = 0; i < 8; i++)
             row_sum += rx_partial[i][local_id];
         rx[(output_index / 8) + local_id] = row_sum;

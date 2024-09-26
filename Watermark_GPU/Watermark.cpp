@@ -69,7 +69,7 @@ void Watermark::load_W(const dim_t rows, const dim_t cols)
 }
 
 //can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
-af::array Watermark::execute_texture_kernel(const af::array& image, const cl::Program& program, const string kernel_name, const af::array& output, const unsigned int local_mem_elements) const
+af::array Watermark::execute_texture_kernel(const af::array& image, const cl::Program& program, const string kernel_name, const af::array& output) const
 {
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
@@ -83,11 +83,8 @@ af::array Watermark::execute_texture_kernel(const af::array& image, const cl::Pr
 		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
 		cl::Buffer buff(*output_ptr.get(), true);
 		cl_utils::KernelBuilder kernel_builder(program, kernel_name.c_str());
-		if (local_mem_elements != 0)
-			kernel_builder.args(image2d, buff, cl::Local(sizeof(float) * local_mem_elements));
-		else
-			kernel_builder.args(image2d, buff);
-		queue.enqueueNDRangeKernel(kernel_builder.build(), cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
+		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff).build(), 
+			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
 		unlock_arrays(image_transpose, output);
 		return output;
@@ -135,7 +132,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	const std::unique_ptr<cl_mem> rx_partial_mem(rx_partial.device<cl_mem>());
 	try {
 		//enqueue "x_" kernel (which is heavy)
-		const af::array x_ = execute_texture_kernel(image, programs[2], "calculate_neighbors_p3", neighbors, 2048);
+		const af::array x_ = execute_texture_kernel(image, programs[2], "calculate_neighbors_p3", neighbors);
 		//initialize custom kernel memory
 		cl::Buffer Rx_buff(*Rx_partial_mem.get(), true);
 		cl::Buffer rx_buff(*rx_partial_mem.get(), true);
@@ -167,7 +164,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, execute_texture_kernel(u, programs[2], "calculate_neighbors_p3", neighbors, 2048)), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, execute_texture_kernel(u, programs[2], "calculate_neighbors_p3", neighbors)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
