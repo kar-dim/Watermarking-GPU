@@ -64,7 +64,7 @@ void Watermark::load_image(const af::array& image)
 		Rx_partial = af::array(rows, padded_cols);
 		rx_partial = af::array(rows, padded_cols / 8);
 		custom_mask = af::array(rows, cols);
-		neighbors = af::array((p * p) - 1, rows * cols);
+		neighbors = af::array(rows * cols, (p * p) - 1);
 	}
 }
 
@@ -109,17 +109,22 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	return custom_mask;
 }
 
-//helper method to calculate the neighbors ("x_" array)
-af::array Watermark::calculate_neighbors_array(const unsigned int rows, const unsigned int cols) const 
+//calls custom kernel to calculate neighbors array ("x_" array)
+af::array Watermark::calculate_neighbors_array(const af::array image) const 
 {
 	const dim3 blockSize(16, 16);
+	const auto rows = static_cast<unsigned int>(image.dims(0));
+	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols);
+	const af::array imageT = image.T();
+	//do a texture copy
+	cuda_utils::copyDataToCudaArray(imageT.device<float>(), rows, cols, texArray);
 	//transfer ownership from arrayfire
 	float* neighbors_output = neighbors.device<float>();
-	af::sync();
-	calculate_neighbors_p3<< <gridSize, blockSize, 0, af_cuda_stream >> > (texObj, neighbors_output, cols, rows);
+	calculate_neighbors_p3<<<gridSize, blockSize, 0, af_cuda_stream >>>(texObj, neighbors_output, cols, rows);
 	//transfer ownership to arrayfire and return x_ array
 	neighbors.unlock();
+	imageT.unlock();
 	return neighbors;
 }
 
@@ -156,31 +161,26 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	//constant data
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
-	const af::array image_transpose = image.T();
 	float* Rx_ptr = Rx_partial.device<float>();
 	float* rx_ptr = rx_partial.device<float>();
-	af::sync();
 	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
 	const dim3 blockSize(1, 64);
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, padded_cols);
-
-	//do a texture copy (for custom kernel)
-	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
+	
 	//enqueue "x_" kernel
-	const af::array x_ = calculate_neighbors_array(rows, cols);
+	const af::array x_ = calculate_neighbors_array(image);
 	//enqueue prediction error mask kernel
 	me_p3 <<<gridSize, blockSize, 0, custom_kernels_stream>>> (texObj, Rx_ptr, rx_ptr, cols, padded_cols, rows);
 	//wait for both streams to finish
 	cudaStreamSynchronize(custom_kernels_stream);
 	cudaStreamSynchronize(af_cuda_stream);
 
-	image_transpose.unlock();
 	Rx_partial.unlock();
 	rx_partial.unlock();
 	//calculation of coefficients, error sequence and mask
 	const auto correlation_arrays = correlation_arrays_transformation(Rx_partial, rx_partial, rows, padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
-	error_sequence = af::moddims(af::flat(image).T() - af::matmulTN(coefficients, x_), rows, cols);
+	error_sequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
 	if (mask_needed) 
 	{
 		const af::array error_sequence_abs = af::abs(error_sequence);
@@ -192,12 +192,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::calculate_error_sequence(const af::array& u, const af::array& coefficients) const 
 {
-	const af::array u_transpose = u.T();
-	af::sync();
-	cuda_utils::copyDataToCudaArray(u_transpose.device<float>(), u.dims(0), u.dims(1), texArray);
-	af::array error_sequence = af::moddims(af::flat(u).T() - af::matmulTN(coefficients, calculate_neighbors_array(u.dims(0), u.dims(1))), u.dims(0), u.dims(1));
-	u_transpose.unlock();
-	return error_sequence;
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, calculate_neighbors_array(u)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter

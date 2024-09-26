@@ -69,20 +69,33 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 
 __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height)
 {
-    const int x = blockIdx.y * blockDim.y + threadIdx.y;
-    const int y = blockIdx.x * blockDim.x + threadIdx.x;
+    const int tx = threadIdx.x;
+    const int ty = threadIdx.y;
+    const int x = blockIdx.y * blockDim.y + ty;
+    const int y = blockIdx.x * blockDim.x + tx;
 
-    if (x >= width || y >= height)
-        return;
+    __shared__ float shared_neighbors[8][16][16]; //all neighbor values per block
 
-    const int output_index = (x * height + y) * 8;
-    x_[output_index] = tex2D<float>(texObj, x - 1, y - 1);
-    x_[output_index + 1] = tex2D<float>(texObj, x - 1, y);
-    x_[output_index + 2] = tex2D<float>(texObj, x - 1, y + 1);
-    x_[output_index + 3] = tex2D<float>(texObj, x, y - 1);
-    x_[output_index + 4] = tex2D<float>(texObj, x, y + 1);
-    x_[output_index + 5] = tex2D<float>(texObj, x + 1, y - 1);
-    x_[output_index + 6] = tex2D<float>(texObj, x + 1, y);
-    x_[output_index + 7] = tex2D<float>(texObj, x + 1, y + 1);
+    if (x < width && y < height) {
+        // Load 8 neighboring pixels into shared memory
+        shared_neighbors[0][ty][tx] = tex2D<float>(texObj, x - 1, y - 1);
+        shared_neighbors[1][ty][tx] = tex2D<float>(texObj, x - 1, y);
+        shared_neighbors[2][ty][tx] = tex2D<float>(texObj, x - 1, y + 1);
+        shared_neighbors[3][ty][tx] = tex2D<float>(texObj, x, y - 1);
+        shared_neighbors[4][ty][tx] = tex2D<float>(texObj, x, y + 1);
+        shared_neighbors[5][ty][tx] = tex2D<float>(texObj, x + 1, y - 1);
+        shared_neighbors[6][ty][tx] = tex2D<float>(texObj, x + 1, y);
+        shared_neighbors[7][ty][tx] = tex2D<float>(texObj, x + 1, y + 1);
+    }
+    __syncthreads();
 
+    //Write 8 neighbors to global memory in a coalesced way
+    if (x < width && y < height) {
+        const int output_index = (x * height + y);
+        //Each thread writes one value from each of the 8 neighbors (to avoid strides and uncoalesced global access)
+#pragma unroll
+        for (int i = 0; i < 8; i++) {
+            x_[i * width * height + output_index] = shared_neighbors[i][ty][tx];
+        }
+    }
 }
