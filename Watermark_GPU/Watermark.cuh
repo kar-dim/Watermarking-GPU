@@ -1,5 +1,6 @@
 #pragma once
 #include <arrayfire.h>
+#include <concepts>
 #include <cuda_runtime.h>
 #include <string>
 #include <utility>
@@ -39,6 +40,8 @@ private:
 	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients) const;
 	af::array calculate_neighbors_array(const af::array image) const;
 	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const;
+	template<std::same_as<af::array>... Args>
+	static void unlock_arrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
 	Watermark(const af::array& rgb_image, const af::array& image, const std::string& w_file_path, const int p, const float psnr);
 	Watermark(const std::string &w_file_path, const int p, const float psnr);

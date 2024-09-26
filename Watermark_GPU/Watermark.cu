@@ -95,7 +95,6 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 	const af::array image_transpose = image.T();
 	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
 	float* mask_output = custom_mask.device<float>();
-	
 	switch (p) 
 	{
 		case 3: nvf<3> <<<gridSize, blockSize, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
@@ -104,8 +103,7 @@ af::array Watermark::compute_custom_mask(const af::array& image) const
 		case 9: nvf<9> <<<gridSize, blockSize, 0, af_cuda_stream >>> (texObj, mask_output, cols, rows); break;
 	}
 	//transfer ownership to arrayfire and return mask
-	image_transpose.unlock();
-	custom_mask.unlock();
+	unlock_arrays(image_transpose, custom_mask);
 	return custom_mask;
 }
 
@@ -123,8 +121,7 @@ af::array Watermark::calculate_neighbors_array(const af::array image) const
 	float* neighbors_output = neighbors.device<float>();
 	calculate_neighbors_p3<<<gridSize, blockSize, 0, af_cuda_stream >>>(texObj, neighbors_output, cols, rows);
 	//transfer ownership to arrayfire and return x_ array
-	neighbors.unlock();
-	imageT.unlock();
+	unlock_arrays(neighbors, imageT);
 	return neighbors;
 }
 
@@ -175,8 +172,7 @@ af::array Watermark::compute_prediction_error_mask(const af::array& image, af::a
 	cudaStreamSynchronize(custom_kernels_stream);
 	cudaStreamSynchronize(af_cuda_stream);
 
-	Rx_partial.unlock();
-	rx_partial.unlock();
+	unlock_arrays(Rx_partial, rx_partial);
 	//calculation of coefficients, error sequence and mask
 	const auto correlation_arrays = correlation_arrays_transformation(Rx_partial, rx_partial, rows, padded_cols);
 	coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
