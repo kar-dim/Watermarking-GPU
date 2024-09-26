@@ -28,15 +28,18 @@ __global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int width, c
 	float mean = 0.0f, variance = 0.0f, local_mean_diff;
 	//maximum local values size is 81 for a 9x9 block
 	float local_values[p_squared];
-	for (j = x - pad; j <= x + pad; j++) {
-		for (i = y - pad; i <= y + pad; i++) {
+	for (j = x - pad; j <= x + pad; j++) 
+	{
+		for (i = y - pad; i <= y + pad; i++) 
+		{
 			local_values[k] = tex2D<float>(texObj, j, i);
 			mean += local_values[k];
 			k++;
 		}
 	}
 	mean /= p_squared;
-	for (i = 0; i < p_squared; i++) {
+	for (i = 0; i < p_squared; i++) 
+	{
 		local_mean_diff = local_values[i] - mean;
 		variance += local_mean_diff * local_mean_diff;
 	}

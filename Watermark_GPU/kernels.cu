@@ -20,7 +20,8 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     if (y >= height)
         return;
 
-    if (x < width) {
+    if (x < width) 
+    {
         int counter = 0;
         float x_[9];
         for (int j = x - 1; j <= x + 1; j++)
@@ -34,7 +35,8 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 
         //calculate this thread's 36 local Rx and 8 local rx values
         counter = 0;
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) 
+        {
             rx_local[i][local_id] = x_[i] * current_pixel;
             for (int j = i; j < 8; j++)
                 Rx_local[local_id][counter++] = x_[i] * x_[j];
@@ -59,7 +61,8 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     __syncthreads();
 
     float row_sum = 0.0f;
-    if (local_id < 8) {
+    if (local_id < 8) 
+    {
         for (int i = 0; i < 8; i++)
             row_sum += rx_partial[i][local_id];
         rx[(output_index / 8) + local_id] = row_sum;
@@ -73,29 +76,18 @@ __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, co
     const int ty = threadIdx.y;
     const int x = blockIdx.y * blockDim.y + ty;
     const int y = blockIdx.x * blockDim.x + tx;
+    const int output_index = (x * height + y);
 
-    __shared__ float shared_neighbors[8][16][16]; //all neighbor values per block
-
-    if (x < width && y < height) {
+    if (x < width && y < height) 
+    {
         // Load 8 neighboring pixels into shared memory
-        shared_neighbors[0][ty][tx] = tex2D<float>(texObj, x - 1, y - 1);
-        shared_neighbors[1][ty][tx] = tex2D<float>(texObj, x - 1, y);
-        shared_neighbors[2][ty][tx] = tex2D<float>(texObj, x - 1, y + 1);
-        shared_neighbors[3][ty][tx] = tex2D<float>(texObj, x, y - 1);
-        shared_neighbors[4][ty][tx] = tex2D<float>(texObj, x, y + 1);
-        shared_neighbors[5][ty][tx] = tex2D<float>(texObj, x + 1, y - 1);
-        shared_neighbors[6][ty][tx] = tex2D<float>(texObj, x + 1, y);
-        shared_neighbors[7][ty][tx] = tex2D<float>(texObj, x + 1, y + 1);
-    }
-    __syncthreads();
-
-    //Write 8 neighbors to global memory in a coalesced way
-    if (x < width && y < height) {
-        const int output_index = (x * height + y);
-        //Each thread writes one value from each of the 8 neighbors (to avoid strides and uncoalesced global access)
-#pragma unroll
-        for (int i = 0; i < 8; i++) {
-            x_[i * width * height + output_index] = shared_neighbors[i][ty][tx];
-        }
+        x_[0 * width * height + output_index] = tex2D<float>(texObj, x - 1, y - 1);
+        x_[1 * width * height + output_index] = tex2D<float>(texObj, x - 1, y);
+        x_[2 * width * height + output_index] = tex2D<float>(texObj, x - 1, y + 1);
+        x_[3 * width * height + output_index] = tex2D<float>(texObj, x, y - 1);
+        x_[4 * width * height + output_index] = tex2D<float>(texObj, x, y + 1);
+        x_[5 * width * height + output_index] = tex2D<float>(texObj, x + 1, y - 1);
+        x_[6 * width * height + output_index] = tex2D<float>(texObj, x + 1, y);
+        x_[7 * width * height + output_index] = tex2D<float>(texObj, x + 1, y + 1);
     }
 }
