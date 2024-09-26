@@ -72,15 +72,13 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 
 __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height)
 {
-    const int tx = threadIdx.x;
-    const int ty = threadIdx.y;
-    const int x = blockIdx.y * blockDim.y + ty;
-    const int y = blockIdx.x * blockDim.x + tx;
+    const int x = blockIdx.y * blockDim.y + threadIdx.y;
+    const int y = blockIdx.x * blockDim.x + threadIdx.x;
     const int output_index = (x * height + y);
 
     if (x < width && y < height) 
     {
-        // Load 8 neighboring pixels into shared memory
+        //store 8 neighboring pixels into global memory (coalesced writes)
         x_[0 * width * height + output_index] = tex2D<float>(texObj, x - 1, y - 1);
         x_[1 * width * height + output_index] = tex2D<float>(texObj, x - 1, y);
         x_[2 * width * height + output_index] = tex2D<float>(texObj, x - 1, y + 1);
