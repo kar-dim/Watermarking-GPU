@@ -178,7 +178,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, const af
 }
 
 //helper method used in detectors
-float Watermark::calculateCorrelation(const af::array& e_u, const af::array& e_z) const
+float Watermark::computeCorrelation(const af::array& e_u, const af::array& e_z) const
 {
 	return af::dot<float>(af::flat(e_u), af::flat(e_z)) / static_cast<float>(af::norm(e_z) * af::norm(e_u));
 }
@@ -196,7 +196,7 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 		mask = computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
 	const af::array u = mask * randomMatrix;
 	const af::array e_u = computeErrorSequence(u, a_z);
-	return calculateCorrelation(e_u, e_z);
+	return computeCorrelation(e_u, e_z);
 }
 
 //fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
@@ -206,7 +206,7 @@ float Watermark::detectWatermarkPredictionErrorFast(const af::array& watermarked
 	const af::array m_e = computePredictionErrorMask(watermarkedImage, coefficients, e_z);
 	const af::array u = m_e * randomMatrix;
 	computePredictionErrorMask(u, e_u, a_u, ME_MASK_CALCULATION_REQUIRED_NO);
-	return calculateCorrelation(e_u, e_z);
+	return computeCorrelation(e_u, e_z);
 }
 
 //helper method to display an af::array in a window

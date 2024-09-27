@@ -48,7 +48,7 @@ private:
 	af::array RxPartial, rxPartial, customMask, neighbors;
 
 	std::pair<af::array, af::array> transformCorrelationArrays() const;
-	float calculateCorrelation(const af::array& e_u, const af::array& e_z) const;
+	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array executeTextureKernel(const af::array& image, const cl::Program& program, const std::string kernelName, const af::array& output) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const;
