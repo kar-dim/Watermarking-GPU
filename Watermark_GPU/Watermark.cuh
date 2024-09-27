@@ -33,7 +33,7 @@ private:
 	cudaArray* texArray = nullptr;
 	af::array RxPartial, rxPartial, customMask, neighbors;
 
-	float calculateCorrelation(const af::array& e_u, const af::array& e_z) const;
+	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array computeCustomMask(const af::array& image) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const;
