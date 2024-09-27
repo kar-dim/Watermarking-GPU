@@ -18,7 +18,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Watermark_GPU.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Utilities.cpp">
@@ -38,7 +38,7 @@
     <ClInclude Include="Watermark.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Watermark_GPU.hpp">
+    <ClInclude Include="main_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="opencl_init.h">

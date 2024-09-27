@@ -1,8 +1,8 @@
 ﻿#include "cimg_init.h"
+#include "main_utils.hpp"
 #include "opencl_init.h"
 #include "Utilities.hpp"
 #include "Watermark.hpp"
-#include "Watermark_GPU.hpp"
 #include <af/opencl.h>
 #include <cstdlib>
 #include <cstring>

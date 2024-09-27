@@ -99,7 +99,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg452_64.dll" "$(SolutionDir)x64\Rel
     <ClCompile Include="opencl_utils.cpp" />
     <ClCompile Include="Utilities.cpp" />
     <ClCompile Include="Watermark.cpp" />
-    <ClCompile Include="Watermark_GPU.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cimg_init.h" />
@@ -107,7 +107,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg452_64.dll" "$(SolutionDir)x64\Rel
     <ClInclude Include="opencl_utils.hpp" />
     <ClInclude Include="Utilities.hpp" />
     <ClInclude Include="Watermark.hpp" />
-    <ClInclude Include="Watermark_GPU.hpp" />
+    <ClInclude Include="main_utils.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="kernels\calculate_neighbors_p3.cl" />
