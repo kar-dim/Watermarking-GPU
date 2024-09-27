@@ -20,11 +20,10 @@ Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatr
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
-	initializeMemory(rows, cols);
-	loadRandomMatrix(randomMatrixPath, rows, cols);
+	reinitialize(randomMatrixPath, rows, cols);
 }
 
-//supply the input image to apply watermarking and detection
+//supply the input image size, and pre-allocate buffers and arrays
 void Watermark::initializeMemory(const dim_t rows, const dim_t cols) 
 {
 	//initialize texture
@@ -51,6 +50,13 @@ void Watermark::loadRandomMatrix(const string randomMatrixPath, const dim_t rows
 	std::unique_ptr<float> w_ptr(new float[rows * cols]);
 	randomMatrixStream.read(reinterpret_cast<char*>(w_ptr.get()), total_bytes);
 	randomMatrix = af::transpose(af::array(cols, rows, w_ptr.get()));
+}
+
+//re-initializes memory (texture, kernel arrays, random matrix array) for new image size
+void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, const dim_t cols)
+{
+	initializeMemory(rows, cols);
+	loadRandomMatrix(randomMatrixPath, rows, cols);
 }
 
 //can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
