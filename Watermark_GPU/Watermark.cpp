@@ -79,11 +79,12 @@ af::array Watermark::executeTextureKernel(const af::array& image, const cl::Prog
 	const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
 	const std::unique_ptr<cl_mem> output_ptr(output.device<cl_mem>());
 
+	//copy to texture cache and execute kernel
 	try {
 		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
 		cl::Buffer buff(*output_ptr.get(), true);
-		cl_utils::KernelBuilder kernel_builder(program, kernelName.c_str());
-		queue.enqueueNDRangeKernel(kernel_builder.args(image2d, buff).build(), 
+		queue.enqueueNDRangeKernel(
+			cl_utils::KernelBuilder(program, kernelName.c_str()).args(image2d, buff).build(),
 			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
 		queue.finish();
 		unlockArrays(image_transpose, output);
@@ -138,12 +139,11 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 		//initialize custom kernel memory
 		cl::Buffer Rx_buff(*Rx_partial_mem.get(), true);
 		cl::Buffer rx_buff(*rx_partial_mem.get(), true);
-		cl_utils::KernelBuilder kernel_builder(programs[1], "me");
 		//call prediction error mask kernel
 		queue.enqueueNDRangeKernel(
-				kernel_builder.args(image2d, Rx_buff, rx_buff, RxMappingsBuff, 
-				cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512), cl::Local(sizeof(float) * 64)).build(),
-				cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
+			cl_utils::KernelBuilder(programs[1], "me").args(image2d, Rx_buff, rx_buff, RxMappingsBuff,
+			cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 512), cl::Local(sizeof(float) * 64)).build(),
+			cl::NDRange(), cl::NDRange(rows, padded_cols), cl::NDRange(1, 64));
 		//finish and return memory to arrayfire
 		queue.finish();
 		unlockArrays(RxPartial, rxPartial);
