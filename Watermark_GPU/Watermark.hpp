@@ -12,12 +12,6 @@ enum MASK_TYPE
 	NVF
 };
 
-enum IMAGE_TYPE 
-{
-	RGB,
-	GRAYSCALE
-};
-
 /*!
  *  \brief  Functions for watermark computation and detection
  *  \author Dimitris Karatzas
@@ -39,14 +33,14 @@ private:
 	const cl::Context context{ afcl::getContext(true) };
 	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
 	const std::vector<cl::Program> programs;
-	const std::string randomMatrixPath;
 	const int p;
 	const float strengthFactor;
-	af::array rgbImage, image, randomMatrix;
+	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
 	cl::Image2D image2d;
 	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
-	af::array RxPartial, rxPartial, customMask, neighbors;
 
+	void initializeMemory(const dim_t rows, const dim_t cols);
+	void loadRandomMatrix(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
 	std::pair<af::array, af::array> transformCorrelationArrays() const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array executeTextureKernel(const af::array& image, const cl::Program& program, const std::string kernelName, const af::array& output) const;
@@ -56,11 +50,13 @@ private:
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
-	Watermark(const af::array& rgbImage, const af::array &image, const std::string &randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program> &programs);
-	Watermark(const std::string &randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program>&programs);
-	void loadRandomMatrix(const dim_t rows, const dim_t cols);
-	void loadImage(const af::array& image);
-	af::array makeWatermark(af::array& coefficients, float& a, MASK_TYPE maskType, IMAGE_TYPE imageType) const;
+	Watermark(const Watermark& other) = delete;
+	Watermark(Watermark&& other) noexcept = delete;
+	Watermark& operator=(Watermark&& other) noexcept = delete;
+	Watermark& operator=(const Watermark& other) = delete;
+
+	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program> &programs);
+	af::array makeWatermark(const af::array& inputImage, const af::array& output_image, af::array& coefficients, float& a, MASK_TYPE maskType) const;
 	float detectWatermark(const af::array& watermarkedImage, MASK_TYPE mask_type) const;
 	float detectWatermarkPredictionErrorFast(const af::array& watermarkedImage, const af::array& coefficients) const;
 	static void displayArray(const af::array& array, const int width = 1600, const int height = 900);

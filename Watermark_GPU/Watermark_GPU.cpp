@@ -139,23 +139,23 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	Watermark watermarkObj(rgbImage, image, inir.Get("paths", "w_path", "w.txt"), p, psnr, programs);
+	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr, programs);
 
 	float a;
 	af::array a_x;
 	//warmup for arrayfire
-	watermarkObj.makeWatermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
-	watermarkObj.makeWatermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
+	watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::NVF);
+	watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::ME);
 
 	//make NVF watermark
 	timer::start();
-	af::array watermarkNVF = watermarkObj.makeWatermark(a_x, a, MASK_TYPE::NVF, IMAGE_TYPE::RGB);
+	af::array watermarkNVF = watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::NVF);
 	timer::end();
 	cout << std::format("Watermark strength (parameter a): {}\nCalculation of NVF mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
 
 	//make ME watermark
 	timer::start();
-	af::array watermarkME = watermarkObj.makeWatermark(a_x, a, MASK_TYPE::ME, IMAGE_TYPE::RGB);
+	af::array watermarkME = watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::ME);
 	timer::end();
 	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
 
@@ -235,8 +235,7 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 
 	//initialize watermark functions class
 	af::array dummy_a_x;
-	Watermark watermarkObj(inir.Get("paths", "w_path", "w.txt"), p, psnr, programs);
-	watermarkObj.loadRandomMatrix(rows, cols);
+	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr, programs);
 
 	//realtime watermarking of raw video
 	const bool makeWatermark = inir.GetBoolean("parameters_video", "watermark_make", false);
@@ -245,29 +244,30 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 		//load video from file
 		videoPath = inir.Get("paths", "video", "NO_VIDEO");
 		videoCimg = CImgList<unsigned char>::get_load_yuv(videoPath.c_str(), cols, rows, 420, 0, frames - 1, 1, false);
+		af::array afFrame;
 		if (watermarkFirstFrameOnly == false) {
 			int counter = 0;
 			for (int i = 0; i < frames; i++) {
 				//copy from CImg to arrayfire
-				watermarkObj.loadImage(Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i)));
+				afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i));
 				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
 				if (watermarkByTwoFrames == true) {
 					if (i % 2 != 0)
-						watermarkedFrames.push_back(watermarkObj.makeWatermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+						watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
 					else {
-						watermarkedFrames.push_back(watermarkObj.makeWatermark(coefficients[counter], a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+						watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, coefficients[counter], a, MASK_TYPE::ME));
 						counter++;
 					}
 				}
 				else
-					watermarkedFrames.push_back(watermarkObj.makeWatermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+					watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
 			}
 		}
 		else {
 			//add the watermark only in the first frame
 			//copy from CImg to arrayfire
-			watermarkObj.loadImage(Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(0)));
-			watermarkedFrames.push_back(watermarkObj.makeWatermark(dummy_a_x, a, MASK_TYPE::ME, IMAGE_TYPE::GRAYSCALE));
+			afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(0));
+			watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
 			//rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
 			for (int i = 1; i < frames; i++)
