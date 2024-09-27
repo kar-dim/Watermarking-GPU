@@ -2,7 +2,7 @@
 #include "cuda_utils.hpp"
 #include "Utilities.hpp"
 #include "Watermark.cuh"
-#include "Watermark_GPU.hpp"
+#include "main_utils.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cuda_runtime.h>

@@ -20,7 +20,7 @@
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Watermark_GPU.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Utilities.cpp">
@@ -31,9 +31,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Watermark_GPU.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="cimg_init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -47,6 +44,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Utilities.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="main_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
