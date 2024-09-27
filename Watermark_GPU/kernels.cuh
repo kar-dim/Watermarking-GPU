@@ -3,7 +3,7 @@
 #include <device_launch_parameters.h>
 //constant array used for optimizing share memory accesses for Rx
 //Helps with reducing the local memory required for each block for Rx arrays from 4096 to 2304
-__constant__ int Rx_mappings[64] =
+__constant__ int RxMappings[64] =
 {
     0,  1,  2,  3,  4,  5,  6,  7,
     1,  8,  9,  10, 11, 12, 13, 14,
@@ -15,8 +15,8 @@ __constant__ int Rx_mappings[64] =
     7,  14, 20, 25, 29, 32, 34, 35
 };
 
-template<int p, int p_squared = p * p, int pad = p / 2>
-__global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int width, const int height)
+template<int p, int pSquared = p * p, int pad = p / 2>
+__global__ void nvf(cudaTextureObject_t texObj, float* nvf, const int width, const int height)
 {
 	const int x = blockIdx.y * blockDim.y + threadIdx.y;
 	const int y = blockIdx.x * blockDim.x + threadIdx.x;
@@ -25,28 +25,27 @@ __global__ void nvf(cudaTextureObject_t texObj, float* m_nvf, const int width, c
 		return;
 
 	int i, j, k = 0;
-	float mean = 0.0f, variance = 0.0f, local_mean_diff;
+	float mean = 0.0f, variance = 0.0f, localMeanDiff;
 	//maximum local values size is 81 for a 9x9 block
-	float local_values[p_squared];
+	float localValues[pSquared];
 	for (j = x - pad; j <= x + pad; j++) 
 	{
 		for (i = y - pad; i <= y + pad; i++) 
 		{
-			local_values[k] = tex2D<float>(texObj, j, i);
-			mean += local_values[k];
+			localValues[k] = tex2D<float>(texObj, j, i);
+			mean += localValues[k];
 			k++;
 		}
 	}
-	mean /= p_squared;
-	for (i = 0; i < p_squared; i++) 
+	mean /= pSquared;
+	for (i = 0; i < pSquared; i++) 
 	{
-		local_mean_diff = local_values[i] - mean;
-		variance += local_mean_diff * local_mean_diff;
+		localMeanDiff = localValues[i] - mean;
+		variance += localMeanDiff * localMeanDiff;
 	}
 	//calculate mask and write pixel value
-	const float nvf_mask = variance / ((p_squared - 1) + variance);
-	m_nvf[(x * height) + y] = nvf_mask;
+	nvf[(x * height) + y] = variance / ((pSquared - 1) + variance);
 }
 
-__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int padded_width, const int height);
+__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int paddedWidth, const int height);
 __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height);

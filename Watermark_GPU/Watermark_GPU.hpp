@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-void exit_program(const int exit_code);
-void realtime_detection(Watermark& watermarkFunctions, const std::vector<af::array>& watermarked_frames, const int frames, const bool display_frames, const float frame_period, const bool show_fps);
-std::string execution_time(const bool show_fps, const double seconds);
-int test_for_image(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr);
-int test_for_video(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr);
+void exitProgram(const int exitCode);
+void realtimeDetection(Watermark& watermarkFunctions, const std::vector<af::array>& watermarkedFrames, const int frames, const bool displayFrames, const float framePeriod, const bool showFps);
+std::string executionTime(const bool showFps, const double seconds);
+int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr);
+int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr);

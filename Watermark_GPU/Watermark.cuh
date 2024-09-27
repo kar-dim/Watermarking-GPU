@@ -24,32 +24,32 @@ enum IMAGE_TYPE
 class Watermark 
 {
 private:
-	const std::string w_file_path;
+	const std::string randomMatrixPath;
 	const int p;
-	const float strength_factor;
-	af::array rgb_image, image, w;
-	cudaStream_t af_cuda_stream, custom_kernels_stream;
+	const float strengthFactor;
+	af::array rgbImage, image, randomMatrix;
+	cudaStream_t afStream, customStream;
 	cudaTextureObject_t texObj = 0;
 	cudaArray* texArray = nullptr;
-	af::array Rx_partial, rx_partial, custom_mask, neighbors;
+	af::array RxPartial, rxPartial, customMask, neighbors;
 
-	float calculate_correlation(const af::array& e_u, const af::array& e_z) const;
-	af::array compute_custom_mask(const af::array& image) const;
-	af::array compute_prediction_error_mask(const af::array& image, af::array& error_sequence, af::array& coefficients, const bool mask_needed) const;
-	af::array compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& error_sequence) const;
-	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients) const;
-	af::array calculate_neighbors_array(const af::array image) const;
-	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const;
+	float calculateCorrelation(const af::array& e_u, const af::array& e_z) const;
+	af::array computeCustomMask(const af::array& image) const;
+	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
+	af::array computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const;
+	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
+	af::array computeNeighborsArray(const af::array image) const;
+	std::pair<af::array, af::array> transformCorrelationArrays() const;
 	template<std::same_as<af::array>... Args>
-	static void unlock_arrays(const Args&... arrays) { (arrays.unlock(), ...); }
+	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
-	Watermark(const af::array& rgb_image, const af::array& image, const std::string& w_file_path, const int p, const float psnr);
-	Watermark(const std::string &w_file_path, const int p, const float psnr);
+	Watermark(const af::array& rgbImage, const af::array& image, const std::string& randomMatrixPath, const int p, const float psnr);
+	Watermark(const std::string &randomMatrixPath, const int p, const float psnr);
 	~Watermark();
-	void load_W(const dim_t rows, const dim_t cols);
-	void load_image(const af::array& image);
-	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE type, IMAGE_TYPE image_type) const;
-	float mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type) const;
-	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients) const;
-	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
+	void loadRandomMatrix(const dim_t rows, const dim_t cols);
+	void loadImage(const af::array& image);
+	af::array makeWatermark(af::array& coefficients, float& a, MASK_TYPE type, IMAGE_TYPE imageType) const;
+	float detectWatermark(const af::array& watermarkedImage, MASK_TYPE maskType) const;
+	float detectWatermarkPredictionErrorFast(const af::array& watermarkedImage, const af::array& coefficients) const;
+	static void displayArray(const af::array& array, const int width = 1600, const int height = 900);
 };
