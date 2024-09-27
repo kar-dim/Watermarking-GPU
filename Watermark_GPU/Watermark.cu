@@ -68,6 +68,15 @@ void Watermark::loadRandomMatrix(const string randomMatrixPath, const dim_t rows
 	randomMatrix = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
+//deletes and re-initializes memory (texture, kernel arrays, random matrix array) for new image size
+void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, const dim_t cols)
+{
+	cudaDestroyTextureObject(texObj);
+	cudaFreeArray(texArray);
+	initializeMemory(rows, cols);
+	loadRandomMatrix(randomMatrixPath, rows, cols);
+}
+
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
 af::array Watermark::computeCustomMask(const af::array& image) const
 {

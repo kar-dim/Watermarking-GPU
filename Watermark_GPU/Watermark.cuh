@@ -44,6 +44,7 @@ public:
 
 	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr);
 	~Watermark();
+	void reinitialize(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
 	af::array makeWatermark(const af::array& inputImage, const af::array& output_image, af::array& coefficients, float& a, MASK_TYPE maskType) const;
 	float detectWatermark(const af::array& watermarkedImage, MASK_TYPE maskType) const;
 	float detectWatermarkPredictionErrorFast(const af::array& watermarkedImage, const af::array& coefficients) const;
