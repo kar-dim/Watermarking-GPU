@@ -25,7 +25,7 @@ enum IMAGE_TYPE
 class Watermark {
 
 private:
-	static constexpr int Rx_mappings[64]
+	static constexpr int RxMappings[64]
 	{
 		0,  1,  2,  3,  4,  5,  6,  7,
 		1,  8,  9,  10, 11, 12, 13, 14,
@@ -39,30 +39,30 @@ private:
 	const cl::Context context{ afcl::getContext(true) };
 	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
 	const std::vector<cl::Program> programs;
-	const std::string w_file_path;
+	const std::string randomMatrixPath;
 	const int p;
-	const float strength_factor;
-	af::array rgb_image, image, w;
+	const float strengthFactor;
+	af::array rgbImage, image, randomMatrix;
 	cl::Image2D image2d;
-	const cl::Buffer Rx_mappings_buff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)Rx_mappings, NULL };
-	af::array Rx_partial, rx_partial, custom_mask, neighbors;
+	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
+	af::array RxPartial, rxPartial, customMask, neighbors;
 
-	std::pair<af::array, af::array> correlation_arrays_transformation(const af::array& Rx_partial, const af::array& rx_partial, const int rows, const int padded_cols) const;
-	float calculate_correlation(const af::array& e_u, const af::array& e_z) const;
-	af::array execute_texture_kernel(const af::array& image, const cl::Program& program, const std::string kernel_name, const af::array& output) const;
-	af::array compute_prediction_error_mask(const af::array& image, af::array& error_sequence, af::array& coefficients, const bool mask_needed) const;
-	af::array compute_prediction_error_mask(const af::array& image, const af::array& coefficients, af::array& error_sequence) const;
-	af::array calculate_error_sequence(const af::array& u, const af::array& coefficients) const;
+	std::pair<af::array, af::array> transformCorrelationArrays() const;
+	float calculateCorrelation(const af::array& e_u, const af::array& e_z) const;
+	af::array executeTextureKernel(const af::array& image, const cl::Program& program, const std::string kernelName, const af::array& output) const;
+	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
+	af::array computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const;
+	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
 	template<std::same_as<af::array>... Args>
-	static void unlock_arrays(const Args&... arrays) { (arrays.unlock(), ...); }
+	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
-	Watermark(const af::array& rgb_image, const af::array &image, const std::string &w_file_path, const int p, const float psnr, const std::vector<cl::Program> &programs);
-	Watermark(const std::string &w_file_path, const int p, const float psnr, const std::vector<cl::Program>&programs);
-	void load_W(const dim_t rows, const dim_t cols);
-	void load_image(const af::array& image);
-	af::array make_and_add_watermark(af::array& coefficients, float& a, MASK_TYPE mask_type, IMAGE_TYPE image_type) const;
-	float mask_detector(const af::array& watermarked_image, MASK_TYPE mask_type) const;
-	float mask_detector_prediction_error_fast(const af::array& watermarked_image, const af::array& coefficients) const;
-	static void display_array(const af::array& array, const int width = 1600, const int height = 900);
+	Watermark(const af::array& rgbImage, const af::array &image, const std::string &randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program> &programs);
+	Watermark(const std::string &randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program>&programs);
+	void loadRandomMatrix(const dim_t rows, const dim_t cols);
+	void loadImage(const af::array& image);
+	af::array makeWatermark(af::array& coefficients, float& a, MASK_TYPE maskType, IMAGE_TYPE imageType) const;
+	float detectWatermark(const af::array& watermarkedImage, MASK_TYPE mask_type) const;
+	float detectWatermarkPredictionErrorFast(const af::array& watermarkedImage, const af::array& coefficients) const;
+	static void displayArray(const af::array& array, const int width = 1600, const int height = 900);
 	
 };

@@ -6,7 +6,7 @@ namespace cl_utils
     KernelBuilder::KernelBuilder(const cl::Program& program, const char* name)
     {
         kernel = cl::Kernel(program, name);
-        arg_counter = 0;
+        argsCounter = 0;
     }
 
     cl::Kernel KernelBuilder::build() const 

@@ -7,7 +7,7 @@ namespace cl_utils
     {
     private:
         cl::Kernel kernel;
-        int arg_counter;
+        int argsCounter;
     public:
         KernelBuilder(const cl::Program& program, const char* name);
 
@@ -15,7 +15,7 @@ namespace cl_utils
         template <typename... T>
         KernelBuilder& args(const T&... values)
         {
-            (kernel.setArg<T>(arg_counter++, values), ...);
+            (kernel.setArg<T>(argsCounter++, values), ...);
             return *this;
         }
 
