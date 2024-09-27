@@ -16,23 +16,17 @@
 
 using std::string;
 
-//constructor without specifying input image yet, it must be supplied later by calling the appropriate public method
-Watermark::Watermark(const string &randomMatrixPath, const int p, const float psnr)
-	:randomMatrixPath(randomMatrixPath), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+
+//initialize data and memory
+Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatrixPath, const int p, const float psnr)
+	:p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
+	initializeMemory(rows, cols);
+	loadRandomMatrix(randomMatrixPath, rows, cols);
 	afStream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 	cudaStreamCreate(&customStream);
-}
-
-//full constructor
-Watermark::Watermark(const af::array &rgbImage, const af::array& image, const string &randomMatrixPath, const int p, const float psnr)
-	:Watermark::Watermark(randomMatrixPath, p, psnr) 
-{
-	this->rgbImage = rgbImage;
-	loadImage(image);
-	loadRandomMatrix(image.dims(0), image.dims(1));
 }
 
 //destructor, only custom kernels cuda stream must be destroyed
@@ -43,45 +37,35 @@ Watermark::~Watermark()
 	cudaFreeArray(texArray);
 }
 
-//supply the input image to apply watermarking and detection, and initialize texture and global data
-void Watermark::loadImage(const af::array& image) 
+//supply the input image to apply watermarking and detection
+void Watermark::initializeMemory(const dim_t rows, const dim_t cols)
 {
-	this->image = image;
-	//initialize texture objects only once
-	if (texObj == 0) 
-	{
-		auto textureData = cuda_utils::createTextureData(
-			static_cast<unsigned int>(image.dims(0)), static_cast<unsigned int>(image.dims(1)));
-		texObj = textureData.first;
-		texArray = textureData.second;
-	}
+	//initialize texture
+	auto textureData = cuda_utils::createTextureData(static_cast<unsigned int>(rows), static_cast<unsigned int>(cols));
+	texObj = textureData.first;
+	texArray = textureData.second;
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	if (RxPartial.bytes() == 0 || rxPartial.bytes() == 0 || customMask.bytes() == 0 || neighbors.bytes() == 0)
-	{
-		const auto rows = static_cast<unsigned int>(image.dims(0));
-		const auto cols = static_cast<unsigned int>(image.dims(1));
-		const auto paddedCols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-		RxPartial = af::array(rows, paddedCols);
-		rxPartial = af::array(rows, paddedCols / 8);
-		customMask = af::array(rows, cols);
-		neighbors = af::array(rows * cols, (p * p) - 1);
-	}
+	const dim_t padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+	RxPartial = af::array(rows, padded_cols);
+	rxPartial = af::array(rows, padded_cols / 8);
+	customMask = af::array(rows, cols);
+	neighbors = af::array(rows * cols, (p * p) - 1);
 }
 
 //helper method to load the random noise matrix W from the file specified.
-void Watermark::loadRandomMatrix(const dim_t rows, const dim_t cols) 
+void Watermark::loadRandomMatrix(const string randomMatrixPath, const dim_t rows, const dim_t cols)
 {
 	std::ifstream randomMatrixStream(randomMatrixPath.c_str(), std::ios::binary);
 	if (!randomMatrixStream.is_open())
 		throw std::runtime_error(string("Error opening '" + randomMatrixPath + "' file for Random noise W array\n"));
 	randomMatrixStream.seekg(0, std::ios::end);
-	const auto totalFileBytes = randomMatrixStream.tellg();
+	const auto total_bytes = randomMatrixStream.tellg();
 	randomMatrixStream.seekg(0, std::ios::beg);
-	if (rows * cols * sizeof(float) != totalFileBytes)
-		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(totalFileBytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
-	std::unique_ptr<float> randomMatrixData(new float[rows * cols]);
-	randomMatrixStream.read(reinterpret_cast<char*>(randomMatrixData.get()), totalFileBytes);
-	randomMatrix = af::transpose(af::array(cols, rows, randomMatrixData.get()));
+	if (rows * cols * sizeof(float) != total_bytes)
+		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
+	std::unique_ptr<float> w_ptr(new float[rows * cols]);
+	randomMatrixStream.read(reinterpret_cast<char*>(w_ptr.get()), total_bytes);
+	randomMatrix = af::transpose(af::array(cols, rows, w_ptr.get()));
 }
 
 //compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
@@ -142,15 +126,17 @@ std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
 }
 
 //Main watermark embedding method
-af::array Watermark::makeWatermark(af::array& coefficients, float& a, MASK_TYPE maskType, IMAGE_TYPE imageType) const
+//it embeds the watermark computed fom "inputImage" (always grayscale)
+//into a new array based on "outputImage" (can be grayscale or RGB).
+af::array Watermark::makeWatermark(const af::array& inputImage, const af::array& outputImage, af::array& coefficients, float& a, MASK_TYPE maskType) const
 {
 	af::array error_sequence;
 	const af::array mask = maskType == MASK_TYPE::ME ?
-		computePredictionErrorMask(image, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		computeCustomMask(image);
+		computePredictionErrorMask(inputImage, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
+		computeCustomMask(inputImage);
 	const af::array u = mask * randomMatrix;
-	a = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / image.elements());
-	return af::clamp((imageType == IMAGE_TYPE::RGB ? rgbImage : image) + (u * a), 0, 255);
+	a = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
+	return af::clamp(outputImage + (u * a), 0, 255);
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
