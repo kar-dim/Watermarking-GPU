@@ -41,10 +41,11 @@ Watermark::Watermark(const Watermark& other) : p(other.p), strengthFactor(other.
 Watermark::Watermark(Watermark&& other) noexcept : p(other.p), strengthFactor(other.strengthFactor), afStream(other.afStream),
 randomMatrix(std::move(other.randomMatrix)), RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
 {
-	cudaStreamCreate(&customStream);
 	texObj = other.texObj;
-	other.texObj = 0;
 	texArray = other.texArray;
+	customStream = other.customStream;
+	other.texObj = 0;
+	other.customStream = nullptr;
 	other.texArray = nullptr;
 }
 
@@ -90,7 +91,8 @@ Watermark& Watermark::operator=(const Watermark& other)
 //destructor, only custom kernels cuda stream must be destroyed
 Watermark::~Watermark()
 {
-	cudaStreamDestroy(customStream);
+	if (customStream != nullptr)
+	    cudaStreamDestroy(customStream);
 	if (texObj != 0)
 		cudaDestroyTextureObject(texObj);
 	if (texArray != nullptr)
