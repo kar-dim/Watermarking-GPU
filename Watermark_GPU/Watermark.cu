@@ -1,6 +1,6 @@
-#include "Watermark.cuh"
 #include "cuda_utils.hpp"
 #include "kernels.cuh"
+#include "Watermark.cuh"
 #include <af/cuda.h>
 #include <arrayfire.h>
 #include <cmath>
@@ -9,13 +9,13 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true
 
 using std::string;
-
 
 //initialize data and memory
 Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatrixPath, const int p, const float psnr)
@@ -29,12 +29,72 @@ Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatr
 	cudaStreamCreate(&customStream);
 }
 
+//copy constructor
+Watermark::Watermark(const Watermark& other) : p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
+{
+	initializeMemory(other.customMask.dims(0), other.customMask.dims(1));
+	afStream = other.afStream;
+	cudaStreamCreate(&customStream);
+}
+
+//move constructor
+Watermark::Watermark(Watermark&& other) noexcept : p(other.p), strengthFactor(other.strengthFactor), afStream(other.afStream),
+randomMatrix(std::move(other.randomMatrix)), RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
+{
+	cudaStreamCreate(&customStream);
+	texObj = other.texObj;
+	other.texObj = 0;
+	texArray = other.texArray;
+	other.texArray = nullptr;
+}
+
+//move assignment operator
+Watermark& Watermark::operator=(Watermark&& other) noexcept
+{
+	if (this != &other) 
+	{
+		p = other.p;
+		strengthFactor = other.strengthFactor;
+		randomMatrix = std::move(other.randomMatrix);
+		afStream = other.afStream; //common for all objects
+		cudaDestroyTextureObject(texObj);
+		texObj = other.texObj;
+		other.texObj = 0;
+		cudaFreeArray(texArray);
+		texArray = other.texArray;
+		other.texArray = nullptr;
+		RxPartial = std::move(other.RxPartial);
+		rxPartial = std::move(other.rxPartial);
+		customMask = std::move(other.customMask);
+		neighbors = std::move(other.neighbors);
+	}
+	return *this;
+}
+
+//copy assignment operator
+Watermark& Watermark::operator=(const Watermark& other)
+{
+	if (this != &other) 
+	{
+		p = other.p;
+		strengthFactor = other.strengthFactor;
+		afStream = other.afStream;
+		cudaDestroyTextureObject(texObj);
+		cudaFreeArray(texArray);
+		initializeMemory(other.customMask.dims(0), other.customMask.dims(1));
+		randomMatrix = other.randomMatrix;
+	}
+	return *this;
+}
+
 //destructor, only custom kernels cuda stream must be destroyed
 Watermark::~Watermark()
 {
 	cudaStreamDestroy(customStream);
-	cudaDestroyTextureObject(texObj);
-	cudaFreeArray(texArray);
+	if (texObj != 0)
+		cudaDestroyTextureObject(texObj);
+	if (texArray != nullptr)
+		cudaFreeArray(texArray);
 }
 
 //supply the input image to apply watermarking and detection

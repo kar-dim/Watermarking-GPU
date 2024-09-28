@@ -18,8 +18,8 @@ enum MASK_TYPE
 class Watermark 
 {
 private:
-	const int p;
-	const float strengthFactor;
+	int p;
+	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
 	cudaStream_t afStream, customStream;
 	cudaTextureObject_t texObj = 0;
@@ -37,10 +37,10 @@ private:
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
-	Watermark(const Watermark& other) = delete;
-	Watermark(Watermark&& other) noexcept = delete;
-	Watermark& operator=(Watermark&& other) noexcept = delete;
-	Watermark& operator=(const Watermark& other) = delete;
+	Watermark(const Watermark& other);
+	Watermark(Watermark&& other) noexcept;
+	Watermark& operator=(Watermark&& other) noexcept;
+	Watermark& operator=(const Watermark& other);
 
 	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr);
 	~Watermark();
