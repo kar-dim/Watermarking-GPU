@@ -1,7 +1,6 @@
 ﻿#pragma once
 #include "arrayfire.h"
 #include "opencl_init.h"
-#include <af/opencl.h>
 #include <concepts>
 #include <string>
 #include <utility>
@@ -30,14 +29,14 @@ private:
 		6,  13, 19, 24, 28, 31, 33, 34,
 		7,  14, 20, 25, 29, 32, 34, 35
 	};
-	const cl::Context context{ afcl::getContext(true) };
-	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
-	const std::vector<cl::Program> programs;
-	const int p;
-	const float strengthFactor;
+	cl::Context context;
+	cl::CommandQueue queue; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
+	std::vector<cl::Program> programs;
+	int p;
+	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
 	cl::Image2D image2d;
-	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
+	cl::Buffer RxMappingsBuff;
 
 	void initializeMemory(const dim_t rows, const dim_t cols);
 	void loadRandomMatrix(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
@@ -50,12 +49,11 @@ private:
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
-	Watermark(const Watermark& other) = delete;
-	Watermark(Watermark&& other) noexcept = delete;
-	Watermark& operator=(Watermark&& other) noexcept = delete;
-	Watermark& operator=(const Watermark& other) = delete;
-
-	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program> &programs);
+	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program>& programs);
+	Watermark(const Watermark& other);
+	Watermark(Watermark&& other) noexcept = default; //default move constructor is fine, will call std::move for all fields
+	Watermark& operator=(Watermark&& other) noexcept = default; //default move assignmet is fine
+	Watermark& operator=(const Watermark& other);
 	void reinitialize(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
 	af::array makeWatermark(const af::array& inputImage, const af::array& output_image, af::array& coefficients, float& a, MASK_TYPE maskType) const;
 	float detectWatermark(const af::array& watermarkedImage, MASK_TYPE mask_type) const;
