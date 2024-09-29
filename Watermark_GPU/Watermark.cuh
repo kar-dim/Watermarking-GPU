@@ -38,12 +38,11 @@ private:
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
+	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr);
 	Watermark(const Watermark& other);
 	Watermark(Watermark&& other) noexcept;
 	Watermark& operator=(Watermark&& other) noexcept;
 	Watermark& operator=(const Watermark& other);
-
-	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr);
 	~Watermark();
 	void reinitialize(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
 	af::array makeWatermark(const af::array& inputImage, const af::array& output_image, af::array& coefficients, float& a, MASK_TYPE maskType) const;
