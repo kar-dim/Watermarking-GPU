@@ -2,7 +2,6 @@
 #include "opencl_utils.hpp"
 #include "Watermark.hpp"
 #include <arrayfire.h>
-#include <af/opencl.h>
 #include <cmath>
 #include <fstream>
 #include <memory>
@@ -22,13 +21,11 @@ Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatr
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
-	context = cl::Context(afcl::getContext(true));
-	queue = cl::CommandQueue(afcl::getQueue(true));
 	reinitialize(randomMatrixPath, rows, cols);
 }
 
 //copy constructor
-Watermark::Watermark(const Watermark& other) : context(other.context), queue(other.queue), programs(other.programs), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
+Watermark::Watermark(const Watermark& other) : programs(other.programs), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
 {
 	initializeMemory(other.customMask.dims(0), other.customMask.dims(1));
 }
@@ -38,8 +35,6 @@ Watermark& Watermark::operator=(const Watermark& other)
 {
 	if (this != &other) 
 	{
-		context = other.context;
-		queue = other.queue;
 		programs = other.programs;
 		p = other.p;
 		strengthFactor = other.strengthFactor;
@@ -52,7 +47,6 @@ Watermark& Watermark::operator=(const Watermark& other)
 //supply the input image size, and pre-allocate buffers and arrays
 void Watermark::initializeMemory(const dim_t rows, const dim_t cols) 
 {
-	RxMappingsBuff = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL);
 	//initialize texture
 	image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL);
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc

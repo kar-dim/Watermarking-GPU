@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "arrayfire.h"
 #include "opencl_init.h"
+#include <af/opencl.h>
 #include <concepts>
 #include <string>
 #include <utility>
@@ -29,14 +30,14 @@ private:
 		6,  13, 19, 24, 28, 31, 33, 34,
 		7,  14, 20, 25, 29, 32, 34, 35
 	};
-	cl::Context context;
-	cl::CommandQueue queue; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
+	const cl::Context context{ afcl::getContext(true) };
+	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
+	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
 	std::vector<cl::Program> programs;
 	int p;
 	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
 	cl::Image2D image2d;
-	cl::Buffer RxMappingsBuff;
 
 	void initializeMemory(const dim_t rows, const dim_t cols);
 	void loadRandomMatrix(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
