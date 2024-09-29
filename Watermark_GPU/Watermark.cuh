@@ -21,9 +21,10 @@ private:
 	int p;
 	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
-	cudaStream_t afStream, customStream;
-	cudaTextureObject_t texObj = 0;
-	cudaArray* texArray = nullptr;
+	cudaStream_t customStream;
+	cudaTextureObject_t texObj;
+	cudaArray* texArray;
+	static cudaStream_t afStream;
 
 	void initializeMemory(const dim_t rows, const dim_t cols);
 	void loadRandomMatrix(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);

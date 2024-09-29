@@ -17,6 +17,8 @@
 
 using std::string;
 
+cudaStream_t Watermark::afStream = afcu::getStream(afcu::getNativeId(af::getDevice()));
+
 //initialize data and memory
 Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatrixPath, const int p, const float psnr)
 	:p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
@@ -25,22 +27,22 @@ Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatr
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
 	initializeMemory(rows, cols);
 	loadRandomMatrix(randomMatrixPath, rows, cols);
-	afStream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 	cudaStreamCreate(&customStream);
 }
 
 //copy constructor
 Watermark::Watermark(const Watermark& other) : p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
 {
+	//we don't need to copy the internal buffers data, only to allocate the correct size based on other
 	initializeMemory(other.customMask.dims(0), other.customMask.dims(1));
-	afStream = other.afStream;
 	cudaStreamCreate(&customStream);
 }
 
 //move constructor
-Watermark::Watermark(Watermark&& other) noexcept : p(other.p), strengthFactor(other.strengthFactor), afStream(other.afStream),
+Watermark::Watermark(Watermark&& other) noexcept : p(other.p), strengthFactor(other.strengthFactor),
 randomMatrix(std::move(other.randomMatrix)), RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
 {
+	//move texture data and nullify other
 	texObj = other.texObj;
 	texArray = other.texArray;
 	customStream = other.customStream;
@@ -57,13 +59,19 @@ Watermark& Watermark::operator=(Watermark&& other) noexcept
 		p = other.p;
 		strengthFactor = other.strengthFactor;
 		randomMatrix = std::move(other.randomMatrix);
-		afStream = other.afStream; //common for all objects
+		//move custom stream
+		cudaStreamDestroy(customStream);
+		customStream = other.customStream;
+		other.customStream = nullptr;
+		//move texture object
 		cudaDestroyTextureObject(texObj);
 		texObj = other.texObj;
 		other.texObj = 0;
+		//move texture array
 		cudaFreeArray(texArray);
 		texArray = other.texArray;
 		other.texArray = nullptr;
+		//move arrayfire arrays
 		RxPartial = std::move(other.RxPartial);
 		rxPartial = std::move(other.rxPartial);
 		customMask = std::move(other.customMask);
@@ -79,7 +87,6 @@ Watermark& Watermark::operator=(const Watermark& other)
 	{
 		p = other.p;
 		strengthFactor = other.strengthFactor;
-		afStream = other.afStream;
 		cudaDestroyTextureObject(texObj);
 		cudaFreeArray(texArray);
 		initializeMemory(other.customMask.dims(0), other.customMask.dims(1));
