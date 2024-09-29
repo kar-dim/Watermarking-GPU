@@ -35,7 +35,8 @@ __kernel void me(__read_only image2d_t image,
 
         //calculate this thread's 64 local Rx and 8 local rx values
         counter = 0;
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 8; i++) 
+        {
             rxLocal[i][localId] = x_[i] * current_pixel;
             for (int j = i; j < 8; j++)
                 RxLocal[localId][counter++] = x_[i] * x_[j];

@@ -32,7 +32,8 @@ int main(void)
 {
 	//open parameters file
 	INIReader inir("settings.ini");
-	if (inir.ParseError() < 0) {
+	if (inir.ParseError() < 0) 
+	{
 		cout << "Could not load opencl configuration file\n";
 		exitProgram(EXIT_FAILURE);
 	}
@@ -58,7 +59,8 @@ int main(void)
 	const float psnr = static_cast<float>(inir.GetReal("parameters", "psnr", -1.0f));
 
 	//TODO for p>3 we have problems with ME masking buffers
-	if (p != 3) {
+	if (p != 3) 
+	{
 		cout << "For now, only p=3 is allowed\n";
 		exitProgram(EXIT_FAILURE);
 	}
@@ -67,7 +69,8 @@ int main(void)
 		exitProgram(EXIT_FAILURE);
 	}*/
 
-	if (psnr <= 0) {
+	if (psnr <= 0) 
+	{
 		cout << "PSNR must be a positive number\n";
 		exitProgram(EXIT_FAILURE);
 	}
@@ -129,11 +132,13 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	const auto rows = image.dims(0);
 	const auto cols = image.dims(1);
 	cout << "Time to load and transfer RGB image from disk to VRAM: " << timer::elapsedSeconds() << "\n\n";
-	if (cols <= 64 || rows <= 16) {
+	if (cols <= 64 || rows <= 16) 
+	{
 		cout << "Image dimensions too low\n";
 		return EXIT_FAILURE;
 	}
-	if (cols > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>()) || cols > 7680 || rows > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) || rows > 4320) {
+	if (cols > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>()) || cols > 7680 || rows > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) || rows > 4320) 
+	{
 		cout << "Image dimensions too high for this GPU\n";
 		return EXIT_FAILURE;
 	}
@@ -181,7 +186,8 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	cout << std::format("Correlation [ME]: {:.16f}\n", correlationMe);
 
 	//save watermarked images to disk
-	if (inir.GetBoolean("options", "save_watermarked_files_to_disk", false)) {
+	if (inir.GetBoolean("options", "save_watermarked_files_to_disk", false)) 
+	{
 		cout << "\nSaving watermarked files to disk...\n";
 //#pragma omp parallel sections
 		//{
@@ -204,19 +210,23 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	const bool watermarkFirstFrameOnly = inir.GetBoolean("parameters_video", "watermark_first_frame_only", false);
 	const bool watermarkByTwoFrames = inir.GetBoolean("parameters_video", "watermark_by_two_frames", false);
 	const bool displayFrames = inir.GetBoolean("parameters_video", "display_frames", false);
-	if (rows <= 64 || cols <= 64) {
+	if (rows <= 64 || cols <= 64) 
+	{
 		cout << "Video dimensions too low\n";
 		return EXIT_FAILURE;
 	}
-	if (rows > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || cols > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) {
+	if (rows > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>() || cols > device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) 
+	{
 		cout << "Video dimensions too high for this GPU\n";
 		return EXIT_FAILURE;
 	}
-	if (fps <= 15 || fps > 60) {
+	if (fps <= 15 || fps > 60) 
+	{
 		cout << "Video FPS is too low or too high\n";
 		return EXIT_FAILURE;
 	}
-	if (frames <= 1) {
+	if (frames <= 1) 
+	{
 		cout << "Frame count too low\n";
 		return EXIT_FAILURE;
 	}
@@ -245,16 +255,20 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 		videoPath = inir.Get("paths", "video", "NO_VIDEO");
 		videoCimg = CImgList<unsigned char>::get_load_yuv(videoPath.c_str(), cols, rows, 420, 0, frames - 1, 1, false);
 		af::array afFrame;
-		if (watermarkFirstFrameOnly == false) {
+		if (watermarkFirstFrameOnly == false) 
+		{
 			int counter = 0;
-			for (int i = 0; i < frames; i++) {
+			for (int i = 0; i < frames; i++) 
+			{
 				//copy from CImg to arrayfire
 				afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i));
 				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
-				if (watermarkByTwoFrames == true) {
+				if (watermarkByTwoFrames == true) 
+				{
 					if (i % 2 != 0)
 						watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
-					else {
+					else 
+					{
 						watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, coefficients[counter], a, MASK_TYPE::ME));
 						counter++;
 					}
@@ -263,7 +277,8 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 					watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
 			}
 		}
-		else {
+		else 
+		{
 			//add the watermark only in the first frame
 			//copy from CImg to arrayfire
 			afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(0));
@@ -278,13 +293,16 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	//save watermarked video to raw YUV (must be processed with ffmpeg later to add file headers, then it can be compressed etc)
 	if (inir.GetBoolean("parameters_video", "watermark_save_to_file", false) == true)
 	{
-		if (makeWatermark == false) {
+		if (makeWatermark == false) 
+		{
 			cout << "Please set 'watermark_make' to true in settins file, in order to be able to save it.\n";
 		}
-		else {
+		else 
+		{
 			CImgList<unsigned char> videoCimgWatermarked(frames, cols, rows, 1, 3);
 //#pragma omp parallel for
-			for (int i = 0; i < frames; i++) {
+			for (int i = 0; i < frames; i++) 
+			{
 				unsigned char* watermarkedFramesPtr = af::clamp(watermarkedFrames[i].T(), 0, 255).as(af::dtype::u8).host<unsigned char>();
 				CImg<unsigned char> cimgY(cols, rows);
 				std::memcpy(cimgY.data(), watermarkedFramesPtr, sizeof(unsigned char) * rows * cols);
@@ -297,13 +315,16 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 			//save watermark frames to file
 			videoCimgWatermarked.save_yuv((inir.Get("parameters_video", "watermark_save_to_file_path", "./watermarked.yuv")).c_str(), 420, false);
 
-			if (displayFrames == true) {
+			if (displayFrames == true) 
+			{
 				CImgDisplay window;
-				for (int i = 0; i < frames; i++) {
+				for (int i = 0; i < frames; i++) 
+				{
 					timer::start();
 					window.display(videoCimgWatermarked.at(i).get_channel(0));
 					timer::end();
-					if ((timeDiff = framePeriod - timer::elapsedSeconds()) > 0) {
+					if ((timeDiff = framePeriod - timer::elapsedSeconds()) > 0) 
+					{
 						Utilities::accurateSleep(timeDiff);
 					}
 				}
@@ -313,7 +334,8 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 
 	//realtime watermarked video detection
-	if (inir.GetBoolean("parameters_video", "watermark_detection", false) == true) {
+	if (inir.GetBoolean("parameters_video", "watermark_detection", false) == true) 
+	{
 		if (makeWatermark == false)
 			cout << "Please set 'watermark_make' to true in settins file, in order to be able to detect the watermark.\n";
 		else
@@ -321,22 +343,28 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 
 	//realtime watermarked video detection by two frames
-	if (inir.GetBoolean("parameters_video", "watermark_detection_by_two_frames", false) == true) {
-		if (makeWatermark == false) {
+	if (inir.GetBoolean("parameters_video", "watermark_detection_by_two_frames", false) == true) 
+	{
+		if (makeWatermark == false) 
+		{
 			cout << "Please set 'watermark_make' to true in settings file, in order to be able to detect the watermark.\n";
 		}
-		else {
+		else 
+		{
 			std::vector<float> correlations(frames);
 			int counter = 0;
-			for (int i = 0; i < frames; i++) {
+			for (int i = 0; i < frames; i++) 
+			{
 				timer::start();
-				if (i % 2 != 0) {
+				if (i % 2 != 0) 
+				{
 					correlations[i] = watermarkObj.detectWatermarkPredictionErrorFast(watermarkedFrames[i], coefficients[counter]);
 					timer::end();
 					cout << "Watermark detection execution time (fast): " << executionTime(showFps, timer::elapsedSeconds()) << "\n";
 					counter++;
 				}
-				else {
+				else 
+				{
 					correlations[i] = watermarkObj.detectWatermark(watermarkedFrames[i], MASK_TYPE::ME);
 					timer::end();
 					cout << "Watermark detection execution time: " << executionTime(showFps, timer::elapsedSeconds()) << "\n";
@@ -347,7 +375,8 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 
 	//realtimne watermark detection of a compressed file
-	if (inir.GetBoolean("parameters_video", "watermark_detection_compressed", false) == true) {
+	if (inir.GetBoolean("parameters_video", "watermark_detection_compressed", false) == true) 
+	{
 		//read compressed file
 		string videoCompressedPath = inir.Get("paths", "video_compressed", "NO_VIDEO");
 		CImgList<unsigned char>videoCimgW = CImgList<unsigned char>::get_load_video(videoCompressedPath.c_str(), 0, frames - 1);
@@ -370,13 +399,15 @@ void realtimeDetection(Watermark& watermarkFunctions, const std::vector<af::arra
 	const auto rows = static_cast<unsigned int>(watermarkedFrames[1].dims(0));
 	const auto cols = static_cast<unsigned int>(watermarkedFrames[0].dims(1));
 	float timeDiff;
-	for (int i = 0; i < frames; i++) {
+	for (int i = 0; i < frames; i++) 
+	{
 		timer::start();
 		correlations[i] = watermarkFunctions.detectWatermark(watermarkedFrames[i], MASK_TYPE::ME);
 		timer::end();
 		const float watermarkTimeSecs = timer::elapsedSeconds();
 		cout << "Watermark detection execution time: " << executionTime(showFps, watermarkTimeSecs) << "\n";
-		if (displayFrames) {
+		if (displayFrames) 
+		{
 			timer::start();
 			af::array clamped = af::clamp(watermarkedFrames[i], 0, 255);
 			unsigned char* watermarkedFramesPtr = af::clamp(clamped.T(), 0, 255).as(af::dtype::u8).host<unsigned char>();
@@ -393,7 +424,8 @@ void realtimeDetection(Watermark& watermarkFunctions, const std::vector<af::arra
 	}
 }
 
-void exitProgram(const int exitCode) {
+void exitProgram(const int exitCode) 
+{
 	std::system("pause");
 	std::exit(exitCode);
 }

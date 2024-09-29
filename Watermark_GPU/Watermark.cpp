@@ -165,7 +165,8 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 		const auto correlation_arrays = transformCorrelationArrays();
 		coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
 		errorSequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
-		if (maskNeeded) {
+		if (maskNeeded) 
+		{
 			const af::array error_sequence_abs = af::abs(errorSequence);
 			return error_sequence_abs / af::max<float>(error_sequence_abs);
 		}
