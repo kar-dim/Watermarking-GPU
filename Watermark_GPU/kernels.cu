@@ -11,17 +11,15 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     __shared__ float rxLocal[8][64];
     __shared__ float rxPartial[8][8];
 
-    //initialize rx shared memory with coalesced access
+    //initialize shared memory with coalesced access
     for (int i = 0; i < 8; i++)
         rxLocal[i][localId] = 0.0f;
-
     if (x >= width) 
     {
         #pragma unroll
         for (int i = 0; i < 36; i++)
             RxLocal[localId][i] = 0.0f;
     }
-    
     rxPartial[localId % 8][localId / 8] = 0.0f;
 
     if (y >= height)
