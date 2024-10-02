@@ -34,7 +34,7 @@ private:
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
-	af::array computeNeighborsArray(const af::array image) const;
+	af::array computeNeighborsArray(const af::array& image) const;
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:

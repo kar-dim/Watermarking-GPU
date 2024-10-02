@@ -170,20 +170,20 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 }
 
 //calls custom kernel to calculate neighbors array ("x_" array)
-af::array Watermark::computeNeighborsArray(const af::array image) const 
+af::array Watermark::computeNeighborsArray(const af::array& image) const 
 {
 	const dim3 blockSize(16, 16);
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols);
-	const af::array image_transpose = image.T();
+	const af::array imageTranspose = image.T();
 	//do a texture copy
-	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
+	cuda_utils::copyDataToCudaArray(imageTranspose.device<float>(), rows, cols, texArray);
 	//transfer ownership from arrayfire
 	float* neighbors_output = neighbors.device<float>();
 	calculate_neighbors_p3<<<gridSize, blockSize, 0, afStream >>>(texObj, neighbors_output, cols, rows);
 	//transfer ownership to arrayfire and return x_ array
-	unlockArrays(neighbors, image_transpose);
+	unlockArrays(neighbors, imageTranspose);
 	return neighbors;
 }
 
