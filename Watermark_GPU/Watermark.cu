@@ -152,7 +152,7 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const dim3 blockSize(16, 16);
-	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols);
+	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols, true);
 	//transfer ownership from arrayfire and copy data to cuda array
 	const af::array image_transpose = image.T();
 	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
@@ -175,7 +175,7 @@ af::array Watermark::computeNeighborsArray(const af::array& image) const
 	const dim3 blockSize(16, 16);
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
-	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols);
+	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols, true);
 	const af::array imageTranspose = image.T();
 	//do a texture copy
 	cuda_utils::copyDataToCudaArray(imageTranspose.device<float>(), rows, cols, texArray);
@@ -227,7 +227,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	float* RxPartialData = RxPartial.device<float>();
 	float* rxPartialData = rxPartial.device<float>();
 	const auto paddedCols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-	const dim3 blockSize(1, 64);
+	const dim3 blockSize(64, 1);
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, paddedCols);
 	
 	//enqueue "x_" kernel

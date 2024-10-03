@@ -2,9 +2,9 @@
 
 __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int paddedWidth, const int height) 
 {
-    const int x = blockIdx.y * blockDim.y + threadIdx.y;
-    const int y = blockIdx.x * blockDim.x + threadIdx.x;
-	const int localId = threadIdx.y;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+	const int localId = threadIdx.x;
 	const int outputIndex = (y * paddedWidth) + x;
 
     __shared__ float RxLocal[64][36];
