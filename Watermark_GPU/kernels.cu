@@ -5,7 +5,6 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
 	const int localId = threadIdx.x;
-    const int warpId = localId / 32;
 	const int outputIndex = (y * paddedWidth) + x;
 
     __shared__ float RxLocal[64][36];
@@ -54,7 +53,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     //if image is padded we don't want to sum the garbage local array values, we could zero the local array
     //but it would cost time, instead it is better to calculate what is needed directly
     __syncthreads();
-    float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
+    float reduction_sum_Rx = 0.0f;
     #pragma unroll
     for (int j = 0; j < 64; j++)
         reduction_sum_Rx += RxLocal[j][RxMappings[localId]];
