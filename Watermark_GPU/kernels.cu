@@ -1,6 +1,5 @@
 #include "kernels.cuh"
-#include <cub/warp/warp_reduce.cuh>
-
+#include "stdio.h"
 __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int paddedWidth, const int height) 
 {
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -11,8 +10,6 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 
     __shared__ float RxLocal[64][36];
     __shared__ float rxLocal[8][64];
-    __shared__ float rxSums[2][8];
-    __shared__ typename cub::WarpReduce<float>::TempStorage tempStorage[2]; //2 warps
 
     //initialize shared memory with coalesced access
     for (int i = 0; i < 8; i++)
@@ -63,22 +60,17 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
         reduction_sum_Rx += RxLocal[j][RxMappings[localId]];
     Rx[outputIndex] = reduction_sum_Rx;
 
-    //optimized summation for rx with cub
-    float rxThreadSums[8];
+    //optimized summation for rx
+    float ps = 0;
+    const int row = localId / 8;
     #pragma unroll
-    for (int i = 0; i < 8; i++) 
-        rxThreadSums[i] = cub::WarpReduce<float>(tempStorage[warpId]).Sum(rxLocal[i][localId]);
-    __syncthreads();
-    if (localId == 0 || localId == 32)
-    {
-        #pragma unroll
-        for (int i = 0; i < 8; i++)
-            rxSums[warpId][i] = rxThreadSums[i];
-    }
-    __syncthreads();
-    if (localId < 8) 
-         rx[(outputIndex / 8) + localId] = rxSums[0][localId] + rxSums[1][localId];
-
+    for (int i = 0; i < 64; i += 8)
+        ps += rxLocal[row][(localId + i) % 64];
+    // reduce 32 results to 4 per warp
+    for (int i = 4; i > 0; i = i / 2)
+        ps += __shfl_down_sync(0xFFFFFFFF, ps, i);
+    if (localId % 8 == 0)
+        rx[(outputIndex + row) / 8] = ps;
 }
 
 __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height)
