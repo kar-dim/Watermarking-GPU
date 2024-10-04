@@ -1,5 +1,5 @@
 #include "kernels.cuh"
-#include "stdio.h"
+
 __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int paddedWidth, const int height) 
 {
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
