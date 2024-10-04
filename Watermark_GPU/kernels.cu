@@ -48,11 +48,10 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
                 RxLocal[localId][counter++] = x_[i] * x_[j];
         }
     }
-
-    //each thread will calculate the reduction sums of Rx and rx and write them to global memory
-    //if image is padded we don't want to sum the garbage local array values, we could zero the local array
-    //but it would cost time, instead it is better to calculate what is needed directly
     __syncthreads();
+
+    //simplified summation for Rx
+    //TODO can be optimized
     float reduction_sum_Rx = 0.0f;
     #pragma unroll
     for (int j = 0; j < 64; j++)
