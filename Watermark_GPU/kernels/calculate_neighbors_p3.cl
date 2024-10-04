@@ -2,8 +2,8 @@ __kernel void calculate_neighbors_p3(
     __read_only image2d_t image, 
     __global float* x_)
 {
-    const int x = get_group_id(1) * get_local_size(1) + get_local_id(1);
-    const int y = get_group_id(0) * get_local_size(0) + get_local_id(0);
+    const int x = get_global_id(1);
+    const int y = get_global_id(0);
     const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
     const int width = get_image_width(image), height = get_image_height(image);
     const int outputIndex = (x * height + y);

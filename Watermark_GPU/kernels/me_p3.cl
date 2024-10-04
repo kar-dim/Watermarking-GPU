@@ -15,6 +15,7 @@ __kernel void me(__read_only image2d_t image,
     #pragma unroll
     for (int i = 0; i < 36; i++)
         RxLocal[localId][i] = 0.0f;
+    rxPartial[localId % 8][localId / 8] = 0.0f;
 
     int counter = 0;
     float x_[9];
