@@ -11,6 +11,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     __shared__ float RxLocal[64][36]; 
 
     //initialize shared memory, assign a portion for all threads for parallelism
+    #pragma unroll
     for (int i = 0; i < 36; i++)
         RxLocal[localId][i] = 0.0f;
 
