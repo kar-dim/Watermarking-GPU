@@ -9,7 +9,6 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
 
     __shared__ float RxLocal[64][36];
     __shared__ float rxLocal[8][64];
-    __shared__ float rxPartial[8][8];
 
     //initialize shared memory with coalesced access
     for (int i = 0; i < 8; i++)
@@ -20,7 +19,6 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
         for (int i = 0; i < 36; i++)
             RxLocal[localId][i] = 0.0f;
     }
-    rxPartial[localId % 8][localId / 8] = 0.0f;
 
     if (y >= height)
         return;
@@ -55,29 +53,23 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     //if image is padded we don't want to sum the garbage local array values, we could zero the local array
     //but it would cost time, instead it is better to calculate what is needed directly
     __syncthreads();
-    float reduction_sum_Rx = 0.0f, reduction_sum_rx = 0.0f;
+    float reduction_sum_Rx = 0.0f;
     #pragma unroll
     for (int j = 0; j < 64; j++)
         reduction_sum_Rx += RxLocal[j][RxMappings[localId]];
-
-    //optimized summation for rx: normally we would sum 64 values per line/thread for a total of 8 sums
-    //but this introduces heavy uncoalesced shared loads and bank conflicts, so we assign each of the 64 threads
-    //to partially sum 8 horizontal values, and then the first 8 threads will fully sum the partial sums
-    #pragma unroll
-    for (int i = 0; i < 8; i++)
-        reduction_sum_rx += rxLocal[localId / 8][((localId % 8) * 8) + i];
-    rxPartial[localId % 8][localId / 8] = reduction_sum_rx;
-    __syncthreads();
-
-    float row_sum = 0.0f;
-    if (localId < 8)
-    {
-        #pragma unroll
-        for (int i = 0; i < 8; i++)
-            row_sum += rxPartial[i][localId];
-        rx[(outputIndex / 8) + localId] = row_sum;
-    }
     Rx[outputIndex] = reduction_sum_Rx;
+
+    //optimized summation for rx
+    float ps = 0;
+    const int row = localId / 8;
+    #pragma unroll
+    for (int i = 0; i < 64; i += 8)
+        ps += rxLocal[row][(localId + i) % 64];
+    // reduce 32 results to 4 per warp
+    for (int i = 4; i > 0; i = i / 2)
+        ps += __shfl_down_sync(0xFFFFFFFF, ps, i);
+    if (localId % 8 == 0)
+        rx[(outputIndex + row) / 8] = ps;
 }
 
 __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height)
