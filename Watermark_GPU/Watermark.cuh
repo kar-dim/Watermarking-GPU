@@ -32,7 +32,6 @@ private:
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array executeTextureKernel(void (*kernel)(cudaTextureObject_t, float*, unsigned, unsigned), const af::array& image, const af::array& output) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
-	af::array computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
@@ -46,6 +45,5 @@ public:
 	void reinitialize(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
 	af::array makeWatermark(const af::array& inputImage, const af::array& output_image, af::array& coefficients, float& a, MASK_TYPE maskType) const;
 	float detectWatermark(const af::array& watermarkedImage, MASK_TYPE maskType) const;
-	float detectWatermarkPredictionErrorFast(const af::array& watermarkedImage, const af::array& coefficients) const;
 	static void displayArray(const af::array& array, const int width = 1600, const int height = 900);
 };
