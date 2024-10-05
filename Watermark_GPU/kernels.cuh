@@ -1,6 +1,8 @@
 #pragma once
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include "stdio.h"
+
 //constant array used for optimizing share memory accesses for Rx
 //Helps with reducing the local memory required for each block for Rx arrays from 4096 to 2304
 __constant__ int RxMappings[64] =
@@ -28,11 +30,11 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int w
 	float mean = 0.0f, variance = 0.0f, localMeanDiff;
 	//maximum local values size is 81 for a 9x9 block
 	float localValues[pSquared];
-	for (j = x - pad; j <= x + pad; j++) 
+	for (i = y - pad; i <= y + pad; i++)
 	{
-		for (i = y - pad; i <= y + pad; i++) 
+		for (j = x - pad; j <= x + pad; j++) 
 		{
-			localValues[k] = tex2D<float>(texObj, j, i);
+			localValues[k] = tex2D<float>(texObj, i, j);
 			mean += localValues[k];
 			k++;
 		}

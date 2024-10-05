@@ -22,9 +22,9 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const un
     float x_[9];
     if (x < width)
     {
-        for (int j = x - 1; j <= x + 1; j++)
-            for (int i = y - 1; i <= y + 1; i++)
-                x_[counter++] = tex2D<float>(texObj, j, i);
+        for (int i = y - 1; i <= y + 1; i++)
+            for (int j = x - 1; j <= x + 1; j++)
+                x_[counter++] = tex2D<float>(texObj, i, j);
         const float current_pixel = x_[4];
 
         //shift neighborhood values, so that consecutive values are neighbors only (to eliminate "if"s)
@@ -80,13 +80,13 @@ __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, co
     if (x < width && y < height) 
     {
         //store 8 neighboring pixels into global memory (coalesced writes)
-        x_[0 * width * height + outputIndex] = tex2D<float>(texObj, x - 1, y - 1);
-        x_[1 * width * height + outputIndex] = tex2D<float>(texObj, x - 1, y);
-        x_[2 * width * height + outputIndex] = tex2D<float>(texObj, x - 1, y + 1);
-        x_[3 * width * height + outputIndex] = tex2D<float>(texObj, x, y - 1);
-        x_[4 * width * height + outputIndex] = tex2D<float>(texObj, x, y + 1);
-        x_[5 * width * height + outputIndex] = tex2D<float>(texObj, x + 1, y - 1);
-        x_[6 * width * height + outputIndex] = tex2D<float>(texObj, x + 1, y);
-        x_[7 * width * height + outputIndex] = tex2D<float>(texObj, x + 1, y + 1);
+        x_[0 * width * height + outputIndex] = tex2D<float>(texObj, y - 1, x - 1);
+        x_[1 * width * height + outputIndex] = tex2D<float>(texObj, y - 1, x);
+        x_[2 * width * height + outputIndex] = tex2D<float>(texObj, y - 1, x + 1);
+        x_[3 * width * height + outputIndex] = tex2D<float>(texObj, y, x - 1);
+        x_[4 * width * height + outputIndex] = tex2D<float>(texObj, y, x + 1);
+        x_[5 * width * height + outputIndex] = tex2D<float>(texObj, y + 1, x - 1);
+        x_[6 * width * height + outputIndex] = tex2D<float>(texObj, y + 1, x);
+        x_[7 * width * height + outputIndex] = tex2D<float>(texObj, y + 1, x + 1);
     }
 }

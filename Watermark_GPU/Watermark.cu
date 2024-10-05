@@ -110,7 +110,7 @@ Watermark::~Watermark()
 void Watermark::initializeMemory(const dim_t rows, const dim_t cols)
 {
 	//initialize texture
-	auto textureData = cuda_utils::createTextureData(static_cast<unsigned int>(rows), static_cast<unsigned int>(cols));
+	auto textureData = cuda_utils::createTextureData(static_cast<unsigned int>(cols), static_cast<unsigned int>(rows));
 	texObj = textureData.first;
 	texArray = textureData.second;
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
@@ -154,12 +154,11 @@ af::array Watermark::executeTextureKernel(void (*kernel)(cudaTextureObject_t, fl
 	const dim3 blockSize(16, 16);
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols, true);
 	//transfer ownership from arrayfire and copy data to cuda array
-	const af::array imageTranspose = image.T();
-	cuda_utils::copyDataToCudaArray(imageTranspose.device<float>(), rows, cols, texArray);
+	cuda_utils::copyDataToCudaArray(image.device<float>(), cols, rows, texArray);
 	float* outputValues = output.device<float>();
 	kernel << <gridSize, blockSize, 0, afStream >> > (texObj, outputValues, cols, rows);
 	//transfer ownership to arrayfire and return output array
-	unlockArrays(imageTranspose, output);
+	unlockArrays(image, output);
 	return output;
 }
 
