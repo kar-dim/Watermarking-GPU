@@ -109,7 +109,7 @@ Watermark::~Watermark()
 //supply the input image to apply watermarking and detection
 void Watermark::initializeMemory(const dim_t rows, const dim_t cols)
 {
-	//initialize texture
+	//initialize texture (transposed dimensions, arrayfire is column wise, we skip an extra transpose)
 	auto textureData = cuda_utils::createTextureData(static_cast<unsigned int>(cols), static_cast<unsigned int>(rows));
 	texObj = textureData.first;
 	texArray = textureData.second;
@@ -209,15 +209,15 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	const af::array x_ = executeTextureKernel(calculate_neighbors_p3, image, neighbors);
 	//enqueue prediction error mask kernel
 	me_p3 <<<gridSize, blockSize, 0, customStream>>> (texObj, RxPartialData, rxPartialData, cols, paddedCols, rows);
+	
 	//wait for both streams to finish
 	cudaStreamSynchronize(customStream);
 	cudaStreamSynchronize(afStream);
-
 	unlockArrays(RxPartial, rxPartial);
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays();
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
-	errorSequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
+	errorSequence = af::moddims(af::moddims(image, 1, rows * cols) - af::matmulTT(coefficients, x_), rows, cols);
 	if (mask_needed) 
 	{
 		const af::array errorSequenceAbs = af::abs(errorSequence);
@@ -229,7 +229,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::computeErrorSequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, executeTextureKernel(calculate_neighbors_p3, u, neighbors)), u.dims(0), u.dims(1));
+	return af::moddims(af::moddims(u, 1, u.dims(0) * u.dims(1)) - af::matmulTT(coefficients, executeTextureKernel(calculate_neighbors_p3, u, neighbors)), u.dims(0), u.dims(1));
 }
 
 //helper method used in detectors
