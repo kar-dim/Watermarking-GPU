@@ -1,6 +1,6 @@
 #include "kernels.cuh"
 
-__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int paddedWidth, const int height) 
+__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height)
 {
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -71,7 +71,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const in
     Rx[outputIndex] = reduction_sum_Rx;
 }
 
-__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height)
+__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height)
 {
     const int x = blockIdx.y * blockDim.y + threadIdx.y;
     const int y = blockIdx.x * blockDim.x + threadIdx.x;

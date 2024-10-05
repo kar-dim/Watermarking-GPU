@@ -30,11 +30,10 @@ private:
 	void loadRandomMatrix(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
 	std::pair<af::array, af::array> transformCorrelationArrays() const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
-	af::array computeCustomMask(const af::array& image) const;
+	af::array executeTextureKernel(void (*kernel)(cudaTextureObject_t, float*, unsigned, unsigned), const af::array& image, const af::array& output) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
-	af::array computeNeighborsArray(const af::array& image) const;
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:

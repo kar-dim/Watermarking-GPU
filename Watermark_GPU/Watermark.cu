@@ -146,60 +146,36 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 	loadRandomMatrix(randomMatrixPath, rows, cols);
 }
 
-//compute custom mask. supports simple kernels that just apply a mask per-pixel without needing any other configuration
-af::array Watermark::computeCustomMask(const af::array& image) const
+//computes custom Mask (NVF) or neighbors array (x_) used in prediction error mask
+af::array Watermark::executeTextureKernel(void (*kernel)(cudaTextureObject_t, float *, unsigned, unsigned), const af::array& image, const af::array& output) const
 {
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
 	const dim3 blockSize(16, 16);
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols, true);
 	//transfer ownership from arrayfire and copy data to cuda array
-	const af::array image_transpose = image.T();
-	cuda_utils::copyDataToCudaArray(image_transpose.device<float>(), rows, cols, texArray);
-	float* mask_output = customMask.device<float>();
-	switch (p) 
-	{
-		case 3: nvf<3> <<<gridSize, blockSize, 0, afStream >>> (texObj, mask_output, cols, rows); break;
-		case 5: nvf<5> <<<gridSize, blockSize, 0, afStream >>> (texObj, mask_output, cols, rows); break;
-		case 7: nvf<7> <<<gridSize, blockSize, 0, afStream >>> (texObj, mask_output, cols, rows); break;
-		case 9: nvf<9> <<<gridSize, blockSize, 0, afStream >>> (texObj, mask_output, cols, rows); break;
-	}
-	//transfer ownership to arrayfire and return mask
-	unlockArrays(image_transpose, customMask);
-	return customMask;
-}
-
-//calls custom kernel to calculate neighbors array ("x_" array)
-af::array Watermark::computeNeighborsArray(const af::array& image) const 
-{
-	const dim3 blockSize(16, 16);
-	const auto rows = static_cast<unsigned int>(image.dims(0));
-	const auto cols = static_cast<unsigned int>(image.dims(1));
-	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols, true);
 	const af::array imageTranspose = image.T();
-	//do a texture copy
 	cuda_utils::copyDataToCudaArray(imageTranspose.device<float>(), rows, cols, texArray);
-	//transfer ownership from arrayfire
-	float* neighbors_output = neighbors.device<float>();
-	calculate_neighbors_p3<<<gridSize, blockSize, 0, afStream >>>(texObj, neighbors_output, cols, rows);
-	//transfer ownership to arrayfire and return x_ array
-	unlockArrays(neighbors, imageTranspose);
-	return neighbors;
+	float* outputValues = output.device<float>();
+	kernel << <gridSize, blockSize, 0, afStream >> > (texObj, outputValues, cols, rows);
+	//transfer ownership to arrayfire and return output array
+	unlockArrays(imageTranspose, output);
+	return output;
 }
 
 //helper method to sum the incomplete Rx_partial and rxPartial arrays which were produced from the custom kernel
 //and to transform them to the correct size, so that they can be used by the system solver
 std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
 {
-	const int p_sq_minus_one = (p * p) - 1;
-	const int p_sq_minus_one_sq = p_sq_minus_one * p_sq_minus_one;
+	const int neighborsSize = (p * p) - 1;
+	const int neighborsSizeSq = neighborsSize * neighborsSize;
 	const auto rows = RxPartial.dims(0);
-	const auto paddedCols = RxPartial.dims(1);
+	const auto paddedElems = RxPartial.dims(0) * RxPartial.dims(1);
 	//reduction sum of blocks
 	//all [p^2-1,1] blocks will be summed in rx
 	//all [p^2-1, p^2-1] blocks will be summed in Rx
-	const af::array Rx = af::moddims(af::sum(af::moddims(RxPartial, p_sq_minus_one_sq, (paddedCols * rows) / p_sq_minus_one_sq), 1), p_sq_minus_one, p_sq_minus_one);
-	const af::array rx = af::sum(af::moddims(rxPartial, p_sq_minus_one, (paddedCols * rows) / (8 * p_sq_minus_one)), 1);
+	const af::array Rx = af::moddims(af::sum(af::moddims(RxPartial, neighborsSizeSq, paddedElems / neighborsSizeSq), 1), neighborsSize, neighborsSize);
+	const af::array rx = af::sum(af::moddims(rxPartial, neighborsSize, paddedElems / (8 * neighborsSize)), 1);
 	return std::make_pair(Rx, rx);
 }
 
@@ -211,7 +187,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	af::array error_sequence;
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		computeCustomMask(inputImage);
+		executeTextureKernel(nvf<3>, inputImage, customMask);
 	const af::array u = mask * randomMatrix;
 	a = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
 	return af::clamp(outputImage + (u * a), 0, 255);
@@ -231,7 +207,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, paddedCols);
 	
 	//enqueue "x_" kernel
-	const af::array x_ = computeNeighborsArray(image);
+	const af::array x_ = executeTextureKernel(calculate_neighbors_p3, image, neighbors);
 	//enqueue prediction error mask kernel
 	me_p3 <<<gridSize, blockSize, 0, customStream>>> (texObj, RxPartialData, rxPartialData, cols, paddedCols, rows);
 	//wait for both streams to finish
@@ -254,7 +230,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::computeErrorSequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, computeNeighborsArray(u)), u.dims(0), u.dims(1));
+	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, executeTextureKernel(calculate_neighbors_p3, u, neighbors)), u.dims(0), u.dims(1));
 }
 
 //overloaded, fast mask calculation by using a supplied prediction filter
@@ -278,7 +254,7 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 	if (maskType == MASK_TYPE::NVF)
 	{
 		computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
-		mask = computeCustomMask(watermarkedImage);
+		mask = executeTextureKernel(nvf<3>, watermarkedImage, customMask);
 	}
 	else
 		mask = computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);

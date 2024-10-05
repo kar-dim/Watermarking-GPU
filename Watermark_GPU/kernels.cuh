@@ -16,7 +16,7 @@ __constant__ int RxMappings[64] =
 };
 
 template<int p, int pSquared = p * p, int pad = p / 2>
-__global__ void nvf(cudaTextureObject_t texObj, float* nvf, const int width, const int height)
+__global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int width, const unsigned int height)
 {
 	const int x = blockIdx.y * blockDim.y + threadIdx.y;
 	const int y = blockIdx.x * blockDim.x + threadIdx.x;
@@ -47,5 +47,5 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const int width, con
 	nvf[(x * height) + y] = variance / ((pSquared - 1) + variance);
 }
 
-__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const int width, const int paddedWidth, const int height);
-__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const int width, const int height);
+__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height);
+__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height);
