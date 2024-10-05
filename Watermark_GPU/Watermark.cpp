@@ -183,14 +183,6 @@ af::array Watermark::computeErrorSequence(const af::array& u, const af::array& c
 	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, executeTextureKernel(u, programs[2], "calculate_neighbors_p3", neighbors)), u.dims(0), u.dims(1));
 }
 
-//overloaded, fast mask calculation by using a supplied prediction filter
-af::array Watermark::computePredictionErrorMask(const af::array& image, const af::array& coefficients, af::array& errorSequence) const
-{
-	errorSequence = computeErrorSequence(image, coefficients);
-	const af::array error_sequence_abs = af::abs(errorSequence);
-	return error_sequence_abs / af::max<float>(error_sequence_abs);
-}
-
 //helper method used in detectors
 float Watermark::computeCorrelation(const af::array& e_u, const af::array& e_z) const
 {
@@ -210,16 +202,6 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 		mask = computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
 	const af::array u = mask * randomMatrix;
 	const af::array e_u = computeErrorSequence(u, a_z);
-	return computeCorrelation(e_u, e_z);
-}
-
-//fast mask detector, used only for a video frame, by detecting the watermark based on previous frame (coefficients, x_ are supplied)
-float Watermark::detectWatermarkPredictionErrorFast(const af::array& watermarkedImage, const af::array& coefficients) const
-{
-	af::array e_z, e_u, a_u;
-	const af::array m_e = computePredictionErrorMask(watermarkedImage, coefficients, e_z);
-	const af::array u = m_e * randomMatrix;
-	computePredictionErrorMask(u, e_u, a_u, ME_MASK_CALCULATION_REQUIRED_NO);
 	return computeCorrelation(e_u, e_z);
 }
 

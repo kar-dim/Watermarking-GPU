@@ -342,38 +342,6 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 			realtimeDetection(watermarkObj, watermarkedFrames, frames, displayFrames, framePeriod, showFps);
 	}
 
-	//realtime watermarked video detection by two frames
-	if (inir.GetBoolean("parameters_video", "watermark_detection_by_two_frames", false) == true) 
-	{
-		if (makeWatermark == false) 
-		{
-			cout << "Please set 'watermark_make' to true in settings file, in order to be able to detect the watermark.\n";
-		}
-		else 
-		{
-			std::vector<float> correlations(frames);
-			int counter = 0;
-			for (int i = 0; i < frames; i++) 
-			{
-				timer::start();
-				if (i % 2 != 0) 
-				{
-					correlations[i] = watermarkObj.detectWatermarkPredictionErrorFast(watermarkedFrames[i], coefficients[counter]);
-					timer::end();
-					cout << "Watermark detection execution time (fast): " << executionTime(showFps, timer::elapsedSeconds()) << "\n";
-					counter++;
-				}
-				else 
-				{
-					correlations[i] = watermarkObj.detectWatermark(watermarkedFrames[i], MASK_TYPE::ME);
-					timer::end();
-					cout << "Watermark detection execution time: " << executionTime(showFps, timer::elapsedSeconds()) << "\n";
-				}
-				cout << "Correlation of " << i + 1 << " frame: " << correlations[i] << "\n\n";
-			}
-		}
-	}
-
 	//realtimne watermark detection of a compressed file
 	if (inir.GetBoolean("parameters_video", "watermark_detection_compressed", false) == true) 
 	{
