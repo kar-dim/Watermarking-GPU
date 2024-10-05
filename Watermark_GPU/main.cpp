@@ -172,7 +172,6 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	const int frames = inir.GetInteger("parameters_video", "frames", -1);
 	const float fps = (float)inir.GetReal("parameters_video", "fps", -1);
 	const bool watermarkFirstFrameOnly = inir.GetBoolean("parameters_video", "watermark_first_frame_only", false);
-	const bool watermarkByTwoFrames = inir.GetBoolean("parameters_video", "watermark_by_two_frames", false);
 	const bool displayFrames = inir.GetBoolean("parameters_video", "display_frames", false);
 	if (rows <= 64 || cols <= 64) 
 	{
@@ -198,12 +197,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	CImgList<unsigned char> videoCimg;
 	string videoPath;
 	std::vector<af::array> watermarkedFrames;
-	std::vector<af::array> coefficients;
 	watermarkedFrames.reserve(frames);
-	coefficients.reserve((frames / 2) + 1);
-	//preallocate coefficient's vector with empty arrays
-	for (int i = 0; i < (frames / 2) + 1; i++)
-		coefficients.push_back(af::constant<float>(0.0f, 1, 1));
 	const float framePeriod = 1.0f / fps;
 	float timeDiff, a;
 
@@ -224,21 +218,9 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 			int counter = 0;
 			for (int i = 0; i < frames; i++) 
 			{
-				//copy from CImg to arrayfire
+				//copy from CImg to arrayfire and calculate watermarked frame
 				afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i));
-				//calculate watermarked frame, if "by two frames" is on, we keep coefficients per two frames, to be used per 2 detection frames
-				if (watermarkByTwoFrames == true) 
-				{
-					if (i % 2 != 0)
-						watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
-					else 
-					{
-						watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, coefficients[counter], a, MASK_TYPE::ME));
-						counter++;
-					}
-				}
-				else
-					watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
+				watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
 			}
 		}
 		else 
