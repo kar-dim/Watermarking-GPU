@@ -164,7 +164,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 		//calculation of coefficients, error sequence and mask
 		const auto correlation_arrays = transformCorrelationArrays();
 		coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
-		errorSequence = af::moddims(af::flat(image).T() - af::matmulTT(coefficients, x_), rows, cols);
+		errorSequence = af::moddims(af::moddims(image, 1, rows * cols) - af::matmulTT(coefficients, x_), rows, cols);
 		if (maskNeeded) 
 		{
 			const af::array error_sequence_abs = af::abs(errorSequence);
@@ -180,7 +180,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::computeErrorSequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::flat(u).T() - af::matmulTT(coefficients, executeTextureKernel(u, programs[2], "calculate_neighbors_p3", neighbors)), u.dims(0), u.dims(1));
+	return af::moddims(af::moddims(u, 1, u.dims(0) * u.dims(1)) - af::matmulTT(coefficients, executeTextureKernel(u, programs[2], "calculate_neighbors_p3", neighbors)), u.dims(0), u.dims(1));
 }
 
 //helper method used in detectors
