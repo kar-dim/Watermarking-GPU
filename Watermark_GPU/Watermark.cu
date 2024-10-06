@@ -95,7 +95,7 @@ Watermark& Watermark::operator=(const Watermark& other)
 	return *this;
 }
 
-//destructor, only custom kernels cuda stream must be destroyed
+//destroy texture data (texture object, cuda array) and custom cuda stream, only if they have not been moved
 Watermark::~Watermark()
 {
 	if (customStream != nullptr)
