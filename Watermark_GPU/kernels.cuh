@@ -1,7 +1,6 @@
 #pragma once
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include "stdio.h"
 
 //constant array used for optimizing share memory accesses for Rx
 //Helps with reducing the local memory required for each block for Rx arrays from 4096 to 2304
