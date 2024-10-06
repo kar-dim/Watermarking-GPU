@@ -14,10 +14,10 @@ namespace cl_utils
         return kernel;
     }
 
-    void copyBufferToImage(const cl::CommandQueue& queue, const cl::Image2D& image2d, const cl_mem* image_buff, const long long rows, const long long cols)
+    void copyBufferToImage(const cl::CommandQueue& queue, const cl::Image2D& image2d, const cl_mem* imageBuff, const long long rows, const long long cols)
     {
         const size_t orig[] = { 0,0,0 };
         const size_t des[] = { static_cast<size_t>(cols), static_cast<size_t>(rows), 1 };
-        clEnqueueCopyBufferToImage(queue(), *image_buff, image2d(), 0, orig, des, NULL, NULL, NULL);
+        clEnqueueCopyBufferToImage(queue(), *imageBuff, image2d(), 0, orig, des, NULL, NULL, NULL);
     }
 }

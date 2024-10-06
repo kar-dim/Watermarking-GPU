@@ -47,12 +47,12 @@ Watermark& Watermark::operator=(const Watermark& other)
 //supply the input image size, and pre-allocate buffers and arrays
 void Watermark::initializeMemory(const dim_t rows, const dim_t cols) 
 {
-	//initialize texture
-	image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), cols, rows, 0, NULL);
+	//initialize texture (transposed dimensions, arrayfire is column wise, we skip an extra transpose)
+	image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), rows, cols, 0, NULL);
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	const dim_t padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-	RxPartial = af::array(rows, padded_cols);
-	rxPartial = af::array(rows, padded_cols / 8);
+	const dim_t paddedCols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+	RxPartial = af::array(rows, paddedCols);
+	rxPartial = af::array(rows, paddedCols / 8);
 	customMask = af::array(rows, cols);
 	neighbors = af::array(rows * cols, (p * p) - 1);
 }
@@ -85,21 +85,20 @@ af::array Watermark::executeTextureKernel(const af::array& image, const cl::Prog
 {
 	const auto rows = static_cast<unsigned int>(image.dims(0));
 	const auto cols = static_cast<unsigned int>(image.dims(1));
-	const auto pad_rows = (rows % 16 == 0) ? rows : rows + 16 - (rows % 16);
-	const auto pad_cols = (cols % 16 == 0) ? cols : cols + 16 - (cols % 16);
-	const af::array image_transpose = image.T();
-	const std::unique_ptr<cl_mem> imageT_ptr(image_transpose.device<cl_mem>());
-	const std::unique_ptr<cl_mem> output_ptr(output.device<cl_mem>());
+	const auto paddedRows = (rows % 16 == 0) ? rows : rows + 16 - (rows % 16);
+	const auto paddedCols = (cols % 16 == 0) ? cols : cols + 16 - (cols % 16);
+	const std::unique_ptr<cl_mem> imageMem(image.device<cl_mem>());
+	const std::unique_ptr<cl_mem> outputMem(output.device<cl_mem>());
 
 	//copy to texture cache and execute kernel
 	try {
-		cl_utils::copyBufferToImage(queue, image2d, imageT_ptr.get(), rows, cols);
-		cl::Buffer buff(*output_ptr.get(), true);
+		cl_utils::copyBufferToImage(queue, image2d, imageMem.get(), cols, rows);
+		cl::Buffer buff(*outputMem.get(), true);
 		queue.enqueueNDRangeKernel(
 			cl_utils::KernelBuilder(program, kernelName.c_str()).args(image2d, buff).build(),
-			cl::NDRange(), cl::NDRange(pad_rows, pad_cols), cl::NDRange(16, 16));
+			cl::NDRange(), cl::NDRange(paddedRows, paddedCols), cl::NDRange(16, 16));
 		queue.finish();
-		unlockArrays(image_transpose, output);
+		unlockArrays(image, output);
 		return output;
 	}
 	catch (const cl::Error& ex) {
@@ -107,19 +106,19 @@ af::array Watermark::executeTextureKernel(const af::array& image, const cl::Prog
 	}
 }
 
-//helper method to sum the incomplete RxPartial and rxPartial arrays which were produced from the custom kernel
+//helper method to sum the incomplete Rx_partial and rxPartial arrays which were produced from the custom kernel
 //and to transform them to the correct size, so that they can be used by the system solver
-std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const 
+std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
 {
-	const int p_sq_minus_one = (p * p) - 1;
-	const int p_sq_minus_one_sq = p_sq_minus_one * p_sq_minus_one;
+	const int neighborsSize = (p * p) - 1;
+	const int neighborsSizeSq = neighborsSize * neighborsSize;
 	const auto rows = RxPartial.dims(0);
-	const auto paddedCols = RxPartial.dims(1);
+	const auto paddedElems = RxPartial.dims(0) * RxPartial.dims(1);
 	//reduction sum of blocks
 	//all [p^2-1,1] blocks will be summed in rx
 	//all [p^2-1, p^2-1] blocks will be summed in Rx
-	const af::array Rx = af::moddims(af::sum(af::moddims(RxPartial, p_sq_minus_one_sq, (paddedCols * rows) / p_sq_minus_one_sq), 1), p_sq_minus_one, p_sq_minus_one);
-	const af::array rx = af::sum(af::moddims(rxPartial, p_sq_minus_one, (paddedCols * rows) / (8 * p_sq_minus_one)), 1);
+	const af::array Rx = af::moddims(af::sum(af::moddims(RxPartial, neighborsSizeSq, paddedElems / neighborsSizeSq), 1), neighborsSize, neighborsSize);
+	const af::array rx = af::sum(af::moddims(rxPartial, neighborsSize, paddedElems / (8 * neighborsSize)), 1);
 	return std::make_pair(Rx, rx);
 }
 
@@ -128,9 +127,9 @@ std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
 //into a new array based on "outputImage" (can be grayscale or RGB).
 af::array Watermark::makeWatermark(const af::array& inputImage, const af::array& outputImage, af::array& coefficients, float& a, MASK_TYPE maskType) const
 {
-	af::array error_sequence;
+	af::array errorSequence;
 	const af::array mask = maskType == MASK_TYPE::ME ?
-		computePredictionErrorMask(inputImage, error_sequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
+		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		executeTextureKernel(inputImage, programs[0], "nvf", customMask);
 	const af::array u = mask * randomMatrix;
 	a = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
@@ -144,31 +143,31 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	const unsigned int rows = static_cast<unsigned int>(image.dims(0));
 	const unsigned int cols = static_cast<unsigned int>(image.dims(1));
 	//fix for OpenCL 1.2 limitation: GlobalGroupSize % LocalGroupSize should be 0, so we pad GlobalGroupSize (cols)
-	const auto padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-	const std::unique_ptr<cl_mem> Rx_partial_mem(RxPartial.device<cl_mem>());
-	const std::unique_ptr<cl_mem> rx_partial_mem(rxPartial.device<cl_mem>());
+	const auto paddedCols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
+	const std::unique_ptr<cl_mem> RxPartialMem(RxPartial.device<cl_mem>());
+	const std::unique_ptr<cl_mem> rxPartialMem(rxPartial.device<cl_mem>());
 	try {
 		//enqueue "x_" kernel (which is heavy)
 		const af::array x_ = executeTextureKernel(image, programs[2], "calculate_neighbors_p3", neighbors);
 		//initialize custom kernel memory
-		cl::Buffer Rx_buff(*Rx_partial_mem.get(), true);
-		cl::Buffer rx_buff(*rx_partial_mem.get(), true);
+		cl::Buffer Rx_buff(*RxPartialMem.get(), true);
+		cl::Buffer rx_buff(*rxPartialMem.get(), true);
 		//call prediction error mask kernel
 		queue.enqueueNDRangeKernel(
 			cl_utils::KernelBuilder(programs[1], "me").args(image2d, Rx_buff, rx_buff, RxMappingsBuff,
 			cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 64)).build(),
-			cl::NDRange(), cl::NDRange(padded_cols, rows), cl::NDRange(64, 1));
+			cl::NDRange(), cl::NDRange(paddedCols, rows), cl::NDRange(64, 1));
 		//finish and return memory to arrayfire
 		queue.finish();
 		unlockArrays(RxPartial, rxPartial);
 		//calculation of coefficients, error sequence and mask
-		const auto correlation_arrays = transformCorrelationArrays();
-		coefficients = af::solve(correlation_arrays.first, correlation_arrays.second);
+		const auto correlationArrays = transformCorrelationArrays();
+		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
 		errorSequence = af::moddims(af::moddims(image, 1, rows * cols) - af::matmulTT(coefficients, x_), rows, cols);
 		if (maskNeeded) 
 		{
-			const af::array error_sequence_abs = af::abs(errorSequence);
-			return error_sequence_abs / af::max<float>(error_sequence_abs);
+			const af::array errorSequenceAbs = af::abs(errorSequence);
+			return errorSequenceAbs / af::max<float>(errorSequenceAbs);
 		}
 		return af::array();
 	}

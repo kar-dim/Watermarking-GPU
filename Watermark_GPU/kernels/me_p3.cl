@@ -6,7 +6,7 @@ __kernel void me(__read_only image2d_t image,
     __local float rxPartial[8][8]) //helper scratch memory for rx calculation
 {
     const int x = get_global_id(0), y = get_global_id(1);
-    const int width = get_image_width(image);
+    const int width = get_image_height(image); //image2d is transposed, so we read the opposite dimensions
     const int paddedWidth = get_global_size(0);
     const int localId = get_local_id(0);
     const int outputIndex = (y * paddedWidth) + x;
@@ -22,9 +22,9 @@ __kernel void me(__read_only image2d_t image,
     if (x < width) 
     {
         const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
-        for (int j = x - 1; j <= x + 1; j++)
-            for (int i = y - 1; i <= y + 1; i++)
-                x_[counter++] = read_imagef(image, sampler, (int2)(j, i)).x;
+        for (int i = y - 1; i <= y + 1; i++)
+            for (int j = x - 1; j <= x + 1; j++)
+                x_[counter++] = read_imagef(image, sampler, (int2)(i, j)).x;
         const float current_pixel = x_[4];
 
         //shift neighborhood values, so that consecutive values are neighbors only (to eliminate "if"s)

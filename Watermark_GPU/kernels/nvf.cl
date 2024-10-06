@@ -2,7 +2,8 @@ __kernel void nvf(__read_only image2d_t image,
 				  __global float* nvf)
 {	
 	const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
-	const int width = get_image_width(image), height = get_image_height(image);
+	//image2d is transposed, so we read the opposite dimensions
+	const int width = get_image_height(image), height = get_image_width(image);
 	const int x = get_global_id(1), y = get_global_id(0);
 	const int pSquared = p * p;
 	const int pad = p / 2;
@@ -14,11 +15,11 @@ __kernel void nvf(__read_only image2d_t image,
 	float mean = 0.0f, variance = 0.0f;
 	//p_squared is supplied at compile-time to minimize array elements (VLAs not supported in OpenCL)
 	float localValues[pSquared];
-	for (j = x - pad; j <= x + pad; j++) 
+	for (i = y - pad; i <= y + pad; i++)
 	{
-		for (i = y - pad; i <= y + pad; i++) 
+		for (j = x - pad; j <= x + pad; j++)
 		{
-			localValues[k] = read_imagef(image, sampler, (int2)(j, i)).x;
+			localValues[k] = read_imagef(image, sampler, (int2)(i, j)).x;
 			mean += localValues[k];
 			k++;
 		}
