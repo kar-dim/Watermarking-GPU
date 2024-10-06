@@ -155,7 +155,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 		//call prediction error mask kernel
 		queue.enqueueNDRangeKernel(
 			cl_utils::KernelBuilder(programs[1], "me").args(image2d, Rx_buff, rx_buff, RxMappingsBuff,
-			cl::Local(sizeof(float) * 2304), cl::Local(sizeof(float) * 64)).build(),
+			cl::Local(sizeof(float) * 2304)).build(),
 			cl::NDRange(), cl::NDRange(paddedCols, rows), cl::NDRange(64, 1));
 		//finish and return memory to arrayfire
 		queue.finish();

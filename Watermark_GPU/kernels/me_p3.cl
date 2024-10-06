@@ -2,8 +2,8 @@ __kernel void me(__read_only image2d_t image,
     __global float* Rx,
     __global float* rx,
     __constant int* RxMappings,
-    __local float RxLocal[64][36], //64 local threads, 36 values each (8 for rx, this is a shared memory for both Rx,rx)
-    __local float rxPartial[8][8]) //helper scratch memory for rx calculation
+    __local float RxLocal[64][36]) //64 local threads, 36 values each (8 for rx, this is a shared memory for both Rx,rx)
+ 
 {
     const int x = get_global_id(0), y = get_global_id(1);
     const int width = get_image_height(image); //image2d is transposed, so we read the opposite dimensions
@@ -15,7 +15,6 @@ __kernel void me(__read_only image2d_t image,
     #pragma unroll
     for (int i = 0; i < 36; i++)
         RxLocal[localId][i] = 0.0f;
-    rxPartial[localId % 8][localId / 8] = 0.0f;
 
     int counter = 0;
     float x_[9];
@@ -42,21 +41,15 @@ __kernel void me(__read_only image2d_t image,
     //semi-optimized summation for rx
     //sub_group_reduce_add is not available for nvidia cards and we cannot use warp/wavefront reductions
     //the below summation uses shared memory for partial sums
-    float reductionSum_rx = 0.0f;
-    #pragma unroll
-    for (int i = 0; i < 8; i++)
-        reductionSum_rx += RxLocal[((localId % 8) * 8) + i][localId / 8];
-    rxPartial[localId % 8][localId / 8] = reductionSum_rx;
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    float rowSum = 0.0f;
     if (localId < 8)
     {
+        float rxReductionSum = 0.0f;
         #pragma unroll
-        for (int i = 0; i < 8; i++)
-            rowSum += rxPartial[i][localId];
-        rx[(outputIndex / 8) + localId] = rowSum;
+        for (int i = 0; i < 64; i++)
+            rxReductionSum += RxLocal[i][localId];
+        rx[(outputIndex / 8) + localId] = rxReductionSum;
     }
+    barrier(CLK_LOCAL_MEM_FENCE);
 
     //calculate 36 Rx values
     if (x < width)
