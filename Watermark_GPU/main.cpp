@@ -277,7 +277,7 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	{
 		if (makeWatermark == false) 
 		{
-			cout << "Please set 'watermark_make' to true in settins file, in order to be able to save it.\n";
+			cout << "Please set 'watermark_make' to true in settings file, in order to be able to save it.\n";
 		}
 		else 
 		{
@@ -319,7 +319,7 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	if (inir.GetBoolean("parameters_video", "watermark_detection", false) == true) 
 	{
 		if (makeWatermark == false)
-			cout << "Please set 'watermark_make' to true in settins file, in order to be able to detect the watermark.\n";
+			cout << "Please set 'watermark_make' to true in settings file, in order to be able to detect the watermark.\n";
 		else
 			realtimeDetection(watermarkObj, watermarkedFrames, frames, displayFrames, framePeriod, showFps);
 	}
