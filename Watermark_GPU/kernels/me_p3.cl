@@ -38,16 +38,15 @@ __kernel void me(__read_only image2d_t image,
     }
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    //semi-optimized summation for rx
-    //sub_group_reduce_add is not available for nvidia cards and we cannot use warp/wavefront reductions
-    //the below summation uses shared memory for partial sums
+    //simplified summation for rx
+    //TODO can be optimized
     if (localId < 8)
     {
-        float rxReductionSum = 0.0f;
+        float sum = 0.0f;
         #pragma unroll
         for (int i = 0; i < 64; i++)
-            rxReductionSum += RxLocal[i][localId];
-        rx[(outputIndex / 8) + localId] = rxReductionSum;
+            sum += RxLocal[i][localId];
+        rx[(outputIndex / 8) + localId] = sum;
     }
     barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -64,9 +63,9 @@ __kernel void me(__read_only image2d_t image,
 
     //simplified summation for Rx
     //TODO can be optimized
-    float reduction_sum_Rx = 0.0f;
+    float sum = 0.0f;
     #pragma unroll
     for (int i = 0; i < 64; i++)
-        reduction_sum_Rx += RxLocal[i][RxMappings[localId]];
-    Rx[outputIndex] = reduction_sum_Rx;
+        sum += RxLocal[i][RxMappings[localId]];
+    Rx[outputIndex] = sum;
 }
