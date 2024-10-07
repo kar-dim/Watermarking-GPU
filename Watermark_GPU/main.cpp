@@ -241,7 +241,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	{
 		if (makeWatermark == false) 
 		{
-			cout << "Please set 'watermark_make' to true in settins file, in order to be able to save it.\n";
+			cout << "Please set 'watermark_make' to true in settings file, in order to be able to save it.\n";
 		}
 		else 
 		{
