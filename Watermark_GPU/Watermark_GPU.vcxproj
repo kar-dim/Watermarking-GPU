@@ -60,11 +60,11 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;$(ProjectDir)libs\opencl\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>afopencl.lib;opencv_world452d.lib;zlib.lib;OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>afopencl.lib;opencv_world4100d.lib;zlib.lib;OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452d.dll" "$(SolutionDir)x64\Debug\" /y /D
-xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg452_64.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
+      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100d.dll" "$(SolutionDir)x64\Debug\" /y /D
+xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -87,12 +87,12 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg452_64.dll" "$(SolutionDir)x64\Deb
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>afopencl.lib;opencv_world452.lib;zlib.lib;OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>afopencl.lib;opencv_world4100.lib;zlib.lib;OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib\lib;$(ProjectDir)libs\opencl\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world452.dll" "$(SolutionDir)x64\Release\" /y /D
-xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg452_64.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
+      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100.dll" "$(SolutionDir)x64\Release\" /y /D
+xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
