@@ -14,8 +14,8 @@ Libraries used:
 - [inih](https://github.com/jtilly/inih)
     
 For building the project, the below must be installed:
-- OpenCL implementation: AMD APP SDK 3.0 (or Nvidia CUDA Toolkit which includes OpenCL support for NVIDIA GPUs). Must be included in default include path. If AMD APP SDK 3.0 is used, occurrences of "cl.hpp" in code should be replaced with "cl2.hpp"
+- OpenCL implementation: The [OpenCL Headers](https://github.com/KhronosGroup/OpenCL-Headers), [OpenCL C++ Bindings](https://github.com/KhronosGroup/OpenCL-CLHPP) and [OpenCL Library file](https://github.com/KhronosGroup/OpenCL-SDK) are already included and configured for this project.
 - CUDA implementation: NVIDIA CUDA Toolkit.
-- LibPNG (can be installed from Visual Studio marketplace).
+- LibPNG is already included as a vcpkg package from Visual Studio marketplace.
 - ArrayFire should be installed globally, with default installation options. Environment Variable "AF_PATH" will be defined automatically.
-- OpenCV (for video testing, used internally by CImg), with default installation options. Environment Variable "OPENCV_DIR" will be defined automatically.
+- OpenCV (for video testing, used internally by CImg), with default installation options. Environment Variable "OPENCV_DIR" should be defined in the "build" directory (for example: C:\opencv\build\x64\vc16).
