@@ -39,7 +39,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const un
     }
     __syncthreads();
 
-    //optimized summation for rx
+    //optimized summation for rx with warp shuffling
     float rxSum = 0;
     const int row = localId / 8;
     #pragma unroll
@@ -63,7 +63,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const un
     __syncthreads();
 
     //simplified summation for Rx
-    //TODO can be optimized
+    //we cannot use warp shuffling because it introduces too much stalling for Rx
     float reduction_sum_Rx = 0.0f;
     #pragma unroll
     for (int j = 0; j < 64; j++)
