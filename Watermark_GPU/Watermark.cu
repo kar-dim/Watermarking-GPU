@@ -128,13 +128,13 @@ void Watermark::loadRandomMatrix(const string randomMatrixPath, const dim_t rows
 	if (!randomMatrixStream.is_open())
 		throw std::runtime_error(string("Error opening '" + randomMatrixPath + "' file for Random noise W array\n"));
 	randomMatrixStream.seekg(0, std::ios::end);
-	const auto total_bytes = randomMatrixStream.tellg();
+	const auto totalBytes = randomMatrixStream.tellg();
 	randomMatrixStream.seekg(0, std::ios::beg);
-	if (rows * cols * sizeof(float) != total_bytes)
-		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(total_bytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
-	std::unique_ptr<float> w_ptr(new float[rows * cols]);
-	randomMatrixStream.read(reinterpret_cast<char*>(w_ptr.get()), total_bytes);
-	randomMatrix = af::transpose(af::array(cols, rows, w_ptr.get()));
+	if (rows * cols * sizeof(float) != totalBytes)
+		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(totalBytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
+	std::unique_ptr<float> wPtr(new float[rows * cols]);
+	randomMatrixStream.read(reinterpret_cast<char*>(wPtr.get()), totalBytes);
+	randomMatrix = af::transpose(af::array(cols, rows, wPtr.get()));
 }
 
 //deletes and re-initializes memory (texture, kernel arrays, random matrix array) for new image size
