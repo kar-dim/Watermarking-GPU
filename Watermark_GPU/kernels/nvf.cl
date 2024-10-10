@@ -5,7 +5,7 @@ __kernel void nvf(__read_only image2d_t image,
 	//image2d is transposed, so we read the opposite dimensions
 	const int width = get_image_height(image), height = get_image_width(image);
 	const int x = get_global_id(1), y = get_global_id(0);
-	//pSquared is supplied at compile-time to minimize array elements (VLAs not supported in OpenCL)
+	//p is supplied at compile-time to allow the compiler to optimize more efficiently
 	const int pSquared = p * p;
 	const int pad = p / 2;
 
