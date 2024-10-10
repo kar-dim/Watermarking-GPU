@@ -113,10 +113,10 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
 	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr);
 
-	float a;
+	float watermarkStrength;
 	//warmup for arrayfire
-	watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::NVF);
-	watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::ME);
+	watermarkObj.makeWatermark(image, rgbImage, watermarkStrength, MASK_TYPE::NVF);
+	watermarkObj.makeWatermark(image, rgbImage, watermarkStrength, MASK_TYPE::ME);
 
 	double secs = 0;
 	//make NVF watermark
@@ -124,22 +124,22 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 	for (int i = 0; i < loops; i++)
 	{
 		timer::start();
-		watermarkNVF = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::NVF);
+		watermarkNVF = watermarkObj.makeWatermark(image, rgbImage, watermarkStrength, MASK_TYPE::NVF);
 		timer::end();
 		secs += timer::elapsedSeconds();
 	}
-	cout << std::format("Watermark strength (parameter a): {}\nCalculation of NVF mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, secs / loops));
+	cout << std::format("Watermark strength (parameter a): {}\nCalculation of NVF mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", watermarkStrength, rows, cols, p, psnr, executionTime(showFps, secs / loops));
 
 	secs = 0;
 	//Prediction error mask calculation
 	for (int i = 0; i < loops; i++)
 	{
 		timer::start();
-		watermarkME = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::ME);
+		watermarkME = watermarkObj.makeWatermark(image, rgbImage, watermarkStrength, MASK_TYPE::ME);
 		timer::end();
 		secs += timer::elapsedSeconds();
 	}
-	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, secs / loops));
+	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", watermarkStrength, rows, cols, p, psnr, executionTime(showFps, secs / loops));
 
 	const af::array watermarkedNVFgray = af::rgb2gray(watermarkNVF, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	const af::array watermarkedMEgray = af::rgb2gray(watermarkME, R_WEIGHT, G_WEIGHT, B_WEIGHT);
