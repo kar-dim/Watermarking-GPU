@@ -1,7 +1,6 @@
 #pragma once
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include "stdio.h"
 
 //constant array used for optimizing share memory accesses for Rx
 //Helps with reducing the local memory required for each block for Rx arrays from 4096 to 2304
@@ -31,9 +30,9 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int w
 	{
 		for (int j = x - pad; j <= x + pad; j++)
 		{
-			float val = tex2D<float>(texObj, i, j);
-			sum += val;
-			sumSq += val * val;
+			float pixelValue = tex2D<float>(texObj, i, j);
+			sum += pixelValue;
+			sumSq += pixelValue * pixelValue;
 		}
 	}
 	float mean = sum / pSquared;
