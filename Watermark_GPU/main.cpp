@@ -123,6 +123,10 @@ int main(void)
 int testForImage(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr) {
 	const string imageFile = inir.Get("paths", "image", "NO_IMAGE");
 	const bool showFps = inir.GetBoolean("options", "execution_time_in_fps", false);
+	int loops = inir.GetInteger("parameters", "loops_for_test", 5);
+	loops = loops <= 0 ? 5 : loops;
+	cout << "Each test will be executed " << loops << " times. Average time will be shown below\n";
+
 	//load image from disk into an arrayfire array
 	timer::start();
 	const af::array rgbImage = af::loadImage(imageFile.c_str(), true);
@@ -151,17 +155,29 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::NVF);
 	watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::ME);
 
+	double secs = 0;
 	//make NVF watermark
-	timer::start();
-	af::array watermarkNVF = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::NVF);
-	timer::end();
-	cout << std::format("Watermark strength (parameter a): {}\nCalculation of NVF mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
+	af::array watermarkNVF, watermarkME;
+	for (int i = 0; i < loops; i++)
+	{
+		timer::start();
+		watermarkNVF = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::NVF);
+		timer::end();
+		secs += timer::elapsedSeconds();
+	}
+	cout << std::format("Watermark strength (parameter a): {}\nCalculation of NVF mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, secs / loops));
 
 	//make ME watermark
-	timer::start();
-	af::array watermarkME = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::ME);
-	timer::end();
-	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
+	secs = 0;
+	//Prediction error mask calculation
+	for (int i = 0; i < loops; i++)
+	{
+		timer::start();
+		watermarkME = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::ME);
+		timer::end();
+		secs += timer::elapsedSeconds();
+	}
+	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, secs / loops));
 
 	const af::array watermarkedNVFgray = af::rgb2gray(watermarkNVF, R_WEIGHT, G_WEIGHT, B_WEIGHT);
 	const af::array watermarkedMEgray = af::rgb2gray(watermarkME, R_WEIGHT, G_WEIGHT, B_WEIGHT);
@@ -169,17 +185,28 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	watermarkObj.detectWatermark(watermarkedNVFgray, MASK_TYPE::NVF);
 	watermarkObj.detectWatermark(watermarkedMEgray, MASK_TYPE::ME);
 
-	//detection of NVF
-	timer::start();
-	float correlationNvf = watermarkObj.detectWatermark(watermarkedNVFgray, MASK_TYPE::NVF);
-	timer::end();
-	cout << std::format("Calculation of the watermark correlation (NVF) of an image with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
+	float correlationNvf, correlationMe;
+	secs = 0;
+	//NVF mask detection
+	for (int i = 0; i < loops; i++)
+	{
+		timer::start();
+		correlationNvf = watermarkObj.detectWatermark(watermarkedNVFgray, MASK_TYPE::NVF);
+		timer::end();
+		secs += timer::elapsedSeconds();
+	}
+	cout << std::format("Calculation of the watermark correlation (NVF) of an image with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", rows, cols, p, psnr, executionTime(showFps, secs / loops));
 
-	//detection of ME
-	timer::start();
-	float correlationMe = watermarkObj.detectWatermark(watermarkedMEgray, MASK_TYPE::ME);
-	timer::end();
-	cout << std::format("Calculation of the watermark correlation (ME) of an image with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
+	secs = 0;
+	//Prediction error mask detection
+	for (int i = 0; i < loops; i++)
+	{
+		timer::start();
+		correlationMe = watermarkObj.detectWatermark(watermarkedMEgray, MASK_TYPE::ME);
+		timer::end();
+		secs += timer::elapsedSeconds();
+	}
+	cout << std::format("Calculation of the watermark correlation (ME) of an image with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", rows, cols, p, psnr, executionTime(showFps, secs / loops));
 	
 	cout << std::format("Correlation [NVF]: {:.16f}\n", correlationNvf);
 	cout << std::format("Correlation [ME]: {:.16f}\n", correlationMe);
