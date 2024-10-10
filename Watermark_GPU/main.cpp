@@ -110,20 +110,19 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr);
 
 	float a;
-	af::array a_x;
 	//warmup for arrayfire
-	watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::NVF);
-	watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::ME);
+	watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::NVF);
+	watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::ME);
 
 	//make NVF watermark
 	timer::start();
-	const af::array watermarkNVF = watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::NVF);
+	const af::array watermarkNVF = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::NVF);
 	timer::end();
 	cout << std::format("Watermark strength (parameter a): {}\nCalculation of NVF mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
 
 	//make ME watermark
 	timer::start();
-	const af::array watermarkME = watermarkObj.makeWatermark(image, rgbImage, a_x, a, MASK_TYPE::ME);
+	const af::array watermarkME = watermarkObj.makeWatermark(image, rgbImage, a, MASK_TYPE::ME);
 	timer::end();
 	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", a, rows, cols, p, psnr, executionTime(showFps, timer::elapsedSeconds()));
 
@@ -202,7 +201,6 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	float timeDiff, a;
 
 	//initialize watermark functions class
-	af::array dummy_a_x;
 	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr);
 
 	//realtime watermarking of raw video
@@ -220,7 +218,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 			{
 				//copy from CImg to arrayfire and calculate watermarked frame
 				afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i));
-				watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
+				watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, a, MASK_TYPE::ME));
 			}
 		}
 		else 
@@ -228,7 +226,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 			//add the watermark only in the first frame
 			//copy from CImg to arrayfire
 			afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(0));
-			watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, dummy_a_x, a, MASK_TYPE::ME));
+			watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, a, MASK_TYPE::ME));
 			//rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
 			for (int i = 1; i < frames; i++)
