@@ -125,15 +125,15 @@ std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
 //Main watermark embedding method
 //it embeds the watermark computed fom "inputImage" (always grayscale)
 //into a new array based on "outputImage" (can be grayscale or RGB).
-af::array Watermark::makeWatermark(const af::array& inputImage, const af::array& outputImage, float& a, MASK_TYPE maskType) const
+af::array Watermark::makeWatermark(const af::array& inputImage, const af::array& outputImage, float& watermarkStrength, MASK_TYPE maskType) const
 {
 	af::array errorSequence, coefficients;
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		executeTextureKernel(inputImage, programs[0], "nvf", customMask);
 	const af::array u = mask * randomMatrix;
-	a = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
-	return af::clamp(outputImage + (u * a), 0, 255);
+	watermarkStrength = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
+	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
