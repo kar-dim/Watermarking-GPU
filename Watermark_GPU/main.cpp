@@ -90,7 +90,7 @@ int main(void)
 		programNeighbors.build({ device }, "-cl-mad-enable");
 		programs = { programNvf, programMe, programNeighbors };
 	}
-	catch (cl::Error& e) {
+	catch (const cl::Error& e) {
 		cout << "Could not build a kernel, Reason:\n\n";
 		cout << e.what();
 		if (programNvf.get() != NULL)
