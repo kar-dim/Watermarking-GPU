@@ -1,4 +1,6 @@
 #include "kernels.cuh"
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 
 __global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height)
 {
