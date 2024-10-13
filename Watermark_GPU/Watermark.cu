@@ -194,7 +194,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
 //can also calculate error sequence and prediction error filter
-af::array Watermark::computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool mask_needed) const
+af::array Watermark::computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const
 {
 	//constant data
 	const auto rows = static_cast<unsigned int>(image.dims(0));
@@ -218,7 +218,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	const auto correlationArrays = transformCorrelationArrays();
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
 	errorSequence = af::moddims(af::moddims(image, 1, rows * cols) - af::matmulTT(coefficients, x_), rows, cols);
-	if (mask_needed) 
+	if (maskNeeded)
 	{
 		const af::array errorSequenceAbs = af::abs(errorSequence);
 		return errorSequenceAbs / af::max<float>(errorSequenceAbs);
