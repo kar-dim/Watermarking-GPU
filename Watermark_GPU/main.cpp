@@ -195,7 +195,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const bool showFps = inir.GetBoolean("options", "execution_time_in_fps", false);
 	const int frames = inir.GetInteger("parameters_video", "frames", -1);
-	const float fps = (float)inir.GetReal("parameters_video", "fps", -1);
+	const int fps = inir.GetInteger("parameters_video", "fps", -1);
 	const bool watermarkFirstFrameOnly = inir.GetBoolean("parameters_video", "watermark_first_frame_only", false);
 	const bool displayFrames = inir.GetBoolean("parameters_video", "display_frames", false);
 	if (rows <= 64 || cols <= 64) 
