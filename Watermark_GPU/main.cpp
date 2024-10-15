@@ -329,7 +329,7 @@ std::string executionTime(bool showFps, double seconds)
 //main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
 void realtimeDetection(Watermark& watermarkFunctions, const std::vector<af::array>& watermarkedFrames, const int frames, const bool displayFrames, const float framePeriod, const bool showFps) 
 {
-	const auto rows = static_cast<unsigned int>(watermarkedFrames[1].dims(0));
+	const auto rows = static_cast<unsigned int>(watermarkedFrames[0].dims(0));
 	const auto cols = static_cast<unsigned int>(watermarkedFrames[0].dims(1));
 	CImgDisplay window;
 	CImg<unsigned char> cimgWatermarked(cols, rows);
