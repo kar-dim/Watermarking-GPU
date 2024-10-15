@@ -16,7 +16,7 @@ public:
 	template<typename T>
 	static af::array cimgYuvToAfarray(const cimg_library::CImg<T>& cimgImage)
 	{
-		return af::transpose(af::array(cimgImage.width(), cimgImage.height(), cimgImage.get_channel(0).data()).as(af::dtype::f32));
+		return af::transpose(af::array(cimgImage.width(), cimgImage.height(), cimgImage.get_channel(0).data()).as(f32));
 	}
 };
 

@@ -69,7 +69,7 @@ int main(void)
 
 	//test algorithms
 	try {
-		const int code = inir.GetBoolean("parameters_video", "test_for_video", false) == true ?
+		const int code = inir.GetBoolean("parameters_video", "test_for_video", false) ?
 			testForVideo(inir, properties, p, psnr) :
 			testForImage(inir, properties, p, psnr);
 		exitProgram(code);
@@ -180,9 +180,9 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 //#pragma omp parallel sections
 		//{
 //#pragma omp section
-			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_NVF").c_str(), watermarkNVF.as(af::dtype::u8));
+			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_NVF").c_str(), watermarkNVF.as(u8));
 //#pragma omp section
-			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_ME").c_str(), watermarkME.as(af::dtype::u8));
+			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_ME").c_str(), watermarkME.as(u8));
 		//}
 		cout << "Successully saved to disk\n";
 	}
@@ -231,13 +231,13 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 
 	//realtime watermarking of raw video
 	const bool makeWatermark = inir.GetBoolean("parameters_video", "watermark_make", false);
-	if (makeWatermark == true)
+	if (makeWatermark)
 	{
 		//load video from file
 		videoPath = inir.Get("paths", "video", "NO_VIDEO");
 		videoCimg = CImgList<unsigned char>::get_load_yuv(videoPath.c_str(), cols, rows, 420, 0, frames - 1, 1, false);
 		af::array afFrame;
-		if (watermarkFirstFrameOnly == false) 
+		if (!watermarkFirstFrameOnly) 
 		{
 			int counter = 0;
 			for (int i = 0; i < frames; i++) 
@@ -249,35 +249,32 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 		}
 		else 
 		{
-			//add the watermark only in the first frame
-			//copy from CImg to arrayfire
+			//add the watermark only in the first frame, rest of the frames will be as-is, no watermark
+			//NOTE this is useless if there is no compression
 			afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(0));
 			watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, a, MASK_TYPE::ME));
-			//rest of the frames will be as-is, no watermark
-			//NOTE this is useless if there is no compression, because the new frames are irrelevant with the first (watermarked), the correlation will be close to 0
 			for (int i = 1; i < frames; i++)
-				watermarkedFrames.push_back(Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i)).as(af::dtype::f32));
+				watermarkedFrames.push_back(Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i)).as(f32));
 		}
 	}
 
 	//save watermarked video to raw YUV (must be processed with ffmpeg later to add file headers, then it can be compressed etc)
-	if (inir.GetBoolean("parameters_video", "watermark_save_to_file", false) == true)
+	if (inir.GetBoolean("parameters_video", "watermark_save_to_file", false))
 	{
-		if (makeWatermark == false) 
+		if (!makeWatermark) 
 		{
 			cout << "Please set 'watermark_make' to true in settings file, in order to be able to save it.\n";
 		}
 		else 
 		{
 			CImgList<unsigned char> videoCimgWatermarked(frames, cols, rows, 1, 3);
+			CImg<unsigned char> cimgY(cols, rows);
 //#pragma omp parallel for
 			for (int i = 0; i < frames; i++) 
 			{
-				unsigned char* watermarkedFramesPtr = af::clamp(watermarkedFrames[i].T(), 0, 255).as(af::dtype::u8).host<unsigned char>();
-				CImg<unsigned char> cimgY(cols, rows);
+				unsigned char* watermarkedFramesPtr = af::clamp(watermarkedFrames[i].T(), 0, 255).as(u8).host<unsigned char>();
 				std::memcpy(cimgY.data(), watermarkedFramesPtr, sizeof(unsigned char) * rows * cols);
 				af::freeHost(watermarkedFramesPtr);
-				watermarkedFramesPtr = NULL;
 				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 0, cimgY);
 				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 1, CImg<unsigned char>(videoCimg.at(i).get_channel(1)));
 				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 2, CImg<unsigned char>(videoCimg.at(i).get_channel(2)));
@@ -285,7 +282,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 			//save watermark frames to file
 			videoCimgWatermarked.save_yuv((inir.Get("parameters_video", "watermark_save_to_file_path", "./watermarked.yuv")).c_str(), 420, false);
 
-			if (displayFrames == true) 
+			if (displayFrames) 
 			{
 				CImgDisplay window;
 				for (int i = 0; i < frames; i++)
@@ -298,13 +295,12 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 				}
 			}
 		}
-
 	}
 
 	//realtime watermarked video detection
-	if (inir.GetBoolean("parameters_video", "watermark_detection", false) == true) 
+	if (inir.GetBoolean("parameters_video", "watermark_detection", false)) 
 	{
-		if (makeWatermark == false)
+		if (!makeWatermark)
 			cout << "Please set 'watermark_make' to true in settings file, in order to be able to detect the watermark.\n";
 		else
 			realtimeDetection(watermarkObj, watermarkedFrames, frames, displayFrames, framePeriod, showFps);
@@ -312,10 +308,10 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	
 
 	//realtimne watermark detection of a compressed file
-	if (inir.GetBoolean("parameters_video", "watermark_detection_compressed", false) == true) 
+	if (inir.GetBoolean("parameters_video", "watermark_detection_compressed", false)) 
 	{
 		//read compressed file
-		string videoCompressedPath = inir.Get("paths", "video_compressed", "NO_VIDEO");
+		const string videoCompressedPath = inir.Get("paths", "video_compressed", "NO_VIDEO");
 		CImgList<unsigned char>videoCimgW = CImgList<unsigned char>::get_load_video(videoCompressedPath.c_str(), 0, frames - 1);
 		std::vector<af::array> watermarkedFrames(frames);
 		for (int i = 0; i < frames; i++)
@@ -333,33 +329,30 @@ std::string executionTime(bool showFps, double seconds)
 //main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
 void realtimeDetection(Watermark& watermarkFunctions, const std::vector<af::array>& watermarkedFrames, const int frames, const bool displayFrames, const float framePeriod, const bool showFps) 
 {
-	std::vector<float> correlations(frames);
-	CImgDisplay window;
 	const auto rows = static_cast<unsigned int>(watermarkedFrames[1].dims(0));
 	const auto cols = static_cast<unsigned int>(watermarkedFrames[0].dims(1));
-	float timeDiff;
+	CImgDisplay window;
+	CImg<unsigned char> cimgWatermarked(cols, rows);
+	float timeDiff, watermarkTimeSecs, correlation;
 	for (int i = 0; i < frames; i++) 
 	{
 		timer::start();
-		correlations[i] = watermarkFunctions.detectWatermark(watermarkedFrames[i], MASK_TYPE::ME);
+		correlation = watermarkFunctions.detectWatermark(watermarkedFrames[i], MASK_TYPE::ME);
 		timer::end();
-		const float watermarkTimeSecs = timer::elapsedSeconds();
+		watermarkTimeSecs = timer::elapsedSeconds();
 		cout << "Watermark detection execution time: " << executionTime(showFps, watermarkTimeSecs) << "\n";
 		if (displayFrames) 
 		{
 			timer::start();
-			af::array clamped = af::clamp(watermarkedFrames[i], 0, 255);
-			unsigned char* watermarkedFramesPtr = af::clamp(clamped.T(), 0, 255).as(af::dtype::u8).host<unsigned char>();
-			CImg<unsigned char> cimg_watermarked(cols, rows);
-			std::memcpy(cimg_watermarked.data(), watermarkedFramesPtr, rows * cols * sizeof(unsigned char));
-			af::freeHost(watermarkedFramesPtr);
-			watermarkedFramesPtr = NULL;
+			unsigned char* watermarkedFramePtr = af::clamp(watermarkedFrames[i], 0, 255).T().as(u8).host<unsigned char>();
+			std::memcpy(cimgWatermarked.data(), watermarkedFramePtr, rows * cols * sizeof(unsigned char));
+			af::freeHost(watermarkedFramePtr);
 			timer::end();
 			if ((timeDiff = framePeriod - (watermarkTimeSecs + timer::elapsedSeconds())) > 0)
 				Utilities::accurateSleep(timeDiff);
-			window.display(cimg_watermarked);
+			window.display(cimgWatermarked);
 		}
-		cout << "Correlation of " << i + 1 << " frame: " << correlations[i] << "\n\n";
+		cout << "Correlation of " << i + 1 << " frame: " << correlation << "\n\n";
 	}
 }
 
