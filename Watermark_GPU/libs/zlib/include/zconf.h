@@ -1,5 +1,5 @@
 /* zconf.h -- configuration of the zlib compression library
- * Copyright (C) 1995-2016 Jean-loup Gailly, Mark Adler
+ * Copyright (C) 1995-2024 Jean-loup Gailly, Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
@@ -7,6 +7,8 @@
 
 #ifndef ZCONF_H
 #define ZCONF_H
+/* #undef Z_PREFIX */
+/* #undef Z_HAVE_UNISTD_H */
 
 /*
  * If you *really* need a unique prefix for all types and library functions,
@@ -241,7 +243,11 @@
 #endif
 
 #ifdef Z_SOLO
-   typedef unsigned long z_size_t;
+#  ifdef _WIN64
+     typedef unsigned long long z_size_t;
+#  else
+     typedef unsigned long z_size_t;
+#  endif
 #else
 #  define z_longlong long long
 #  if defined(NO_SIZE_T)
@@ -296,14 +302,6 @@
 #  endif
 #endif
 
-#ifndef Z_ARG /* function prototypes for stdarg */
-#  if defined(STDC) || defined(Z_HAVE_STDARG_H)
-#    define Z_ARG(args)  args
-#  else
-#    define Z_ARG(args)  ()
-#  endif
-#endif
-
 /* The following definitions for FAR are needed only for MSDOS mixed
  * model programming (small or medium model with some far allocations).
  * This was tested only with MSC; for other MSDOS compilers you may have
@@ -335,7 +333,7 @@
    /* If building or using zlib as a DLL, define ZLIB_DLL.
     * This is not mandatory, but it offers a little performance increase.
     */
-#  ifdef ZLIB_DLL
+#  if 1
 #    if defined(WIN32) && (!defined(__BORLANDC__) || (__BORLANDC__ >= 0x500))
 #      ifdef ZLIB_INTERNAL
 #        define ZEXTERN extern __declspec(dllexport)
@@ -368,7 +366,7 @@
 #endif
 
 #if defined (__BEOS__)
-#  ifdef ZLIB_DLL
+#  if 1
 #    ifdef ZLIB_INTERNAL
 #      define ZEXPORT   __declspec(dllexport)
 #      define ZEXPORTVA __declspec(dllexport)
@@ -438,11 +436,19 @@ typedef uLong FAR uLongf;
 #endif
 
 #ifdef HAVE_UNISTD_H    /* may be set to #if 1 by ./configure */
-#  define Z_HAVE_UNISTD_H
+#  if ~(~HAVE_UNISTD_H + 0) == 0 && ~(~HAVE_UNISTD_H + 1) == 1
+#    define Z_HAVE_UNISTD_H
+#  elif HAVE_UNISTD_H != 0
+#    define Z_HAVE_UNISTD_H
+#  endif
 #endif
 
 #ifdef HAVE_STDARG_H    /* may be set to #if 1 by ./configure */
-#  define Z_HAVE_STDARG_H
+#  if ~(~HAVE_STDARG_H + 0) == 0 && ~(~HAVE_STDARG_H + 1) == 1
+#    define Z_HAVE_STDARG_H
+#  elif HAVE_STDARG_H != 0
+#    define Z_HAVE_STDARG_H
+#  endif
 #endif
 
 #ifdef STDC
@@ -520,7 +526,7 @@ typedef uLong FAR uLongf;
 #if !defined(_WIN32) && defined(Z_LARGE64)
 #  define z_off64_t off64_t
 #else
-#  if defined(_WIN32) && !defined(__GNUC__) && !defined(Z_SOLO)
+#  if defined(_WIN32) && !defined(__GNUC__)
 #    define z_off64_t __int64
 #  else
 #    define z_off64_t z_off_t
