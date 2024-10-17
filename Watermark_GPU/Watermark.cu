@@ -168,7 +168,6 @@ std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
 {
 	const int neighborsSize = (p * p) - 1;
 	const int neighborsSizeSq = neighborsSize * neighborsSize;
-	const auto rows = RxPartial.dims(0);
 	const auto paddedElems = RxPartial.dims(0) * RxPartial.dims(1);
 	//reduction sum of blocks
 	//all [p^2-1,1] blocks will be summed in rx
