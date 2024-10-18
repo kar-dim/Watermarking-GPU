@@ -44,9 +44,6 @@
     <ClInclude Include="opencl_init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cimg_init.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="opencl_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -58,7 +55,6 @@
     <None Include="kernels\nvf.cl">
       <Filter>Kernels</Filter>
     </None>
-    <None Include="packages.config" />
     <None Include="kernels\calculate_neighbors_p3.cl">
       <Filter>Kernels</Filter>
     </None>

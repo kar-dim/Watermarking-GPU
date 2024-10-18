@@ -1,7 +1,7 @@
 ﻿#pragma once
-#include "cimg_init.h"
 #include <arrayfire.h>
 #include <chrono>
+#include <CImg.h>
 #include <string>
 
 /*!
