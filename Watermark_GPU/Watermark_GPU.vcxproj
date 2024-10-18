@@ -60,7 +60,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;$(ProjectDir)libs\opencl\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>afopencl.lib;opencv_world4100d.lib;zlib.lib;OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>afopencl.lib;opencv_world4100d.lib;zlibd.lib;OpenCL.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100d.dll" "$(SolutionDir)x64\Debug\" /y /D
