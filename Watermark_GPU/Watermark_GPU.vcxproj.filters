@@ -31,9 +31,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cimg_init.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Watermark.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -49,8 +46,5 @@
     <ClInclude Include="main_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
   </ItemGroup>
 </Project>

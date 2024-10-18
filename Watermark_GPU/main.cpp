@@ -1,8 +1,9 @@
-#include "cimg_init.h"
 #include "cuda_utils.hpp"
 #include "Utilities.hpp"
 #include "Watermark.cuh"
 #include "main_utils.hpp"
+#define cimg_use_opencv
+#include <CImg.h>
 #include <cstdlib>
 #include <cstring>
 #include <cuda_runtime.h>
