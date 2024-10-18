@@ -57,7 +57,7 @@ int main(void)
 	const cl::Device device({ afcl::getDeviceId() });
 
 	const int p = inir.GetInteger("parameters", "p", -1);
-	const float psnr = static_cast<float>(inir.GetReal("parameters", "psnr", -1.0f));
+	const float psnr = inir.GetFloat("parameters", "psnr", -1.0f);
 
 	//TODO for p>3 we have problems with ME masking buffers
 	if (p != 3) 
