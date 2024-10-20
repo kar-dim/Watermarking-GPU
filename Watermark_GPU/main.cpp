@@ -195,7 +195,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const bool showFps = inir.GetBoolean("options", "execution_time_in_fps", false);
-	const int frames = inir.GetInteger("parameters_video", "frames", -1);
+	const int framesCount = inir.GetInteger("parameters_video", "frames", -1);
 	const int fps = inir.GetInteger("parameters_video", "fps", -1);
 	const bool watermarkFirstFrameOnly = inir.GetBoolean("parameters_video", "watermark_first_frame_only", false);
 	const bool displayFrames = inir.GetBoolean("parameters_video", "display_frames", false);
@@ -214,18 +214,17 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 		cout << "Video FPS is too low or too high\n";
 		return EXIT_FAILURE;
 	}
-	if (frames <= 1) 
+	if (framesCount <= 1) 
 	{
 		cout << "Frame count too low\n";
 		return EXIT_FAILURE;
 	}
 
-	CImgList<unsigned char> videoCimg;
-	string videoPath;
+	CImgList<unsigned char> videoFrames;
 	std::vector<af::array> watermarkedFrames;
-	watermarkedFrames.reserve(frames);
+	watermarkedFrames.reserve(framesCount);
 	const float framePeriod = 1.0f / fps;
-	float timeDiff, a;
+	float watermarkStrength;
 
 	//initialize watermark functions class
 	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr);
@@ -235,27 +234,26 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	if (makeWatermark)
 	{
 		//load video from file
-		videoPath = inir.Get("paths", "video", "NO_VIDEO");
-		videoCimg = CImgList<unsigned char>::get_load_yuv(videoPath.c_str(), cols, rows, 420, 0, frames - 1, 1, false);
+		const string videoPath = inir.Get("paths", "video", "NO_VIDEO");
+		videoFrames = CImgList<unsigned char>::get_load_yuv(videoPath.c_str(), cols, rows, 420, 0, framesCount - 1, 1, false);
 		af::array afFrame;
 		if (!watermarkFirstFrameOnly) 
 		{
-			int counter = 0;
-			for (int i = 0; i < frames; i++) 
+			for (int i = 0; i < framesCount; i++) 
 			{
 				//copy from CImg to arrayfire and calculate watermarked frame
-				afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i));
-				watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, a, MASK_TYPE::ME));
+				afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoFrames.at(i));
+				watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, watermarkStrength, MASK_TYPE::ME));
 			}
 		}
-		else 
+		else
 		{
 			//add the watermark only in the first frame, rest of the frames will be as-is, no watermark
 			//NOTE this is useless if there is no compression
-			afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(0));
-			watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, a, MASK_TYPE::ME));
-			for (int i = 1; i < frames; i++)
-				watermarkedFrames.push_back(Utilities::cimgYuvToAfarray<unsigned char>(videoCimg.at(i)).as(f32));
+			afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoFrames.at(0));
+			watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, watermarkStrength, MASK_TYPE::ME));
+			for (int i = 1; i < framesCount; i++)
+				watermarkedFrames.push_back(Utilities::cimgYuvToAfarray<unsigned char>(videoFrames.at(i)).as(f32));
 		}
 	}
 
@@ -268,17 +266,17 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 		}
 		else 
 		{
-			CImgList<unsigned char> videoCimgWatermarked(frames, cols, rows, 1, 3);
+			CImgList<unsigned char> videoCimgWatermarked(framesCount, cols, rows, 1, 3);
 			CImg<unsigned char> cimgY(cols, rows);
 //#pragma omp parallel for
-			for (int i = 0; i < frames; i++) 
+			for (int i = 0; i < framesCount; i++) 
 			{
 				unsigned char* watermarkedFramesPtr = af::clamp(watermarkedFrames[i].T(), 0, 255).as(u8).host<unsigned char>();
 				std::memcpy(cimgY.data(), watermarkedFramesPtr, sizeof(unsigned char) * rows * cols);
 				af::freeHost(watermarkedFramesPtr);
 				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 0, cimgY);
-				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 1, CImg<unsigned char>(videoCimg.at(i).get_channel(1)));
-				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 2, CImg<unsigned char>(videoCimg.at(i).get_channel(2)));
+				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 1, CImg<unsigned char>(videoFrames.at(i).get_channel(1)));
+				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 2, CImg<unsigned char>(videoFrames.at(i).get_channel(2)));
 			}
 			//save watermark frames to file
 			videoCimgWatermarked.save_yuv((inir.Get("parameters_video", "watermark_save_to_file_path", "./watermarked.yuv")).c_str(), 420, false);
@@ -286,7 +284,8 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 			if (displayFrames) 
 			{
 				CImgDisplay window;
-				for (int i = 0; i < frames; i++)
+				float timeDiff;
+				for (int i = 0; i < framesCount; i++)
 				{
 					timer::start();
 					window.display(videoCimgWatermarked.at(i).get_channel(0));
@@ -304,7 +303,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 		if (!makeWatermark)
 			cout << "Please set 'watermark_make' to true in settings file, in order to be able to detect the watermark.\n";
 		else
-			realtimeDetection(watermarkObj, watermarkedFrames, frames, displayFrames, framePeriod, showFps);
+			realtimeDetection(watermarkObj, watermarkedFrames, framesCount, displayFrames, framePeriod, showFps);
 	}
 	
 
@@ -313,11 +312,11 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 	{
 		//read compressed file
 		const string videoCompressedPath = inir.Get("paths", "video_compressed", "NO_VIDEO");
-		CImgList<unsigned char>videoCimgW = CImgList<unsigned char>::get_load_video(videoCompressedPath.c_str(), 0, frames - 1);
-		std::vector<af::array> watermarkedFrames(frames);
-		for (int i = 0; i < frames; i++)
+		CImgList<unsigned char>videoCimgW = CImgList<unsigned char>::get_load_video(videoCompressedPath.c_str(), 0, framesCount - 1);
+		std::vector<af::array> watermarkedFrames(framesCount);
+		for (int i = 0; i < framesCount; i++)
 			watermarkedFrames[i] = Utilities::cimgYuvToAfarray<unsigned char>(videoCimgW.at(i));
-		realtimeDetection(watermarkObj, watermarkedFrames, frames, displayFrames, framePeriod, showFps);
+		realtimeDetection(watermarkObj, watermarkedFrames, framesCount, displayFrames, framePeriod, showFps);
 	}
 	return EXIT_SUCCESS;
 }
