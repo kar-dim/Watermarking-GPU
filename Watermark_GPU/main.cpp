@@ -295,7 +295,8 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 
 	//save watermarked video to raw YUV (must be processed with ffmpeg later to add file headers, then it can be compressed etc)
-	if (inir.GetBoolean("parameters_video", "watermark_save_to_file", false))
+	const string watermarkedVideoSavePath = inir.Get("parameters_video", "watermark_save_to_file_path", "NO_VIDEO");
+	if (watermarkedVideoSavePath != "NO_VIDEO")
 	{
 		if (!makeWatermark) 
 		{
@@ -316,7 +317,7 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 2, CImg<unsigned char>(videoFrames.at(i).get_channel(2)));
 			}
 			//save watermark frames to file
-			videoCimgWatermarked.save_yuv((inir.Get("parameters_video", "watermark_save_to_file_path", "./watermarked.yuv")).c_str(), 420, false);
+			videoCimgWatermarked.save_yuv(watermarkedVideoSavePath.c_str(), 420, false);
 
 			if (displayFrames) 
 			{
@@ -344,10 +345,10 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 
 	//realtimne watermark detection of a compressed file
-	if (inir.GetBoolean("parameters_video", "watermark_detection_compressed", false)) 
+	const string videoCompressedPath = inir.Get("parameters_video", "video_compressed", "NO_VIDEO");
+	if (videoCompressedPath != "NO_VIDEO")
 	{
 		//read compressed file
-		const string videoCompressedPath = inir.Get("paths", "video_compressed", "NO_VIDEO");
 		CImgList<unsigned char>videoCimgW = CImgList<unsigned char>::get_load_video(videoCompressedPath.c_str(), 0, framesCount - 1);
 		std::vector<af::array> watermarkedFrames(framesCount);
 		for (int i = 0; i < framesCount; i++)
