@@ -63,7 +63,6 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.4.3;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -95,7 +94,6 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.4.3;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -130,7 +128,6 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.4.3;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
