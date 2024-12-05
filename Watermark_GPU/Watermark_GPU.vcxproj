@@ -52,7 +52,6 @@
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(ProjectDir)libs\CImg-3.4.3;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\opencl\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
@@ -75,7 +74,6 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalIncludeDirectories>$(AF_PATH)\include;$(ProjectDir)libs\CImg-3.4.3;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\opencl\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
