@@ -7,16 +7,23 @@ Code for my Diploma thesis at Information and Communication Systems Engineering 
 
 The original Thesis code is in the <a href="https://github.com/kar-dim/Watermarking-GPU/tree/old">old</a> branch. The code was later refactored and the algorithms improved with much better execution times, now in the default <a href="https://github.com/kar-dim/Watermarking-GPU/tree/master">master</a> branch. There is a newer implementation with the CUDA framework, which works only on NVIDIA GPUs, and is slightly faster on NVIDIA GPUs: <a href="https://github.com/kar-dim/Watermarking-GPU/tree/cuda">CUDA branch</a>
 
+# Overview
 
-This Diploma thesis aims to compare the above algorithms (mainly in execution speed) when they are implemented in GPU and CPU.
-Part 2 / GPU usage for calculations. (Part 1 / CPU usage [here](https://github.com/kar-dim/Watermarking-CPU) )
+The aim of this project is to compare the performance (primarily execution speed) of watermarking algorithms when implemented on CPU versus GPU. This repository focuses on the GPU implementation (Part 2). The CPU implementation can be found in the corresponding CPU repository (Part 1 / CPU usage [here](https://github.com/kar-dim/Watermarking-CPU) ).
 
-Libraries used:
-- [ArrayFire](https://arrayfire.org)
-- [CImg](https://cimg.eu/)
-- [inih](https://github.com/jtilly/inih)
-    
-For building the project, the below must be installed:
+# Key Features
+
+- Implementation of watermark embedding and detection algorithms for images.
+- Comparative performance analysis between CPU and GPU implementations.
+
+# Libraries Used
+
+- [ArrayFire](https://arrayfire.org): A C++ library for fast GPU computing.
+- [CImg](https://cimg.eu/): A C++ library for image processing.
+- [inih](https://github.com/jtilly/inih): A lightweight C++ library for parsing .ini configuration files.
+
+# Additional Dependencies
+
 - OpenCL implementation: The [OpenCL Headers](https://github.com/KhronosGroup/OpenCL-Headers), [OpenCL C++ Bindings](https://github.com/KhronosGroup/OpenCL-CLHPP) and [OpenCL Library file](https://github.com/KhronosGroup/OpenCL-SDK) are already included and configured for this project.
 - CUDA implementation: NVIDIA CUDA Toolkit.
 - ArrayFire should be installed globally, with default installation options. Environment Variable "AF_PATH" will be defined automatically.
