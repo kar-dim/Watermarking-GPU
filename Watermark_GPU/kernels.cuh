@@ -16,6 +16,9 @@ __constant__ int RxMappings[64] =
 	7,  14, 20, 25, 29, 32, 34, 35
 };
 
+__device__ void me_p3_rxCalculate(float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8);
+__device__ void me_p3_RxCalculate(float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8);
+
 template<int p, int pSquared = p * p, int pad = p / 2>
 __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int width, const unsigned int height)
 {
