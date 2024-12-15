@@ -98,12 +98,10 @@ Watermark& Watermark::operator=(const Watermark& other)
 //destroy texture data (texture object, cuda array) and custom cuda stream, only if they have not been moved
 Watermark::~Watermark()
 {
-	if (customStream != nullptr)
-	    cudaStreamDestroy(customStream);
-	if (texObj != 0)
-		cudaDestroyTextureObject(texObj);
-	if (texArray != nullptr)
-		cudaFreeArray(texArray);
+	static constexpr auto destroy = [](auto&& resource, auto&& deleter) { if (resource) deleter(resource); };
+	destroy(customStream, cudaStreamDestroy);
+	destroy(texObj, cudaDestroyTextureObject);
+	destroy(texArray, cudaFreeArray);
 }
 
 //supply the input image to apply watermarking and detection
