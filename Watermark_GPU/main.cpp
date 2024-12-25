@@ -105,7 +105,7 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 		return EXIT_FAILURE;
 	}
 
-	if (cols > static_cast<dim_t>(properties.maxTexture2D[0]) || cols > 7680 || rows > static_cast<dim_t>(properties.maxTexture2D[1]) || rows > 4320) 
+	if (cols > static_cast<dim_t>(properties.maxTexture2D[0]) || rows > static_cast<dim_t>(properties.maxTexture2D[1])) 
 	{
 		cout << "Image dimensions too high for this GPU\n";
 		return EXIT_FAILURE;

@@ -120,6 +120,7 @@ void Watermark::initializeMemory(const dim_t rows, const dim_t cols)
 }
 
 //helper method to load the random noise matrix W from the file specified.
+//This is the random generated watermark generated from a Normal distribution generator with mean 0 and standard deviation 1
 void Watermark::loadRandomMatrix(const string randomMatrixPath, const dim_t rows, const dim_t cols)
 {
 	std::ifstream randomMatrixStream(randomMatrixPath.c_str(), std::ios::binary);
