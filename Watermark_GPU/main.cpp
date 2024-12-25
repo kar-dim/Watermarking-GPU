@@ -142,7 +142,7 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 		cout << "Image dimensions too low\n";
 		return EXIT_FAILURE;
 	}
-	if (cols > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>()) || cols > 7680 || rows > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>()) || rows > 4320) 
+	if (cols > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_WIDTH>()) || rows > static_cast<dim_t>(device.getInfo<CL_DEVICE_IMAGE2D_MAX_HEIGHT>())) 
 	{
 		cout << "Image dimensions too high for this GPU\n";
 		return EXIT_FAILURE;
