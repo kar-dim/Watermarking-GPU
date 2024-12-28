@@ -32,7 +32,7 @@ using namespace cimg_library;
 int main(void)
 {
 	//open parameters file
-	INIReader inir("settings.ini");
+	const INIReader inir("settings.ini");
 	if (inir.ParseError() < 0) 
 	{
 		cout << "Could not load opencl configuration file\n";
@@ -77,29 +77,22 @@ int main(void)
 	}
 
 	//compile opencl kernels
-	std::vector<cl::Program> programs;
-	cl::Program programNvf, programMe, programNeighbors;
+	std::vector<cl::Program> programs(3);
 	try {
-		string program_data = Utilities::loadFileString("kernels/nvf.cl");
-		programNvf = cl::Program(context, program_data);
-		programNvf.build({ device }, std::format("-cl-fast-relaxed-math -cl-mad-enable -Dp={}", p).c_str());
-		program_data = Utilities::loadFileString("kernels/me_p3.cl");
-		programMe = cl::Program(context, program_data);
-		programMe.build({ device }, "-cl-fast-relaxed-math -cl-mad-enable");
-		program_data = Utilities::loadFileString("kernels/calculate_neighbors_p3.cl");
-		programNeighbors = cl::Program(context, program_data);
-		programNeighbors.build({ device }, "-cl-mad-enable");
-		programs = { programNvf, programMe, programNeighbors };
+		programs[0] = cl::Program(context, Utilities::loadFileString("kernels/nvf.cl"));
+		programs[0].build(device, std::format("-cl-mad-enable -Dp={}", p).c_str());
+		programs[1] = cl::Program(context, Utilities::loadFileString("kernels/me_p3.cl"));
+		programs[1].build(device , "-cl-mad-enable");
+		programs[2] = cl::Program(context, Utilities::loadFileString("kernels/calculate_neighbors_p3.cl"));
+		programs[2].build(device, "-cl-mad-enable");
 	}
 	catch (const cl::Error& e) {
-		cout << "Could not build a kernel, Reason:\n\n";
-		cout << e.what();
-		if (programNvf.get() != NULL)
-			cout << programNvf.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
-		if (programMe.get() != NULL)
-			cout << programMe.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
-		if (programNeighbors.get() != NULL)
-			cout << programNeighbors.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
+		cout << "Could not build a kernel, Reason: " << e.what() << "\n\n";
+		for (const cl::Program& program : programs) 
+		{
+			if (program.get() != NULL && program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(device) != CL_BUILD_SUCCESS)
+				cout << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << "\n";
+		}
 		exitProgram(EXIT_FAILURE);
 	}
 	catch (const std::exception& ex) {
@@ -121,7 +114,8 @@ int main(void)
 	exitProgram(EXIT_SUCCESS);
 }
 
-int testForImage(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr) {
+int testForImage(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr)
+{
 	const string imageFile = inir.Get("paths", "image", "NO_IMAGE");
 	const bool showFps = inir.GetBoolean("options", "execution_time_in_fps", false);
 	int loops = inir.GetInteger("parameters", "loops_for_test", 5);
@@ -228,7 +222,8 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	return EXIT_SUCCESS;
 }
 
-int testForVideo(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr) {
+int testForVideo(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr)
+{
 	const int rows = inir.GetInteger("parameters_video", "rows", -1);
 	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const bool showFps = inir.GetBoolean("options", "execution_time_in_fps", false);
@@ -358,7 +353,9 @@ int testForVideo(const cl::Device& device, const std::vector<cl::Program>& progr
 	return EXIT_SUCCESS;
 }
 
-std::string executionTime(const bool showFps, const double seconds) {
+//helper method to calculate execution time in FPS or in seconds
+std::string executionTime(const bool showFps, const double seconds) 
+{
 	return showFps ? std::format("FPS: {:.2f} FPS", 1.0 / seconds) : std::format("{:.6f} seconds", seconds);
 }
 
@@ -391,6 +388,7 @@ void realtimeDetection(Watermark& watermarkFunctions, const std::vector<af::arra
 	}
 }
 
+//terminates the program
 void exitProgram(const int exitCode) 
 {
 	std::system("pause");
