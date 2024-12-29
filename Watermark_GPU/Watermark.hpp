@@ -12,6 +12,12 @@ enum MASK_TYPE
 	NVF
 };
 
+struct dim2
+{
+	dim_t rows;
+	dim_t cols;
+};
+
 /*!
  *  \brief  Functions for watermark computation and detection
  *  \author Dimitris Karatzas
@@ -33,14 +39,15 @@ private:
 	const cl::Context context{ afcl::getContext(true) };
 	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
 	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
+	dim2 dims, texKernelDims, meKernelDims;
 	std::vector<cl::Program> programs;
 	int p;
 	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
 	cl::Image2D image2d;
 
-	void initializeMemory(const dim_t rows, const dim_t cols);
-	void loadRandomMatrix(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
+	void initializeMemory();
+	void loadRandomMatrix(const std::string randomMatrixPath);
 	std::pair<af::array, af::array> transformCorrelationArrays() const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array executeTextureKernel(const af::array& image, const cl::Program& program, const std::string kernelName, const af::array& output) const;
