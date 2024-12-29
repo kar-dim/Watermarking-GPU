@@ -143,7 +143,6 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <FastMath>true</FastMath>
       <AdditionalOptions>-diag-suppress 1388 --std c++20 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalCompilerOptions>/wd4275 /Zc:__cplusplus</AdditionalCompilerOptions>
       <GenerateLineInfo>true</GenerateLineInfo>
