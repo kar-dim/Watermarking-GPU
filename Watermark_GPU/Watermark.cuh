@@ -18,6 +18,8 @@ enum MASK_TYPE
 class Watermark 
 {
 private:
+	static constexpr dim3 texKernelBlockSize{ 16, 16 }, meKernelBlockSize{ 64, 1 };
+	dim3 dims, texKernelDims, meKernelDims;
 	int p;
 	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
@@ -26,8 +28,8 @@ private:
 	cudaArray* texArray;
 	static cudaStream_t afStream;
 
-	void initializeMemory(const dim_t rows, const dim_t cols);
-	void loadRandomMatrix(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
+	void initializeMemory();
+	void loadRandomMatrix(const std::string randomMatrixPath);
 	std::pair<af::array, af::array> transformCorrelationArrays() const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array executeTextureKernel(void (*kernel)(cudaTextureObject_t, float*, unsigned, unsigned), const af::array& image, const af::array& output) const;

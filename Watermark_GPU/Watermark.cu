@@ -14,6 +14,7 @@
 
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true
+#define UINT(x) static_cast<unsigned int>(x)
 
 using std::string;
 
@@ -21,26 +22,28 @@ cudaStream_t Watermark::afStream = afcu::getStream(afcu::getNativeId(af::getDevi
 
 //initialize data and memory
 Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatrixPath, const int p, const float psnr)
-	:p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+	: dims(UINT(cols), UINT(rows)), texKernelDims(UINT((cols + 15) & ~15), UINT((rows + 15) & ~15)), meKernelDims(UINT((cols + 63) & ~63), UINT(rows)), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
-	initializeMemory(rows, cols);
-	loadRandomMatrix(randomMatrixPath, rows, cols);
+	initializeMemory();
+	loadRandomMatrix(randomMatrixPath);
 	cudaStreamCreate(&customStream);
 }
 
 //copy constructor
-Watermark::Watermark(const Watermark& other) : p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
+Watermark::Watermark(const Watermark& other) 
+	: dims(other.dims), texKernelDims(other.texKernelDims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
 {
 	//we don't need to copy the internal buffers data, only to allocate the correct size based on other
-	initializeMemory(other.customMask.dims(0), other.customMask.dims(1));
+	initializeMemory();
 	cudaStreamCreate(&customStream);
 }
 
 //move constructor
-Watermark::Watermark(Watermark&& other) noexcept : p(other.p), strengthFactor(other.strengthFactor),
-randomMatrix(std::move(other.randomMatrix)), RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
+Watermark::Watermark(Watermark&& other) noexcept 
+	: dims(other.dims), texKernelDims(other.texKernelDims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor),
+      randomMatrix(std::move(other.randomMatrix)), RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
 {
 	//move texture data and nullify other
 	texObj = other.texObj;
@@ -56,6 +59,9 @@ Watermark& Watermark::operator=(Watermark&& other) noexcept
 {
 	if (this != &other) 
 	{
+		dims = other.dims;
+		texKernelDims = other.texKernelDims;
+		meKernelDims = other.meKernelDims;
 		p = other.p;
 		strengthFactor = other.strengthFactor;
 		randomMatrix = std::move(other.randomMatrix);
@@ -85,11 +91,14 @@ Watermark& Watermark::operator=(const Watermark& other)
 {
 	if (this != &other) 
 	{
+		dims = other.dims;
+		texKernelDims = other.texKernelDims;
+		meKernelDims = other.meKernelDims;
 		p = other.p;
 		strengthFactor = other.strengthFactor;
 		cudaDestroyTextureObject(texObj);
 		cudaFreeArray(texArray);
-		initializeMemory(other.customMask.dims(0), other.customMask.dims(1));
+		initializeMemory();
 		randomMatrix = other.randomMatrix;
 	}
 	return *this;
@@ -105,23 +114,22 @@ Watermark::~Watermark()
 }
 
 //supply the input image to apply watermarking and detection
-void Watermark::initializeMemory(const dim_t rows, const dim_t cols)
+void Watermark::initializeMemory()
 {
 	//initialize texture (transposed dimensions, arrayfire is column wise, we skip an extra transpose)
-	auto textureData = cuda_utils::createTextureData(static_cast<unsigned int>(cols), static_cast<unsigned int>(rows));
+	auto textureData = cuda_utils::createTextureData(static_cast<unsigned int>(dims.x), static_cast<unsigned int>(dims.y));
 	texObj = textureData.first;
 	texArray = textureData.second;
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	const dim_t padded_cols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-	RxPartial = af::array(rows, padded_cols);
-	rxPartial = af::array(rows, padded_cols / 8);
-	customMask = af::array(rows, cols);
-	neighbors = af::array(rows * cols, (p * p) - 1);
+	RxPartial = af::array(dims.y, meKernelDims.x);
+	rxPartial = af::array(dims.y, meKernelDims.x / 8);
+	customMask = af::array(dims.y, dims.x);
+	neighbors = af::array(dims.y * dims.x, (p * p) - 1);
 }
 
 //helper method to load the random noise matrix W from the file specified.
 //This is the random generated watermark generated from a Normal distribution generator with mean 0 and standard deviation 1
-void Watermark::loadRandomMatrix(const string randomMatrixPath, const dim_t rows, const dim_t cols)
+void Watermark::loadRandomMatrix(const string randomMatrixPath)
 {
 	std::ifstream randomMatrixStream(randomMatrixPath.c_str(), std::ios::binary);
 	if (!randomMatrixStream.is_open())
@@ -129,11 +137,11 @@ void Watermark::loadRandomMatrix(const string randomMatrixPath, const dim_t rows
 	randomMatrixStream.seekg(0, std::ios::end);
 	const auto totalBytes = randomMatrixStream.tellg();
 	randomMatrixStream.seekg(0, std::ios::beg);
-	if (rows * cols * sizeof(float) != totalBytes)
-		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(totalBytes / (sizeof(float))) + ", Image width: " + std::to_string(cols) + ", Image height: " + std::to_string(rows) + "\n"));
-	std::unique_ptr<float> wPtr(new float[rows * cols]);
+	if (dims.y * dims.x * sizeof(float) != totalBytes)
+		throw std::runtime_error(string("Error: W file total elements != image dimensions! W file total elements: " + std::to_string(totalBytes / (sizeof(float))) + ", Image width: " + std::to_string(dims.x) + ", Image height: " + std::to_string(dims.y) + "\n"));
+	std::unique_ptr<float> wPtr(new float[dims.y * dims.x]);
 	randomMatrixStream.read(reinterpret_cast<char*>(wPtr.get()), totalBytes);
-	randomMatrix = af::transpose(af::array(cols, rows, wPtr.get()));
+	randomMatrix = af::transpose(af::array(dims.x, dims.y, wPtr.get()));
 }
 
 //deletes and re-initializes memory (texture, kernel arrays, random matrix array) for new image size
@@ -141,21 +149,18 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 {
 	cudaDestroyTextureObject(texObj);
 	cudaFreeArray(texArray);
-	initializeMemory(rows, cols);
-	loadRandomMatrix(randomMatrixPath, rows, cols);
+	initializeMemory();
+	loadRandomMatrix(randomMatrixPath);
 }
 
 //computes custom Mask (NVF) or neighbors array (x_) used in prediction error mask
 af::array Watermark::executeTextureKernel(void (*kernel)(cudaTextureObject_t, float *, unsigned, unsigned), const af::array& image, const af::array& output) const
 {
-	const auto rows = static_cast<unsigned int>(image.dims(0));
-	const auto cols = static_cast<unsigned int>(image.dims(1));
-	const dim3 blockSize(16, 16);
-	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, cols, true);
+	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
 	//transfer ownership from arrayfire and copy data to cuda array
-	cuda_utils::copyDataToCudaArray(image.device<float>(), cols, rows, texArray);
+	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
 	float* outputValues = output.device<float>();
-	kernel << <gridSize, blockSize, 0, afStream >> > (texObj, outputValues, cols, rows);
+	kernel << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, outputValues, dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
 	unlockArrays(image, output);
 	return output;
@@ -195,18 +200,14 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 af::array Watermark::computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const
 {
 	//constant data
-	const auto rows = static_cast<unsigned int>(image.dims(0));
-	const auto cols = static_cast<unsigned int>(image.dims(1));
 	float* RxPartialData = RxPartial.device<float>();
 	float* rxPartialData = rxPartial.device<float>();
-	const auto paddedCols = (cols % 64 == 0) ? cols : cols + 64 - (cols % 64);
-	const dim3 blockSize(64, 1);
-	const dim3 gridSize = cuda_utils::gridSizeCalculate(blockSize, rows, paddedCols);
+	const dim3 gridSize = cuda_utils::gridSizeCalculate(meKernelBlockSize, meKernelDims.y, meKernelDims.x);
 	
 	//enqueue "x_" kernel
 	const af::array x_ = executeTextureKernel(calculate_neighbors_p3, image, neighbors);
 	//enqueue prediction error mask kernel
-	me_p3 <<<gridSize, blockSize, 0, customStream>>> (texObj, RxPartialData, rxPartialData, cols, paddedCols, rows);
+	me_p3 <<<gridSize, meKernelBlockSize, 0, customStream>>> (texObj, RxPartialData, rxPartialData, dims.x, meKernelDims.x, dims.y);
 	
 	//wait for both streams to finish
 	cudaStreamSynchronize(customStream);
@@ -215,7 +216,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays();
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
-	errorSequence = af::moddims(af::moddims(image, 1, rows * cols) - af::matmulTT(coefficients, x_), rows, cols);
+	errorSequence = af::moddims(af::moddims(image, 1, dims.x * dims.y) - af::matmulTT(coefficients, x_), dims.y, dims.x);
 	if (maskNeeded)
 	{
 		const af::array errorSequenceAbs = af::abs(errorSequence);

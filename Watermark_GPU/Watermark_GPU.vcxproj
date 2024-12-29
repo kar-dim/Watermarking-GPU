@@ -78,7 +78,7 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <AdditionalOptions>-diag-suppress 1388 --std c++20 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
+      <AdditionalCompilerOptions>/wd4275 /Zc:__cplusplus</AdditionalCompilerOptions>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
@@ -110,9 +110,8 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <FastMath>true</FastMath>
       <AdditionalOptions>-diag-suppress 1388 --std c++20 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
+      <AdditionalCompilerOptions>/wd4275 /Zc:__cplusplus</AdditionalCompilerOptions>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
@@ -146,7 +145,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <FastMath>true</FastMath>
       <AdditionalOptions>-diag-suppress 1388 --std c++20 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalCompilerOptions>/wd4275</AdditionalCompilerOptions>
+      <AdditionalCompilerOptions>/wd4275 /Zc:__cplusplus</AdditionalCompilerOptions>
       <GenerateLineInfo>true</GenerateLineInfo>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
