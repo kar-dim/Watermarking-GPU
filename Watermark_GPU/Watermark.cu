@@ -45,39 +45,36 @@ Watermark::Watermark(Watermark&& other) noexcept
 	: dims(other.dims), texKernelDims(other.texKernelDims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor),
       randomMatrix(std::move(other.randomMatrix)), RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
 {
+	static constexpr auto moveMember = [](auto& thisData, auto& otherData, auto value) { thisData = otherData; otherData = value; };
 	//move texture data and nullify other
-	texObj = other.texObj;
-	texArray = other.texArray;
-	customStream = other.customStream;
-	other.texObj = 0;
-	other.customStream = nullptr;
-	other.texArray = nullptr;
+	moveMember(texObj, other.texObj, 0);
+	moveMember(texArray, other.texArray, nullptr);
+	moveMember(customStream, other.customStream, nullptr);
+}
+
+//helper method to copy the parameters of another watermark object (for move/copy operators)
+void Watermark::copyParams(const Watermark& other) noexcept
+{
+	dims = other.dims;
+	texKernelDims = other.texKernelDims;
+	meKernelDims = other.meKernelDims;
+	p = other.p;
+	strengthFactor = other.strengthFactor;
 }
 
 //move assignment operator
 Watermark& Watermark::operator=(Watermark&& other) noexcept
 {
+	static constexpr auto moveAndDestroyMember = [](auto& thisData, auto& otherData, auto& deleter, auto value) { deleter(thisData); thisData = otherData; otherData = value; };
 	if (this != &other) 
 	{
-		dims = other.dims;
-		texKernelDims = other.texKernelDims;
-		meKernelDims = other.meKernelDims;
-		p = other.p;
-		strengthFactor = other.strengthFactor;
-		randomMatrix = std::move(other.randomMatrix);
-		//move custom stream
-		cudaStreamDestroy(customStream);
-		customStream = other.customStream;
-		other.customStream = nullptr;
-		//move texture object
-		cudaDestroyTextureObject(texObj);
-		texObj = other.texObj;
-		other.texObj = 0;
-		//move texture array
-		cudaFreeArray(texArray);
-		texArray = other.texArray;
-		other.texArray = nullptr;
+		copyParams(other);
+		//move custom stream, texture object/array and arrayfire arrays
+		moveAndDestroyMember(customStream, other.customStream, cudaStreamDestroy, nullptr);
+		moveAndDestroyMember(texObj, other.texObj, cudaDestroyTextureObject, 0);
+		moveAndDestroyMember(texArray, other.texArray, cudaFreeArray, nullptr);
 		//move arrayfire arrays
+		randomMatrix = std::move(other.randomMatrix);
 		RxPartial = std::move(other.RxPartial);
 		rxPartial = std::move(other.rxPartial);
 		customMask = std::move(other.customMask);
@@ -91,11 +88,7 @@ Watermark& Watermark::operator=(const Watermark& other)
 {
 	if (this != &other) 
 	{
-		dims = other.dims;
-		texKernelDims = other.texKernelDims;
-		meKernelDims = other.meKernelDims;
-		p = other.p;
-		strengthFactor = other.strengthFactor;
+		copyParams(other);
 		cudaDestroyTextureObject(texObj);
 		cudaFreeArray(texArray);
 		initializeMemory();

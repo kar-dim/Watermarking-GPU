@@ -35,6 +35,7 @@ private:
 	af::array executeTextureKernel(void (*kernel)(cudaTextureObject_t, float*, unsigned, unsigned), const af::array& image, const af::array& output) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
+	void copyParams(const Watermark& other) noexcept;
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 public:
