@@ -39,7 +39,7 @@ private:
 	const cl::Context context{ afcl::getContext(true) };
 	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
 	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
-	dim2 dims, texKernelDims, meKernelDims;
+	dim2 dims, meKernelDims;
 	std::vector<cl::Program> programs;
 	int p;
 	float strengthFactor;

@@ -17,7 +17,7 @@ using std::string;
 
 //initialize data and memory
 Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program>& programs)
-	: dims({ rows, cols }), texKernelDims({ (rows + 15) & ~15, (cols + 15) & ~15 }), meKernelDims({rows, (cols + 63) & ~63 }), programs(programs), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+	: dims({ rows, cols }), meKernelDims({ rows, (cols + 63) & ~63 }), programs(programs), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
@@ -26,7 +26,7 @@ Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatr
 
 //copy constructor
 Watermark::Watermark(const Watermark& other) 
-	: dims(other.dims), texKernelDims(other.texKernelDims), meKernelDims(other.meKernelDims), programs(other.programs), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
+	: dims(other.dims), meKernelDims(other.meKernelDims), programs(other.programs), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
 {
 	initializeMemory();
 }
@@ -37,7 +37,6 @@ Watermark& Watermark::operator=(const Watermark& other)
 	if (this != &other) 
 	{
 		dims = other.dims;
-		texKernelDims = other.texKernelDims;
 		meKernelDims = other.meKernelDims;
 		programs = other.programs;
 		p = other.p;
@@ -80,6 +79,8 @@ void Watermark::loadRandomMatrix(const string randomMatrixPath)
 //re-initializes memory (texture, kernel arrays, random matrix array) for new image size
 void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, const dim_t cols)
 {
+	dims = { rows, cols };
+	meKernelDims = { rows, (cols + 63) & ~63 };
 	initializeMemory();
 	loadRandomMatrix(randomMatrixPath);
 }
@@ -95,7 +96,7 @@ af::array Watermark::executeTextureKernel(const af::array& image, const cl::Prog
 		cl::Buffer buff(*outputMem.get(), true);
 		queue.enqueueNDRangeKernel(
 			cl_utils::KernelBuilder(program, kernelName.c_str()).args(image2d, buff).build(),
-			cl::NDRange(), cl::NDRange(texKernelDims.rows, texKernelDims.cols), cl::NDRange(16, 16));
+			cl::NDRange(), cl::NDRange(dims.rows, dims.cols), cl::NDRange(16, 16));
 		queue.finish();
 		unlockArrays(image, output);
 		return output;
