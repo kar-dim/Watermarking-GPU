@@ -19,7 +19,7 @@ class Watermark
 {
 private:
 	static constexpr dim3 texKernelBlockSize{ 16, 16 }, meKernelBlockSize{ 64, 1 };
-	dim3 dims, texKernelDims, meKernelDims;
+	dim3 dims, meKernelDims;
 	int p;
 	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;

@@ -22,7 +22,7 @@ cudaStream_t Watermark::afStream = afcu::getStream(afcu::getNativeId(af::getDevi
 
 //initialize data and memory
 Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatrixPath, const int p, const float psnr)
-	: dims(UINT(cols), UINT(rows)), texKernelDims(UINT((cols + 15) & ~15), UINT((rows + 15) & ~15)), meKernelDims(UINT((cols + 63) & ~63), UINT(rows)), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+	: dims(UINT(cols), UINT(rows)), meKernelDims(UINT((cols + 63) & ~63), UINT(rows)), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
@@ -33,7 +33,7 @@ Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatr
 
 //copy constructor
 Watermark::Watermark(const Watermark& other) 
-	: dims(other.dims), texKernelDims(other.texKernelDims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
+	: dims(other.dims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(other.randomMatrix)
 {
 	//we don't need to copy the internal buffers data, only to allocate the correct size based on other
 	initializeMemory();
@@ -42,8 +42,8 @@ Watermark::Watermark(const Watermark& other)
 
 //move constructor
 Watermark::Watermark(Watermark&& other) noexcept 
-	: dims(other.dims), texKernelDims(other.texKernelDims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor),
-      randomMatrix(std::move(other.randomMatrix)), RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
+	: dims(other.dims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(std::move(other.randomMatrix)),
+	  RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
 {
 	static constexpr auto moveMember = [](auto& thisData, auto& otherData, auto value) { thisData = otherData; otherData = value; };
 	//move texture data and nullify other
@@ -56,7 +56,6 @@ Watermark::Watermark(Watermark&& other) noexcept
 void Watermark::copyParams(const Watermark& other) noexcept
 {
 	dims = other.dims;
-	texKernelDims = other.texKernelDims;
 	meKernelDims = other.meKernelDims;
 	p = other.p;
 	strengthFactor = other.strengthFactor;
@@ -140,6 +139,8 @@ void Watermark::loadRandomMatrix(const string randomMatrixPath)
 //deletes and re-initializes memory (texture, kernel arrays, random matrix array) for new image size
 void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, const dim_t cols)
 {
+	dims = { UINT(cols), UINT(rows) };
+	meKernelDims = { UINT((cols + 63) & ~63), UINT(rows) };
 	cudaDestroyTextureObject(texObj);
 	cudaFreeArray(texArray);
 	initializeMemory();
