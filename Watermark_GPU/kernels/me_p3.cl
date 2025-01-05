@@ -53,9 +53,9 @@ void me_p3_RxCalculate(__local float RxLocal[64][36], const int localId, const f
 }
 
 __kernel void me(__read_only image2d_t image,
-    __global float* Rx,
-    __global float* rx,
-    __constant int* RxMappings,
+    __global float* __restrict__ Rx,
+    __global float* __restrict__ rx,
+    __constant int* __restrict__ RxMappings,
     __local float RxLocal[64][36]) //64 local threads, 36 values each (8 for rx, this is a shared memory for both Rx,rx)
  
 {
