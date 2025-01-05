@@ -16,9 +16,11 @@ __constant__ int RxMappings[64] =
 	7,  14, 20, 25, 29, 32, 34, 35
 };
 
+//helper methods of ME kernel, to calculate block-wide Rx/rx values in shared memory
 __device__ void me_p3_rxCalculate(float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8);
 __device__ void me_p3_RxCalculate(float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8);
 
+//NVF kernel, calculates NVF values for each pixel in the image
 template<int p, int pSquared = p * p, int pad = p / 2>
 __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int width, const unsigned int height)
 {
@@ -44,5 +46,7 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int w
 	nvf[(x * height) + y] = variance / (1 + variance);
 }
 
-__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height);
+//main ME kernel, calculates ME values for each pixel in the image
+__global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float* __restrict__ rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height);
+//main kernel for neighbors calculation. used in ME kernel
 __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height);

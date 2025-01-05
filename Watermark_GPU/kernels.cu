@@ -54,7 +54,7 @@ __device__ void me_p3_RxCalculate(float RxLocal[64][36], const int localId, cons
     RxLocal[localId][35] = x_8 * x_8;
 }
 
-__global__ void me_p3(cudaTextureObject_t texObj, float* Rx, float* rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height)
+__global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float* __restrict__ rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height)
 {
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
