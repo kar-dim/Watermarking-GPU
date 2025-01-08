@@ -1,62 +1,29 @@
 //manual loop unrolled calculation of rx in local memory
 void me_p3_rxCalculate(__local float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8)
 {
-    RxLocal[localId][0] = x_0 * currentPixel;
-    RxLocal[localId][1] = x_1 * currentPixel;
-    RxLocal[localId][2] = x_2 * currentPixel;
-    RxLocal[localId][3] = x_3 * currentPixel;
-    RxLocal[localId][4] = x_5 * currentPixel;
-    RxLocal[localId][5] = x_6 * currentPixel;
-    RxLocal[localId][6] = x_7 * currentPixel;
-    RxLocal[localId][7] = x_8 * currentPixel;
+    vstore4((float4)(x_0 * currentPixel, x_1 * currentPixel, x_2 * currentPixel, x_3 * currentPixel), 0, (__local float*) &RxLocal[localId][0]);
+    vstore4((float4)(x_5 * currentPixel, x_6 * currentPixel, x_7 * currentPixel, x_8 * currentPixel), 0, (__local float*) &RxLocal[localId][4]);
 }
 
 //manual loop unrolled calculation of Rx in local memory
 void me_p3_RxCalculate(__local float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8)
 {
-    RxLocal[localId][0] = x_0 * x_0;
-    RxLocal[localId][1] = x_0 * x_1;
-    RxLocal[localId][2] = x_0 * x_2;
-    RxLocal[localId][3] = x_0 * x_3;
-    RxLocal[localId][4] = x_0 * x_5;
-    RxLocal[localId][5] = x_0 * x_6;
-    RxLocal[localId][6] = x_0 * x_7;
-    RxLocal[localId][7] = x_0 * x_8;
-    RxLocal[localId][8] = x_1 * x_1;
-    RxLocal[localId][9] = x_1 * x_2;
-    RxLocal[localId][10] = x_1 * x_3;
-    RxLocal[localId][11] = x_1 * x_5;
-    RxLocal[localId][12] = x_1 * x_6;
-    RxLocal[localId][13] = x_1 * x_7;
-    RxLocal[localId][14] = x_1 * x_8;
-    RxLocal[localId][15] = x_2 * x_2;
-    RxLocal[localId][16] = x_2 * x_3;
-    RxLocal[localId][17] = x_2 * x_5;
-    RxLocal[localId][18] = x_2 * x_6;
-    RxLocal[localId][19] = x_2 * x_7;
-    RxLocal[localId][20] = x_2 * x_8;
-    RxLocal[localId][21] = x_3 * x_3;
-    RxLocal[localId][22] = x_3 * x_5;
-    RxLocal[localId][23] = x_3 * x_6;
-    RxLocal[localId][24] = x_3 * x_7;
-    RxLocal[localId][25] = x_3 * x_8;
-    RxLocal[localId][26] = x_5 * x_5;
-    RxLocal[localId][27] = x_5 * x_6;
-    RxLocal[localId][28] = x_5 * x_7;
-    RxLocal[localId][29] = x_5 * x_8;
-    RxLocal[localId][30] = x_6 * x_6;
-    RxLocal[localId][31] = x_6 * x_7;
-    RxLocal[localId][32] = x_6 * x_8;
-    RxLocal[localId][33] = x_7 * x_7;
-    RxLocal[localId][34] = x_7 * x_8;
-    RxLocal[localId][35] = x_8 * x_8;
+    vstore4((float4)(x_0 * x_0, x_0 * x_1, x_0 * x_2, x_0 * x_3), 0, (__local float*) &RxLocal[localId][0]);
+    vstore4((float4)(x_0 * x_5, x_0 * x_6, x_0 * x_7, x_0 * x_8), 0, (__local float*) &RxLocal[localId][4]);
+    vstore4((float4)(x_1 * x_1, x_1 * x_2, x_1 * x_3, x_1 * x_5), 0, (__local float*) &RxLocal[localId][8]);
+    vstore4((float4)(x_1 * x_6, x_1 * x_7, x_1 * x_8, x_2 * x_2), 0, (__local float*) &RxLocal[localId][12]);
+    vstore4((float4)(x_2 * x_3, x_2 * x_5, x_2 * x_6, x_2 * x_7), 0, (__local float*) &RxLocal[localId][16]);
+    vstore4((float4)(x_2 * x_8, x_3 * x_3, x_3 * x_5, x_3 * x_6), 0, (__local float*) &RxLocal[localId][20]);
+    vstore4((float4)(x_3 * x_7, x_3 * x_8, x_5 * x_5, x_5 * x_6), 0, (__local float*) &RxLocal[localId][24]);
+    vstore4((float4)(x_5 * x_7, x_5 * x_8, x_6 * x_6, x_6 * x_7), 0, (__local float*) &RxLocal[localId][28]);
+    vstore4((float4)(x_6 * x_8, x_7 * x_7, x_7 * x_8, x_8 * x_8), 0, (__local float*) &RxLocal[localId][32]);
 }
 
 __kernel void me(__read_only image2d_t image,
     __global float* __restrict__ Rx,
     __global float* __restrict__ rx,
     __constant int* __restrict__ RxMappings,
-    __local float RxLocal[64][36]) //64 local threads, 36 values each (8 for rx, this is a shared memory for both Rx,rx)
+    __local float RxLocal[64][36] __attribute__((aligned(16)))) //64 local threads, 36 values each (8 for rx, this is a shared memory for both Rx,rx)
  
 {
     const int x = get_global_id(0), y = get_global_id(1);
