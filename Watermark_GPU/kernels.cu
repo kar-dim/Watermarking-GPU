@@ -69,6 +69,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
         rxSum += __shfl_down_sync(0xFFFFFFFF, rxSum, i);
     if (localId % 8 == 0)
         rx[(outputIndex + row) / 8] = rxSum;
+    __syncthreads();
 
     //calculate 36 Rx values
     if (x < width)
