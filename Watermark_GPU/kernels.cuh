@@ -17,8 +17,8 @@ __constant__ int RxMappings[64] =
 };
 
 //helper methods of ME kernel, to calculate block-wide Rx/rx values in shared memory
-__device__ void me_p3_rxCalculate(float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8);
-__device__ void me_p3_RxCalculate(float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8);
+__device__ void me_p3_rxCalculate(float4* RxLocalVec, const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8);
+__device__ void me_p3_RxCalculate(float4* RxLocalVec, const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8);
 
 //NVF kernel, calculates NVF values for each pixel in the image
 template<int p, int pSquared = p * p, int pad = p / 2>
