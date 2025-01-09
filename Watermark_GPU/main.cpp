@@ -11,7 +11,7 @@
 #include <format>
 #include <INIReader.h>
 #include <iostream>
-//#include <omp.h>
+#include <omp.h>
 #include <string>
 #include <vector>
 
@@ -39,9 +39,9 @@ int main(void)
 		exitProgram(EXIT_FAILURE);
 	}
 
-	//omp_set_num_threads(omp_get_max_threads());
-//#pragma omp parallel for
-	//for (int i = 0; i < 24; i++) { }
+	omp_set_num_threads(omp_get_max_threads());
+#pragma omp parallel for
+	for (int i = 0; i < 24; i++) { }
 
 	af::info();
 	cout << "\n";
@@ -178,13 +178,13 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 	if (inir.GetBoolean("options", "save_watermarked_files_to_disk", false)) 
 	{
 		cout << "\nSaving watermarked files to disk...\n";
-//#pragma omp parallel sections
-		//{
-//#pragma omp section
+#pragma omp parallel sections
+		{
+#pragma omp section
 			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_NVF").c_str(), watermarkNVF.as(u8));
-//#pragma omp section
+#pragma omp section
 			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_ME").c_str(), watermarkME.as(u8));
-		//}
+		}
 		cout << "Successully saved to disk\n";
 	}
 	return EXIT_SUCCESS;
@@ -269,7 +269,7 @@ int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const 
 		{
 			CImgList<unsigned char> videoCimgWatermarked(framesCount, cols, rows, 1, 3);
 			CImg<unsigned char> cimgY(cols, rows);
-//#pragma omp parallel for
+#pragma omp parallel for
 			for (int i = 0; i < framesCount; i++) 
 			{
 				unsigned char* watermarkedFramesPtr = af::clamp(watermarkedFrames[i].T(), 0, 255).as(u8).host<unsigned char>();
