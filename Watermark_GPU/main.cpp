@@ -79,12 +79,13 @@ int main(void)
 	//compile opencl kernels
 	std::vector<cl::Program> programs(3);
 	try {
-		programs[0] = cl::Program(context, Utilities::loadFileString("kernels/nvf.cl"));
-		programs[0].build(device, std::format("-cl-mad-enable -Dp={}", p).c_str());
-		programs[1] = cl::Program(context, Utilities::loadFileString("kernels/me_p3.cl"));
-		programs[1].build(device , "-cl-mad-enable");
-		programs[2] = cl::Program(context, Utilities::loadFileString("kernels/calculate_neighbors_p3.cl"));
-		programs[2].build(device, "-cl-mad-enable");
+		auto buildProgram = [&context, &device](auto& program, const std::string& kernelName, const std::string& buildOptions) {
+			program = cl::Program(context, Utilities::loadFileString(kernelName));
+			program.build(device, buildOptions.c_str());
+		};
+		buildProgram(programs[0], "kernels/nvf.cl", std::format("-cl-mad-enable -Dp={}", p));
+		buildProgram(programs[1], "kernels/me_p3.cl", "-cl-mad-enable");
+		buildProgram(programs[2], "kernels/calculate_neighbors_p3.cl", "-cl-mad-enable");
 	}
 	catch (const cl::Error& e) {
 		cout << "Could not build a kernel, Reason: " << e.what() << "\n\n";
