@@ -1,24 +1,31 @@
 #include "kernels.cuh"
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <cuda_fp16.h>
 
-__device__ void me_p3_rxCalculate(float4* RxLocalVec, const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8)
+__device__ half8 make_half8(const float a, const float b, const float c, const float d, const float e, const float f, const float g, const float h)
 {
-    RxLocalVec[0] = make_float4(x_0 * currentPixel, x_1 * currentPixel, x_2 * currentPixel, x_3 * currentPixel);
-    RxLocalVec[1] = make_float4(x_5 * currentPixel, x_6 * currentPixel, x_7 * currentPixel, x_8 * currentPixel);
+    return half8 { __float2half(a), __float2half(b), __float2half(c), __float2half(d), __float2half(e), __float2half(f), __float2half(g), __float2half(h) };
 }
 
-__device__ void me_p3_RxCalculate(float4* RxLocalVec, const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8)
+__device__ half8 make_half8(const half a, const half b, const half c, const half d, const half e, const half f, const half g, const half h)
 {
-    RxLocalVec[0] = make_float4(x_0 * x_0, x_0 * x_1, x_0 * x_2, x_0 * x_3);
-    RxLocalVec[1] = make_float4(x_0 * x_5, x_0 * x_6, x_0 * x_7, x_0 * x_8);
-    RxLocalVec[2] = make_float4(x_1 * x_1, x_1 * x_2, x_1 * x_3, x_1 * x_5);
-    RxLocalVec[3] = make_float4(x_1 * x_6, x_1 * x_7, x_1 * x_8, x_2 * x_2);
-    RxLocalVec[4] = make_float4(x_2 * x_3, x_2 * x_5, x_2 * x_6, x_2 * x_7);
-    RxLocalVec[5] = make_float4(x_2 * x_8, x_3 * x_3, x_3 * x_5, x_3 * x_6);
-    RxLocalVec[6] = make_float4(x_3 * x_7, x_3 * x_8, x_5 * x_5, x_5 * x_6);
-    RxLocalVec[7] = make_float4(x_5 * x_7, x_5 * x_8, x_6 * x_6, x_6 * x_7);
-    RxLocalVec[8] = make_float4(x_6 * x_8, x_7 * x_7, x_7 * x_8, x_8 * x_8);
+    return half8 { a, b, c, d, e, f, g, h };
+}
+
+__device__ void me_p3_rxCalculate(half8* RxLocalVec8, const int localId, const half x_0, const half x_1, const half x_2, const half x_3, const half x_4, const half x_5, const half x_6, const half x_7, const half x_8)
+{
+    *RxLocalVec8 = make_half8(__hmul(x_0, x_4), __hmul(x_1, x_4), __hmul(x_2, x_4), __hmul(x_3, x_4),__hmul(x_5, x_4), __hmul(x_6, x_4), __hmul(x_7, x_4), __hmul(x_8, x_4));
+}
+
+__device__ void me_p3_RxCalculate(half8* RxLocalVec8, const int localId, const half x_0, const half x_1, const half x_2, const half x_3, const half x_5, const half x_6, const half x_7, const half x_8)
+{
+    const half zero = __float2half(0.0f);
+    RxLocalVec8[0] = make_half8(__hmul(x_0, x_0), __hmul(x_0, x_1), __hmul(x_0, x_2), __hmul(x_0, x_3), __hmul(x_0, x_5), __hmul(x_0, x_6), __hmul(x_0, x_7), __hmul(x_0, x_8));
+    RxLocalVec8[1] = make_half8(__hmul(x_1, x_1), __hmul(x_1, x_2), __hmul(x_1, x_3), __hmul(x_1, x_5), __hmul(x_1, x_6), __hmul(x_1, x_7), __hmul(x_1, x_8), __hmul(x_2, x_2));
+    RxLocalVec8[2] = make_half8(__hmul(x_2, x_3), __hmul(x_2, x_5), __hmul(x_2, x_6), __hmul(x_2, x_7), __hmul(x_2, x_8), __hmul(x_3, x_3), __hmul(x_3, x_5), __hmul(x_3, x_6));
+    RxLocalVec8[3] = make_half8(__hmul(x_3, x_7), __hmul(x_3, x_8), __hmul(x_5, x_5), __hmul(x_5, x_6), __hmul(x_5, x_7), __hmul(x_5, x_8), __hmul(x_6, x_6), __hmul(x_6, x_7));
+    RxLocalVec8[4] = make_half8(__hmul(x_6, x_8), __hmul(x_7, x_7), __hmul(x_7, x_8), __hmul(x_8, x_8), zero, zero, zero, zero);
 }
 
 __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float* __restrict__ rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height)
@@ -29,32 +36,32 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
 	const int outputIndex = (y * paddedWidth) + x;
 
     //re-use shared memory for Rx and rx calculation, helps with occupancy
-    __shared__ float RxLocal[64][36];
-    float4* RxLocalVec = reinterpret_cast<float4*>(RxLocal[localId]);
+    __shared__ half RxLocal[64][40]; //36 + 4 for 16-byte alignment (in order to use vectorized 128-bit load/store)
+    half8* RxLocalVec8 = reinterpret_cast<half8*>(RxLocal[localId]);
 
     //initialize shared memory, assign a portion for all threads for parallelism
     #pragma unroll
-    for (int i = 0; i < 9; i++)
-        RxLocalVec[i] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+    for (int i = 0; i < 5; i++)
+        RxLocalVec8[i] = make_half8(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 
     if (y >= height)
         return;
 
-    float x_0, x_1, x_2, x_3, currentPixel, x_5, x_6, x_7, x_8;
+    half x_0, x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8;
 
     //calculate this thread's 8 rx values
     if (x < width)
     {
-        x_0 = tex2D<float>(texObj, y - 1, x - 1);
-        x_1 = tex2D<float>(texObj, y - 1, x);
-        x_2 = tex2D<float>(texObj, y - 1, x + 1);
-        x_3 = tex2D<float>(texObj, y, x - 1);
-        currentPixel = tex2D<float>(texObj, y, x);
-        x_5 = tex2D<float>(texObj, y, x + 1);
-        x_6 = tex2D<float>(texObj, y + 1, x - 1);
-        x_7 = tex2D<float>(texObj, y + 1, x);
-        x_8 = tex2D<float>(texObj, y + 1, x + 1);
-        me_p3_rxCalculate(RxLocalVec, localId, x_0, x_1, x_2, x_3, currentPixel, x_5, x_6, x_7, x_8);
+        x_0 = __float2half(tex2D<float>(texObj, y - 1, x - 1));
+        x_1 = __float2half(tex2D<float>(texObj, y - 1, x));
+        x_2 = __float2half(tex2D<float>(texObj, y - 1, x + 1));
+        x_3 = __float2half(tex2D<float>(texObj, y, x - 1));
+        x_4 = __float2half(tex2D<float>(texObj, y, x)); //x_4 is central pixel
+        x_5 = __float2half(tex2D<float>(texObj, y, x + 1));
+        x_6 = __float2half(tex2D<float>(texObj, y + 1, x - 1));
+        x_7 = __float2half(tex2D<float>(texObj, y + 1, x));
+        x_8 = __float2half(tex2D<float>(texObj, y + 1, x + 1));
+        me_p3_rxCalculate(RxLocalVec8, localId, x_0, x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8);
     }
     __syncthreads();
 
@@ -63,7 +70,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
     const int row = localId / 8;
     #pragma unroll
     for (int i = 0; i < 64; i += 8)
-        rxSum += RxLocal[(localId + i) % 64][row];
+        rxSum += __half2float(RxLocal[(localId + i) % 64][row]);
     // reduce 32 results to 4 per warp
     for (int i = 4; i > 0; i = i / 2)
         rxSum += __shfl_down_sync(0xFFFFFFFF, rxSum, i);
@@ -73,7 +80,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
 
     //calculate 36 Rx values
     if (x < width)
-        me_p3_RxCalculate(RxLocalVec, localId, x_0, x_1, x_2, x_3, x_5, x_6, x_7, x_8);
+        me_p3_RxCalculate(RxLocalVec8, localId, x_0, x_1, x_2, x_3, x_5, x_6, x_7, x_8);
     __syncthreads();
 
     //simplified summation for Rx
@@ -81,7 +88,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
     float reduction_sum_Rx = 0.0f;
     #pragma unroll
     for (int j = 0; j < 64; j++)
-        reduction_sum_Rx += RxLocal[j][RxMappings[localId]];
+        reduction_sum_Rx += __half2float(RxLocal[j][RxMappings[localId]]);
     Rx[outputIndex] = reduction_sum_Rx;
 }
 
