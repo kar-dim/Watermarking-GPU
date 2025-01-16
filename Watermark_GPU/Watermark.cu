@@ -199,7 +199,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	me_p3 <<<gridSize, meKernelBlockSize, 0, customStream>>> (texObj, RxPartial.device<float>(), rxPartial.device<float>(), dims.x, meKernelDims.x, dims.y);
 	
 	//wait for both streams to finish
-	cudaStreamsSynchronize(customStream, afStream);
+	cuda_utils::cudaStreamsSynchronize(customStream, afStream);
 	unlockArrays(RxPartial, rxPartial);
 
 	//calculation of coefficients, error sequence and mask
