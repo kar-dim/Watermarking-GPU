@@ -19,5 +19,5 @@ namespace cuda_utils
     void copyDataToCudaArray(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray);
     void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray, cudaStream_t stream);
     template<std::same_as<cudaStream_t>... Args>
-    static void cudaStreamsSynchronize(const Args&... streams) { (cudaStreamSynchronize(streams), ...); }
+    void cudaStreamsSynchronize(const Args&... streams) { (cudaStreamSynchronize(streams), ...); }
 }
