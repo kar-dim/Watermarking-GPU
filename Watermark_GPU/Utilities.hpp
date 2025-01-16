@@ -5,7 +5,7 @@
 #include <string>
 
 /*!
- *  \brief  Helper methods for testing the watermark algorithms
+ *  \brief  Helper utility methods for testing the watermark algorithms
  *  \author Dimitris Karatzas
  */
 class Utilities 

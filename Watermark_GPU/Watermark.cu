@@ -109,7 +109,7 @@ Watermark::~Watermark()
 void Watermark::initializeMemory()
 {
 	//initialize texture (transposed dimensions, arrayfire is column wise, we skip an extra transpose)
-	auto textureData = cuda_utils::createTextureData(static_cast<unsigned int>(dims.x), static_cast<unsigned int>(dims.y));
+	auto textureData = cuda_utils::createTextureData(dims.x, dims.y);
 	texObj = textureData.first;
 	texArray = textureData.second;
 	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
@@ -176,7 +176,7 @@ std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
 }
 
 //Main watermark embedding method
-//it embeds the watermark computed fom "inputImage" (always grayscale)
+//it embeds the watermark computed from "inputImage" (always grayscale)
 //into a new array based on "outputImage" (can be grayscale or RGB).
 af::array Watermark::makeWatermark(const af::array& inputImage, const af::array& outputImage, float& watermarkStrength, MASK_TYPE maskType) const
 {
@@ -190,23 +190,18 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 }
 
 //Compute prediction error mask. Used in both creation and detection of the watermark.
-//can also calculate error sequence and prediction error filter
+//Can also calculate error sequence and prediction error filter
 af::array Watermark::computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const
 {
-	//constant data
-	float* RxPartialData = RxPartial.device<float>();
-	float* rxPartialData = rxPartial.device<float>();
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(meKernelBlockSize, meKernelDims.y, meKernelDims.x);
-	
-	//enqueue "x_" kernel
+	//enqueue "x_" and prediction error mask kernel in two streams
 	const af::array x_ = executeTextureKernel(calculate_neighbors_p3, image, neighbors);
-	//enqueue prediction error mask kernel
-	me_p3 <<<gridSize, meKernelBlockSize, 0, customStream>>> (texObj, RxPartialData, rxPartialData, dims.x, meKernelDims.x, dims.y);
+	me_p3 <<<gridSize, meKernelBlockSize, 0, customStream>>> (texObj, RxPartial.device<float>(), rxPartial.device<float>(), dims.x, meKernelDims.x, dims.y);
 	
 	//wait for both streams to finish
-	cudaStreamSynchronize(customStream);
-	cudaStreamSynchronize(afStream);
+	cudaStreamsSynchronize(customStream, afStream);
 	unlockArrays(RxPartial, rxPartial);
+
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays();
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);

@@ -36,8 +36,13 @@ private:
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
 	void copyParams(const Watermark& other) noexcept;
+
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
+
+	template<std::same_as<cudaStream_t>... Args>
+	static void cudaStreamsSynchronize(const Args&... streams) { (cudaStreamSynchronize(streams), ...); }
+
 public:
 	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr);
 	Watermark(const Watermark& other);
