@@ -51,16 +51,12 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
     half x_0, x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8;
     if (x < width)
     {
-        x_4 = __float2half(tex2D<float>(texObj, y, x)); //x_4 is central pixel
-        //shuffle the left-right values from threads in the same warp to reduce 2 tex fetches
-        x_3 = __shfl_sync(0xFFFFFFFF, x_4, max(threadIdx.x - 1, 0));
-        x_5 = __shfl_sync(0xFFFFFFFF, x_4, min(threadIdx.x + 1, 63));
-        //edge handling
-        if (threadIdx.x == 0 || threadIdx.x == 32) x_3 = __float2half(tex2D<float>(texObj, y, x - 1));
-        if (threadIdx.x == 31 || threadIdx.x == 63) x_5 = __float2half(tex2D<float>(texObj, y, x + 1));
         x_0 = __float2half(tex2D<float>(texObj, y - 1, x - 1));
         x_1 = __float2half(tex2D<float>(texObj, y - 1, x));
         x_2 = __float2half(tex2D<float>(texObj, y - 1, x + 1));
+        x_3 = __float2half(tex2D<float>(texObj, y, x - 1));
+        x_4 = __float2half(tex2D<float>(texObj, y, x)); //x_4 is central pixel
+        x_5 = __float2half(tex2D<float>(texObj, y, x + 1));
         x_6 = __float2half(tex2D<float>(texObj, y + 1, x - 1));
         x_7 = __float2half(tex2D<float>(texObj, y + 1, x));
         x_8 = __float2half(tex2D<float>(texObj, y + 1, x + 1));
