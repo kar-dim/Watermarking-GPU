@@ -40,7 +40,7 @@ __kernel void me(__read_only image2d_t image,
     float x_0, x_1, x_2, x_3, currentPixel, x_5, x_6, x_7, x_8;
     if (x < width)
     {
-        const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
+        const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
         x_0 = read_imagef(image, sampler, (int2)(y - 1, x - 1)).x;
         x_1 = read_imagef(image, sampler, (int2)(y - 1, x)).x;
         x_2 = read_imagef(image, sampler, (int2)(y - 1, x + 1)).x;

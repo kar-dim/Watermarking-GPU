@@ -1,7 +1,7 @@
 __kernel void nvf(__read_only image2d_t image, 
 				  __global float* nvf)
 {	
-	const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;
+	const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 	//image2d is transposed, so we read the opposite dimensions
 	const int width = get_image_height(image), height = get_image_width(image);
 	const int x = get_global_id(1), y = get_global_id(0);
