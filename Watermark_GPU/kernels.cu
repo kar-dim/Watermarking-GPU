@@ -47,7 +47,6 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
         return;
 
     //load 3x3 window
-  
     half x_0, x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8;
     if (x < width)
     {
@@ -66,16 +65,16 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
     __syncthreads();
 
     //optimized summation for rx with warp shuffling
-    float rxSum = 0;
+    float sum = 0;
     const int row = threadIdx.x / 8;
     #pragma unroll
     for (int i = 0; i < 64; i += 8)
-        rxSum += __half2float(RxLocal[(threadIdx.x + i) % 64][row]);
+        sum += __half2float(RxLocal[(threadIdx.x + i) % 64][row]);
     // reduce 32 results to 4 per warp
     for (int i = 4; i > 0; i = i / 2)
-        rxSum += __shfl_down_sync(0xFFFFFFFF, rxSum, i);
+        sum += __shfl_down_sync(0xFFFFFFFF, sum, i);
     if (threadIdx.x % 8 == 0)
-        rx[(outputIndex + row) / 8] = rxSum;
+        rx[(outputIndex + row) / 8] = sum;
     __syncthreads();
 
     //calculate 36 Rx values
@@ -85,11 +84,11 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
 
     //simplified summation for Rx
     //we cannot use warp shuffling because it introduces too much stalling for Rx
-    float reduction_sum_Rx = 0.0f;
+    sum = 0.0f;
     #pragma unroll
-    for (int j = 0; j < 64; j++)
-        reduction_sum_Rx += __half2float(RxLocal[j][RxMappings[threadIdx.x]]);
-    Rx[outputIndex] = reduction_sum_Rx;
+    for (int i = 0; i < 64; i++)
+        sum += __half2float(RxLocal[i][RxMappings[threadIdx.x]]);
+    Rx[outputIndex] = sum;
 }
 
 __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height)
