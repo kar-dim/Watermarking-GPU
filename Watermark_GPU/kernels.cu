@@ -3,6 +3,22 @@
 #include <device_launch_parameters.h>
 #include <cuda_fp16.h>
 
+extern __constant__ float coeffs[8];
+
+//constant array used for optimizing share memory accesses for Rx
+//Helps with reducing the local memory required for each block for Rx arrays from 4096 to 2304
+__constant__ int RxMappings[64] =
+{
+    0,  1,  2,  3,  4,  5,  6,  7,
+    1,  8,  9,  10, 11, 12, 13, 14,
+    2,  9,  15, 16, 17, 18, 19, 20,
+    3,  10, 16, 21, 22, 23, 24, 25,
+    4,  11, 17, 22, 26, 27, 28, 29,
+    5,  12, 18, 23, 27, 30, 31, 32,
+    6,  13, 19, 24, 28, 31, 33, 34,
+    7,  14, 20, 25, 29, 32, 34, 35
+};
+
 __device__ half8 make_half8(const float a, const float b, const float c, const float d, const float e, const float f, const float g, const float h)
 {
     return half8 { __float2half(a), __float2half(b), __float2half(c), __float2half(d), __float2half(e), __float2half(f), __float2half(g), __float2half(h) };
@@ -91,7 +107,7 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
     Rx[outputIndex] = sum;
 }
 
-__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height)
+__global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height)
 {
     const int x = blockIdx.y * blockDim.y + threadIdx.y;
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
@@ -99,14 +115,15 @@ __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, co
 
     if (x < width && y < height) 
     {
-        //store 8 neighboring pixels into global memory (coalesced writes)
-        x_[0 * width * height + outputIndex] = tex2D<float>(texObj, y - 1, x - 1);
-        x_[1 * width * height + outputIndex] = tex2D<float>(texObj, y - 1, x);
-        x_[2 * width * height + outputIndex] = tex2D<float>(texObj, y - 1, x + 1);
-        x_[3 * width * height + outputIndex] = tex2D<float>(texObj, y, x - 1);
-        x_[4 * width * height + outputIndex] = tex2D<float>(texObj, y, x + 1);
-        x_[5 * width * height + outputIndex] = tex2D<float>(texObj, y + 1, x - 1);
-        x_[6 * width * height + outputIndex] = tex2D<float>(texObj, y + 1, x);
-        x_[7 * width * height + outputIndex] = tex2D<float>(texObj, y + 1, x + 1);
+        float dot = 0.0f;
+        dot += coeffs[0] * tex2D<float>(texObj, y - 1, x - 1);
+        dot += coeffs[1] * tex2D<float>(texObj, y - 1, x);
+        dot += coeffs[2] * tex2D<float>(texObj, y - 1, x + 1);
+        dot += coeffs[3] * tex2D<float>(texObj, y, x - 1);
+        dot += coeffs[4] * tex2D<float>(texObj, y, x + 1);
+        dot += coeffs[5] * tex2D<float>(texObj, y + 1, x - 1);
+        dot += coeffs[6] * tex2D<float>(texObj, y + 1, x);
+        dot += coeffs[7] * tex2D<float>(texObj, y + 1, x + 1);
+		x_[outputIndex] = dot;
     }
 }

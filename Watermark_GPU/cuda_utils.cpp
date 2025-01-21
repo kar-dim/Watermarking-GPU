@@ -79,10 +79,4 @@ namespace cuda_utils
     {
         cudaMemcpy2DToArray(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
     }
-
-    //async version of copy Device data to Device Array
-    void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray *cuArray, cudaStream_t stream) 
-    {
-        cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice, stream);
-    }
 }
