@@ -58,4 +58,4 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int w
 //main ME kernel, calculates ME values for each pixel in the image
 __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float* __restrict__ rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height);
 //main kernel for neighbors calculation. used in ME kernel
-__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height);
+__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const float* coefficients, const unsigned int width, const unsigned int height);

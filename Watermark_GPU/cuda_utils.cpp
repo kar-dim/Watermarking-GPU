@@ -38,8 +38,8 @@ namespace cuda_utils
     {
         struct cudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
-        texDesc.addressMode[0] = cudaAddressModeClamp;
-        texDesc.addressMode[1] = cudaAddressModeClamp;
+        texDesc.addressMode[0] = cudaAddressModeBorder;
+        texDesc.addressMode[1] = cudaAddressModeBorder;
         texDesc.filterMode = cudaFilterModePoint;
         texDesc.readMode = cudaReadModeElementType;
         texDesc.normalizedCoords = 0;
