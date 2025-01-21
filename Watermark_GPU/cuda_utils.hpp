@@ -1,5 +1,4 @@
 #pragma once
-#include <concepts>
 #include <cuda_runtime.h>
 #include <utility>
 
@@ -17,7 +16,4 @@ namespace cuda_utils
     cudaDeviceProp getDeviceProperties();
     std::pair<cudaTextureObject_t, cudaArray*> createTextureData(const unsigned int rows, const unsigned int cols);
     void copyDataToCudaArray(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray);
-    void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray, cudaStream_t stream);
-    template<std::same_as<cudaStream_t>... Args>
-    void cudaStreamsSynchronize(const Args&... streams) { (cudaStreamSynchronize(streams), ...); }
 }

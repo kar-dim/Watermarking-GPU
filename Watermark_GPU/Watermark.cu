@@ -28,7 +28,6 @@ Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatr
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
 	initializeMemory();
 	loadRandomMatrix(randomMatrixPath);
-	cudaStreamCreate(&customStream);
 }
 
 //copy constructor
@@ -37,7 +36,6 @@ Watermark::Watermark(const Watermark& other)
 {
 	//we don't need to copy the internal buffers data, only to allocate the correct size based on other
 	initializeMemory();
-	cudaStreamCreate(&customStream);
 }
 
 //move constructor
@@ -49,7 +47,6 @@ Watermark::Watermark(Watermark&& other) noexcept
 	//move texture data and nullify other
 	moveMember(texObj, other.texObj, 0);
 	moveMember(texArray, other.texArray, nullptr);
-	moveMember(customStream, other.customStream, nullptr);
 }
 
 //helper method to copy the parameters of another watermark object (for move/copy operators)
@@ -68,8 +65,7 @@ Watermark& Watermark::operator=(Watermark&& other) noexcept
 	if (this != &other) 
 	{
 		copyParams(other);
-		//move custom stream, texture object/array and arrayfire arrays
-		moveAndDestroyMember(customStream, other.customStream, cudaStreamDestroy, nullptr);
+		//move texture object/array and arrayfire arrays
 		moveAndDestroyMember(texObj, other.texObj, cudaDestroyTextureObject, 0);
 		moveAndDestroyMember(texArray, other.texArray, cudaFreeArray, nullptr);
 		//move arrayfire arrays
@@ -96,11 +92,10 @@ Watermark& Watermark::operator=(const Watermark& other)
 	return *this;
 }
 
-//destroy texture data (texture object, cuda array) and custom cuda stream, only if they have not been moved
+//destroy texture data (texture object, cuda array) only if they have not been moved
 Watermark::~Watermark()
 {
 	static constexpr auto destroy = [](auto&& resource, auto&& deleter) { if (resource) deleter(resource); };
-	destroy(customStream, cudaStreamDestroy);
 	destroy(texObj, cudaDestroyTextureObject);
 	destroy(texArray, cudaFreeArray);
 }
@@ -148,24 +143,21 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 }
 
 //computes custom Mask (NVF) or neighbors array (x_) used in prediction error mask
-af::array Watermark::computeCustomMask(const af::array& image, const af::array& output) const
+af::array Watermark::computeCustomMask(const af::array& image) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
 	//transfer ownership from arrayfire and copy data to cuda array
 	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
-	float* outputValues = output.device<float>();
-	nvf<3> << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, outputValues, dims.x, dims.y);
+	nvf<3> << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, customMask.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
-	unlockArrays(image, output);
-	return output;
+	unlockArrays(image, customMask);
+	return customMask;
 }
 
 //computes custom Mask (NVF) or neighbors array (x_) used in prediction error mask
 af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
-	//transfer ownership from arrayfire and copy data to cuda array
-	//cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
 	calculate_neighbors_p3 << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, neighbors.device<float>(), coefficients.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
 	unlockArrays(neighbors, coefficients);
@@ -195,7 +187,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	af::array errorSequence, coefficients;
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		computeCustomMask(inputImage, customMask);
+		computeCustomMask(inputImage);
 	const af::array u = mask * randomMatrix;
 	watermarkStrength = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
@@ -209,7 +201,6 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
 	//enqueue "x_" and prediction error mask kernel in two streams
 	me_p3 <<<gridSize, meKernelBlockSize, 0, afStream >>> (texObj, RxPartial.device<float>(), rxPartial.device<float>(), dims.x, meKernelDims.x, dims.y);
-	cuda_utils::cudaStreamsSynchronize(afStream);
 	unlockArrays(RxPartial, rxPartial);
 
 	//calculation of coefficients, error sequence and mask
@@ -246,7 +237,7 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 	if (maskType == MASK_TYPE::NVF)
 	{
 		computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
-		mask = computeCustomMask(watermarkedImage, customMask);
+		mask = computeCustomMask(watermarkedImage);
 	}
 	else
 		mask = computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);

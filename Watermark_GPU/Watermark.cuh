@@ -23,7 +23,6 @@ private:
 	int p;
 	float strengthFactor;
 	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
-	cudaStream_t customStream;
 	cudaTextureObject_t texObj;
 	cudaArray* texArray;
 	static cudaStream_t afStream;
@@ -32,8 +31,8 @@ private:
 	void loadRandomMatrix(const std::string randomMatrixPath);
 	std::pair<af::array, af::array> transformCorrelationArrays() const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
-	af::array computeCustomMask(const af::array& image, const af::array& output) const;
-	af::array computeScaledNeighbors(const af::array& output) const;
+	af::array computeCustomMask(const af::array& image) const;
+	af::array computeScaledNeighbors(const af::array& coefficients) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
 	void copyParams(const Watermark& other) noexcept;

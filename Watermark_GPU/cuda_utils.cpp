@@ -38,8 +38,8 @@ namespace cuda_utils
     {
         struct cudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
-        texDesc.addressMode[0] = cudaAddressModeBorder;
-        texDesc.addressMode[1] = cudaAddressModeBorder;
+        texDesc.addressMode[0] = cudaAddressModeClamp;
+        texDesc.addressMode[1] = cudaAddressModeClamp;
         texDesc.filterMode = cudaFilterModePoint;
         texDesc.readMode = cudaReadModeElementType;
         texDesc.normalizedCoords = 0;
@@ -78,11 +78,5 @@ namespace cuda_utils
     void copyDataToCudaArray(const float* data, const unsigned int rows, const unsigned int cols, cudaArray* cuArray) 
     {
         cudaMemcpy2DToArray(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice);
-    }
-
-    //async version of copy Device data to Device Array
-    void copyDataToCudaArrayAsync(const float* data, const unsigned int rows, const unsigned int cols, cudaArray *cuArray, cudaStream_t stream) 
-    {
-        cudaMemcpy2DToArrayAsync(cuArray, 0, 0, data, cols * sizeof(float), cols * sizeof(float), rows, cudaMemcpyDeviceToDevice, stream);
     }
 }

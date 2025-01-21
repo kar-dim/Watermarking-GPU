@@ -96,24 +96,11 @@ __global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, co
 {
     const int x = blockIdx.y * blockDim.y + threadIdx.y;
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
-    const int outputIndex = (y * width + x);
+    const int outputIndex = (x * height + y);
 
     if (x < width && y < height) 
     {
-        //store 8 neighboring pixels into global memory (coalesced writes)
         float dot = 0.0f;
-	/*	dot += coefficients[0] * tex2D<float>(texObj, y - 1, x - 1);
-        dot += coefficients[1] * tex2D<float>(texObj, y, x - 1);
-        dot += coefficients[2] * tex2D<float>(texObj, y + 1, x - 1);
-
-        dot += coefficients[3] * tex2D<float>(texObj, y - 1, x);
-        dot += coefficients[4] * tex2D<float>(texObj, y + 1, x);
-
-		dot += coefficients[5] * tex2D<float>(texObj, y - 1, x + 1);
-		dot += coefficients[6] * tex2D<float>(texObj, y, x + 1);
-		dot += coefficients[7] * tex2D<float>(texObj, y + 1, x + 1);*/
-
-
         dot += coefficients[0] * tex2D<float>(texObj, y - 1, x - 1);
         dot += coefficients[1] * tex2D<float>(texObj, y - 1, x);
         dot += coefficients[2] * tex2D<float>(texObj, y - 1, x + 1);
