@@ -176,7 +176,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 			cl::NDRange(), cl::NDRange(meKernelDims.cols, meKernelDims.rows), cl::NDRange(64, 1));
 		//finish and return memory to arrayfire
 		queue.finish();
-		unlockArrays(RxPartial, rxPartial);
+		unlockArrays(RxPartial, rxPartial, image);
 		//calculation of coefficients, error sequence and mask
 		const auto correlationArrays = transformCorrelationArrays();
 		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
