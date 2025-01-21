@@ -3,20 +3,6 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-//constant array used for optimizing share memory accesses for Rx
-//Helps with reducing the local memory required for each block for Rx arrays from 4096 to 2304
-__constant__ int RxMappings[64] =
-{
-	0,  1,  2,  3,  4,  5,  6,  7,
-	1,  8,  9,  10, 11, 12, 13, 14,
-	2,  9,  15, 16, 17, 18, 19, 20,
-	3,  10, 16, 21, 22, 23, 24, 25,
-	4,  11, 17, 22, 26, 27, 28, 29,
-	5,  12, 18, 23, 27, 30, 31, 32,
-	6,  13, 19, 24, 28, 31, 33, 34,
-	7,  14, 20, 25, 29, 32, 34, 35
-};
-
 struct alignas(16) half8
 {
 	half a, b, c, d, e, f, g, h;
@@ -57,5 +43,6 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int w
 
 //main ME kernel, calculates ME values for each pixel in the image
 __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float* __restrict__ rx, const unsigned int width, const unsigned int paddedWidth, const unsigned int height);
-//main kernel for neighbors calculation. used in ME kernel
-__global__ void calculate_neighbors_p3(cudaTextureObject_t texObj, float* x_, const float* coefficients, const unsigned int width, const unsigned int height);
+
+//main kernel for scaled neighbors calculation. used in ME kernel
+__global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height);

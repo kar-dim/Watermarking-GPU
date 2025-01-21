@@ -18,6 +18,8 @@
 
 using std::string;
 
+__constant__ float coeffs[8]; //prediction filter coefficients (ME kernel)
+
 cudaStream_t Watermark::afStream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 
 //initialize data and memory
@@ -142,7 +144,7 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 	loadRandomMatrix(randomMatrixPath);
 }
 
-//computes custom Mask (NVF) or neighbors array (x_) used in prediction error mask
+//computes custom Mask (NVF)
 af::array Watermark::computeCustomMask(const af::array& image) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
@@ -154,11 +156,12 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 	return customMask;
 }
 
-//computes custom Mask (NVF) or neighbors array (x_) used in prediction error mask
+//computes scaled neighbors array used in prediction error mask
 af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
-	calculate_neighbors_p3 << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, neighbors.device<float>(), coefficients.device<float>(), dims.x, dims.y);
+	cudaMemcpyToSymbol(coeffs, coefficients.device<float>(), 8 * sizeof(float), 0, cudaMemcpyDeviceToDevice);
+	calculate_scaled_neighbors_p3 << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, neighbors.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
 	unlockArrays(neighbors, coefficients);
 	return neighbors;
@@ -201,13 +204,12 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
 	//enqueue "x_" and prediction error mask kernel in two streams
 	me_p3 <<<gridSize, meKernelBlockSize, 0, afStream >>> (texObj, RxPartial.device<float>(), rxPartial.device<float>(), dims.x, meKernelDims.x, dims.y);
-	unlockArrays(RxPartial, rxPartial);
+	unlockArrays(image, RxPartial, rxPartial);
 
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays();
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
-	const af::array x_ = computeScaledNeighbors(coefficients);
-	errorSequence = image - x_;
+	errorSequence = image - computeScaledNeighbors(coefficients);
 	if (maskNeeded)
 	{
 		const af::array errorSequenceAbs = af::abs(errorSequence);
@@ -233,17 +235,16 @@ float Watermark::computeCorrelation(const af::array& e_u, const af::array& e_z) 
 //the main mask detector function
 float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE maskType) const
 {
-	af::array mask, e_z, a_z;
+	af::array mask, errorSequenceW, coefficients;
 	if (maskType == MASK_TYPE::NVF)
 	{
-		computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
+		computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_NO);
 		mask = computeCustomMask(watermarkedImage);
 	}
 	else
-		mask = computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
+		mask = computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
 	const af::array u = mask * randomMatrix;
-	const af::array e_u = computeErrorSequence(u, a_z);
-	return computeCorrelation(e_u, e_z);
+	return computeCorrelation(computeErrorSequence(u, coefficients), errorSequenceW);
 }
 
 //helper method to display an af::array in a window

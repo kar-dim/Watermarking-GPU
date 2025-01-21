@@ -80,6 +80,7 @@
       <AdditionalOptions>-diag-suppress 1388 --std c++20 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalCompilerOptions>/wd4275 /Zc:__cplusplus</AdditionalCompilerOptions>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
     </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100d.dll" "$(SolutionDir)x64\Debug\" /y /D
@@ -113,6 +114,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
       <AdditionalOptions>-diag-suppress 1388 --std c++20 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalCompilerOptions>/wd4275 /Zc:__cplusplus</AdditionalCompilerOptions>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
     </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100.dll" "$(SolutionDir)x64\Release\" /y /D
@@ -147,6 +149,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
       <AdditionalCompilerOptions>/wd4275 /Zc:__cplusplus</AdditionalCompilerOptions>
       <GenerateLineInfo>true</GenerateLineInfo>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
     </CudaCompile>
     <PostBuildEvent>
       <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
