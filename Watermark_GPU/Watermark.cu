@@ -18,8 +18,6 @@
 
 using std::string;
 
-__constant__ float coeffs[8]; //prediction filter coefficients (ME kernel)
-
 cudaStream_t Watermark::afStream = afcu::getStream(afcu::getNativeId(af::getDevice()));
 
 //initialize data and memory
@@ -160,7 +158,7 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
-	cudaMemcpyToSymbol(coeffs, coefficients.device<float>(), 8 * sizeof(float), 0, cudaMemcpyDeviceToDevice);
+	setCoeffs(coefficients.device<float>());
 	calculate_scaled_neighbors_p3 << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, neighbors.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
 	unlockArrays(neighbors, coefficients);

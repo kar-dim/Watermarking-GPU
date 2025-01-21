@@ -3,7 +3,12 @@
 #include <device_launch_parameters.h>
 #include <cuda_fp16.h>
 
-extern __constant__ float coeffs[8];
+__constant__ float coeffs[8];
+
+__host__ void setCoeffs(const float* c)
+{
+	cudaMemcpyToSymbol(coeffs, c, 8 * sizeof(float), 0, cudaMemcpyDeviceToDevice);
+}
 
 //constant array used for optimizing share memory accesses for Rx
 //Helps with reducing the local memory required for each block for Rx arrays from 4096 to 2304
