@@ -107,7 +107,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
     <ClInclude Include="main_utils.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="kernels\calculate_neighbors_p3.cl" />
+    <None Include="kernels\calculate_scaled_neighbors_p3.cl" />
     <None Include="kernels\me_p3.cl" />
     <None Include="kernels\nvf.cl" />
   </ItemGroup>

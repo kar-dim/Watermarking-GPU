@@ -85,7 +85,7 @@ int main(void)
 		};
 		buildProgram(programs[0], "kernels/nvf.cl", std::format("-cl-mad-enable -Dp={}", p));
 		buildProgram(programs[1], "kernels/me_p3.cl", "-cl-mad-enable");
-		buildProgram(programs[2], "kernels/calculate_neighbors_p3.cl", "-cl-mad-enable");
+		buildProgram(programs[2], "kernels/calculate_scaled_neighbors_p3.cl", "-cl-mad-enable");
 	}
 	catch (const cl::Error& e) {
 		cout << "Could not build a kernel, Reason: " << e.what() << "\n\n";

@@ -56,7 +56,7 @@ void Watermark::initializeMemory()
 	RxPartial = af::array(dims.rows, meKernelDims.cols);
 	rxPartial = af::array(dims.rows, meKernelDims.cols / 8);
 	customMask = af::array(dims.rows, dims.cols);
-	neighbors = af::array(dims.rows * dims.cols, (p * p) - 1);
+	neighbors = af::array(dims.rows, dims.cols);
 }
 
 //helper method to load the random noise matrix W from the file specified.
@@ -86,23 +86,44 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 }
 
 //can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
-af::array Watermark::executeTextureKernel(const af::array& image, const cl::Program& program, const string kernelName, const af::array& output) const
+af::array Watermark::computeCustomMask(const af::array& image) const
 {
 	const std::unique_ptr<cl_mem> imageMem(image.device<cl_mem>());
-	const std::unique_ptr<cl_mem> outputMem(output.device<cl_mem>());
+	const std::unique_ptr<cl_mem> outputMem(customMask.device<cl_mem>());
 	//copy to texture cache and execute kernel
 	try {
 		cl_utils::copyBufferToImage(queue, image2d, imageMem.get(), dims.cols, dims.rows);
 		cl::Buffer buff(*outputMem.get(), true);
 		queue.enqueueNDRangeKernel(
-			cl_utils::KernelBuilder(program, kernelName.c_str()).args(image2d, buff).build(),
+			cl_utils::KernelBuilder(programs[0],"nvf").args(image2d, buff).build(),
 			cl::NDRange(), cl::NDRange(dims.rows, dims.cols), cl::NDRange(16, 16));
 		queue.finish();
-		unlockArrays(image, output);
-		return output;
+		unlockArrays(image, customMask);
+		return customMask;
 	}
 	catch (const cl::Error& ex) {
-		throw std::runtime_error("ERROR in " + kernelName + ": " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
+		throw std::runtime_error("ERROR in nvf: " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
+	}
+}
+
+//can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
+af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
+{
+	const std::unique_ptr<cl_mem> coeffsMem(coefficients.device<cl_mem>());
+	const std::unique_ptr<cl_mem> neighborsMem(neighbors.device<cl_mem>());
+	//execute kernel
+	try {
+		cl::Buffer neighborsBuff(*neighborsMem.get(), true);
+		cl::Buffer coeffsBuff(*coeffsMem.get(), true);
+		queue.enqueueNDRangeKernel(
+			cl_utils::KernelBuilder(programs[2], "calculate_scaled_neighbors_p3").args(image2d, neighborsBuff, coeffsBuff).build(),
+			cl::NDRange(), cl::NDRange(dims.rows, dims.cols), cl::NDRange(16, 16));
+		queue.finish();
+		unlockArrays(coefficients, neighbors);
+		return neighbors;
+	}
+	catch (const cl::Error& ex) {
+		throw std::runtime_error("ERROR in calculate_scaled_neighbors_p3: " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
 	}
 }
 
@@ -129,7 +150,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	af::array errorSequence, coefficients;
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		executeTextureKernel(inputImage, programs[0], "nvf", customMask);
+		computeCustomMask(inputImage);
 	const af::array u = mask * randomMatrix;
 	watermarkStrength = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
@@ -141,9 +162,10 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 {
 	const std::unique_ptr<cl_mem> RxPartialMem(RxPartial.device<cl_mem>());
 	const std::unique_ptr<cl_mem> rxPartialMem(rxPartial.device<cl_mem>());
+	const std::unique_ptr<cl_mem> imageMem(image.device<cl_mem>());
 	try {
-		//enqueue "x_" kernel (which is heavy)
-		const af::array x_ = executeTextureKernel(image, programs[2], "calculate_neighbors_p3", neighbors);
+		//copy image to texture cache
+		cl_utils::copyBufferToImage(queue, image2d, imageMem.get(), dims.cols, dims.rows);
 		//initialize custom kernel memory
 		cl::Buffer Rx_buff(*RxPartialMem.get(), true);
 		cl::Buffer rx_buff(*rxPartialMem.get(), true);
@@ -158,7 +180,8 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 		//calculation of coefficients, error sequence and mask
 		const auto correlationArrays = transformCorrelationArrays();
 		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
-		errorSequence = af::moddims(af::moddims(image, 1, dims.rows * dims.cols) - af::matmulTT(coefficients, x_), dims.rows, dims.cols);
+		//enqueue "x_" kernel
+		errorSequence = image - computeScaledNeighbors(coefficients);
 		if (maskNeeded) 
 		{
 			const af::array errorSequenceAbs = af::abs(errorSequence);
@@ -174,7 +197,10 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::computeErrorSequence(const af::array& u, const af::array& coefficients) const 
 {
-	return af::moddims(af::moddims(u, 1, u.dims(0) * u.dims(1)) - af::matmulTT(coefficients, executeTextureKernel(u, programs[2], "calculate_neighbors_p3", neighbors)), u.dims(0), u.dims(1));
+	const std::unique_ptr<cl_mem> uMem(u.device<cl_mem>());
+	cl_utils::copyBufferToImage(queue, image2d, uMem.get(), dims.cols, dims.rows);
+	unlockArrays(u);
+	return u - computeScaledNeighbors(coefficients);
 }
 
 //helper method used in detectors
@@ -186,17 +212,16 @@ float Watermark::computeCorrelation(const af::array& e_u, const af::array& e_z) 
 //the main mask detector function
 float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE maskType) const
 {
-	af::array mask, e_z, a_z;
+	af::array mask, errorSequenceW, coefficients;
 	if (maskType == MASK_TYPE::NVF)
 	{
-		computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_NO);
-		mask = executeTextureKernel(watermarkedImage, programs[0], "nvf", customMask);
+		computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_NO);
+		mask = computeCustomMask(watermarkedImage);
 	}
 	else
-		mask = computePredictionErrorMask(watermarkedImage, e_z, a_z, ME_MASK_CALCULATION_REQUIRED_YES);
+		mask = computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
 	const af::array u = mask * randomMatrix;
-	const af::array e_u = computeErrorSequence(u, a_z);
-	return computeCorrelation(e_u, e_z);
+	return computeCorrelation(computeErrorSequence(u, coefficients), errorSequenceW);
 }
 
 //helper method to display an af::array in a window

@@ -55,7 +55,7 @@
     <None Include="kernels\nvf.cl">
       <Filter>Kernels</Filter>
     </None>
-    <None Include="kernels\calculate_neighbors_p3.cl">
+    <None Include="kernels\calculate_scaled_neighbors_p3.cl">
       <Filter>Kernels</Filter>
     </None>
   </ItemGroup>

@@ -37,7 +37,7 @@ private:
 		7,  14, 20, 25, 29, 32, 34, 35
 	};
 	const cl::Context context{ afcl::getContext(true) };
-	const cl::CommandQueue queue{ afcl::getQueue(true) }; /*custom_queue{context, cl::Device{afcl::getDeviceId()}}; */
+	const cl::CommandQueue queue{ afcl::getQueue(true) };
 	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
 	dim2 dims, meKernelDims;
 	std::vector<cl::Program> programs;
@@ -50,7 +50,8 @@ private:
 	void loadRandomMatrix(const std::string randomMatrixPath);
 	std::pair<af::array, af::array> transformCorrelationArrays() const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
-	af::array executeTextureKernel(const af::array& image, const cl::Program& program, const std::string kernelName, const af::array& output) const;
+	af::array computeCustomMask(const af::array& image) const;
+	af::array computeScaledNeighbors(const af::array& coefficients) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
 	template<std::same_as<af::array>... Args>
