@@ -9,7 +9,7 @@ __kernel void calculate_scaled_neighbors_p3(
     //image2d is transposed, so we read the opposite dimensions
     const int width = get_image_height(image), height = get_image_width(image);
     const int outputIndex = (x * height + y);
-
+    //calculate the dot product of the coefficients and the neighborhood for this pixel
     if (x < width && y < height) 
     {
         float dot = 0.0f;

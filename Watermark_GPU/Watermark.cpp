@@ -182,7 +182,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 		//calculation of coefficients, error sequence and mask
 		const auto correlationArrays = transformCorrelationArrays();
 		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
-		//enqueue "x_" kernel
+		//call scaled neighbors kernel and compute error sequence
 		errorSequence = image - computeScaledNeighbors(coefficients);
 		if (maskNeeded) 
 		{
