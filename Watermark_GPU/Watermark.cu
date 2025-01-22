@@ -199,14 +199,15 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 af::array Watermark::computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(meKernelBlockSize, meKernelDims.y, meKernelDims.x);
+	//copy image to texture cache
 	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
-	//enqueue "x_" and prediction error mask kernel in two streams
+	//call prediction error mask kernel
 	me_p3 <<<gridSize, meKernelBlockSize, 0, afStream >>> (texObj, RxPartial.device<float>(), rxPartial.device<float>(), dims.x, meKernelDims.x, dims.y);
 	unlockArrays(image, RxPartial, rxPartial);
-
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays();
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
+	//call scaled neighbors kernel and compute error sequence
 	errorSequence = image - computeScaledNeighbors(coefficients);
 	if (maskNeeded)
 	{
@@ -216,7 +217,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	return af::array();
 }
 
-//helper method that calculates the error sequence by using a supplied prediction filter coefficients
+//Helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::computeErrorSequence(const af::array& u, const af::array& coefficients) const 
 {
 	cuda_utils::copyDataToCudaArray(u.device<float>(), dims.x, dims.y, texArray);

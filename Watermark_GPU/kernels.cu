@@ -118,6 +118,7 @@ __global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float*
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
     const int outputIndex = (x * height + y);
 
+    //calculate the dot product of the coefficients and the neighborhood for this pixel
     if (x < width && y < height) 
     {
         float dot = 0.0f;
