@@ -22,14 +22,14 @@ private:
 	dim3 dims, meKernelDims;
 	int p;
 	float strengthFactor;
-	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
+	af::array randomMatrix;
 	cudaTextureObject_t texObj;
 	cudaArray* texArray;
 	static cudaStream_t afStream;
 
 	void initializeMemory();
 	void loadRandomMatrix(const std::string randomMatrixPath);
-	std::pair<af::array, af::array> transformCorrelationArrays() const;
+	std::pair<af::array, af::array> transformCorrelationArrays(const af::array& RxPartial, const af::array& rxPartial) const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array computeCustomMask(const af::array& image) const;
 	af::array computeScaledNeighbors(const af::array& coefficients) const;

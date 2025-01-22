@@ -40,8 +40,7 @@ Watermark::Watermark(const Watermark& other)
 
 //move constructor
 Watermark::Watermark(Watermark&& other) noexcept 
-	: dims(other.dims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(std::move(other.randomMatrix)),
-	  RxPartial(std::move(other.RxPartial)), rxPartial(std::move(other.rxPartial)), customMask(std::move(other.customMask)), neighbors(std::move(other.neighbors))
+	: dims(other.dims), meKernelDims(other.meKernelDims), p(other.p), strengthFactor(other.strengthFactor), randomMatrix(std::move(other.randomMatrix))
 {
 	static constexpr auto moveMember = [](auto& thisData, auto& otherData, auto value) { thisData = otherData; otherData = value; };
 	//move texture data and nullify other
@@ -70,10 +69,6 @@ Watermark& Watermark::operator=(Watermark&& other) noexcept
 		moveAndDestroyMember(texArray, other.texArray, cudaFreeArray, nullptr);
 		//move arrayfire arrays
 		randomMatrix = std::move(other.randomMatrix);
-		RxPartial = std::move(other.RxPartial);
-		rxPartial = std::move(other.rxPartial);
-		customMask = std::move(other.customMask);
-		neighbors = std::move(other.neighbors);
 	}
 	return *this;
 }
@@ -107,11 +102,6 @@ void Watermark::initializeMemory()
 	auto textureData = cuda_utils::createTextureData(dims.x, dims.y);
 	texObj = textureData.first;
 	texArray = textureData.second;
-	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	RxPartial = af::array(dims.y, meKernelDims.x);
-	rxPartial = af::array(dims.y, meKernelDims.x / 8);
-	customMask = af::array(dims.y, dims.x);
-	neighbors = af::array(dims.y, dims.x);
 }
 
 //helper method to load the random noise matrix W from the file specified.
@@ -146,6 +136,7 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 af::array Watermark::computeCustomMask(const af::array& image) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
+	const af::array customMask(dims.y, dims.x);
 	//transfer ownership from arrayfire and copy data to cuda array
 	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
 	nvf<3> << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, customMask.device<float>(), dims.x, dims.y);
@@ -158,6 +149,7 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
+	const af::array neighbors = af::array(dims.y, dims.x);
 	setCoeffs(coefficients.device<float>());
 	calculate_scaled_neighbors_p3 << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, neighbors.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
@@ -167,7 +159,7 @@ af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 
 //helper method to sum the incomplete Rx_partial and rxPartial arrays which were produced from the custom kernel
 //and to transform them to the correct size, so that they can be used by the system solver
-std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
+std::pair<af::array, af::array> Watermark::transformCorrelationArrays(const af::array& RxPartial, const af::array& rxPartial) const
 {
 	const int neighborsSize = (p * p) - 1;
 	const int neighborsSizeSq = neighborsSize * neighborsSize;
@@ -202,10 +194,12 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	//copy image to texture cache
 	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
 	//call prediction error mask kernel
+	const af::array RxPartial(dims.y, meKernelDims.x);
+	const af::array rxPartial(dims.y, meKernelDims.x / 8);
 	me_p3 <<<gridSize, meKernelBlockSize, 0, afStream >>> (texObj, RxPartial.device<float>(), rxPartial.device<float>(), dims.x, meKernelDims.x, dims.y);
 	unlockArrays(image, RxPartial, rxPartial);
 	//calculation of coefficients, error sequence and mask
-	const auto correlationArrays = transformCorrelationArrays();
+	const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
 	//call scaled neighbors kernel and compute error sequence
 	errorSequence = image - computeScaledNeighbors(coefficients);
