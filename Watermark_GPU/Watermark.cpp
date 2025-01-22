@@ -53,11 +53,6 @@ void Watermark::initializeMemory()
 {
 	//initialize texture (transposed dimensions, arrayfire is column wise, we skip an extra transpose)
 	image2d = cl::Image2D(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_LUMINANCE, CL_FLOAT), dims.rows, dims.cols, 0, NULL);
-	//allocate memory (Rx/rx partial sums and custom maks output) to avoid constant cudaMalloc
-	RxPartial = af::array(dims.rows, meKernelDims.cols);
-	rxPartial = af::array(dims.rows, meKernelDims.cols / 8);
-	customMask = af::array(dims.rows, dims.cols);
-	neighbors = af::array(dims.rows, dims.cols);
 }
 
 //helper method to load the random noise matrix W from the file specified.
@@ -90,6 +85,7 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 //can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
 af::array Watermark::computeCustomMask(const af::array& image) const
 {
+	const af::array customMask(dims.rows, dims.cols);
 	const std::unique_ptr<cl_mem> imageMem(image.device<cl_mem>());
 	const std::unique_ptr<cl_mem> outputMem(customMask.device<cl_mem>());
 	//copy to texture cache and execute kernel
@@ -111,6 +107,7 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 //can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
 af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 {
+	const af::array neighbors(dims.rows, dims.cols);
 	const std::unique_ptr<cl_mem> coeffsMem(coefficients.device<cl_mem>());
 	const std::unique_ptr<cl_mem> neighborsMem(neighbors.device<cl_mem>());
 	//execute kernel
@@ -131,7 +128,7 @@ af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 
 //helper method to sum the incomplete Rx_partial and rxPartial arrays which were produced from the custom kernel
 //and to transform them to the correct size, so that they can be used by the system solver
-std::pair<af::array, af::array> Watermark::transformCorrelationArrays() const
+std::pair<af::array, af::array> Watermark::transformCorrelationArrays(const af::array& RxPartial, const af::array& rxPartial) const
 {
 	const int neighborsSize = (p * p) - 1;
 	const int neighborsSizeSq = neighborsSize * neighborsSize;
@@ -162,6 +159,8 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 //can also calculate error sequence and prediction error filter
 af::array Watermark::computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const
 {
+	const af::array RxPartial(dims.rows, meKernelDims.cols);
+	const af::array rxPartial(dims.rows, meKernelDims.cols / 8);
 	const std::unique_ptr<cl_mem> RxPartialMem(RxPartial.device<cl_mem>());
 	const std::unique_ptr<cl_mem> rxPartialMem(rxPartial.device<cl_mem>());
 	const std::unique_ptr<cl_mem> imageMem(image.device<cl_mem>());
@@ -180,7 +179,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 		queue.finish();
 		unlockArrays(RxPartial, rxPartial, image);
 		//calculation of coefficients, error sequence and mask
-		const auto correlationArrays = transformCorrelationArrays();
+		const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
 		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
 		//call scaled neighbors kernel and compute error sequence
 		errorSequence = image - computeScaledNeighbors(coefficients);

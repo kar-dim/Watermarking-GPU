@@ -43,12 +43,12 @@ private:
 	std::vector<cl::Program> programs;
 	int p;
 	float strengthFactor;
-	af::array randomMatrix, RxPartial, rxPartial, customMask, neighbors;
+	af::array randomMatrix;
 	cl::Image2D image2d;
 
 	void initializeMemory();
 	void loadRandomMatrix(const std::string randomMatrixPath);
-	std::pair<af::array, af::array> transformCorrelationArrays() const;
+	std::pair<af::array, af::array> transformCorrelationArrays(const af::array& RxPartial, const af::array& rxPartial) const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array computeCustomMask(const af::array& image) const;
 	af::array computeScaledNeighbors(const af::array& coefficients) const;
