@@ -123,9 +123,10 @@ __global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float*
 
 	__shared__ float region[16 + 2][16 + 2]; //hold the 18 x 18 region for this 16 x 16 block
 
+    //load current pixel value
     region[shY][shX] = tex2D<float>(texObj, y, x);
 
-    // Load the halo regions
+    // Load the padded regions (only edge threads)
     if (threadIdx.x == 0)
         region[shY - 1][shX] = tex2D<float>(texObj, y - 1, x);
     if (threadIdx.x == 15)
@@ -135,7 +136,7 @@ __global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float*
     if (threadIdx.y == 15)
         region[shY][shX + 1] = tex2D<float>(texObj, y, x + 1);
 
-    // Load the corners of the halo region
+    // Load the corners of the padded region (only edge threads)
     if (threadIdx.x == 0 && threadIdx.y == 0)
         region[shY - 1][shX - 1] = tex2D<float>(texObj, y - 1, x - 1);
     if (threadIdx.x == 15 && threadIdx.y == 15)
