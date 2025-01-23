@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <cuda_fp16.h>
+#include <cstdio>
 
 __constant__ float coeffs[8];
 
@@ -116,20 +117,48 @@ __global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float*
 {
     const int x = blockIdx.y * blockDim.y + threadIdx.y;
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
+    const int shX = threadIdx.y + 1;
+    const int shY = threadIdx.x + 1;
     const int outputIndex = (x * height + y);
 
-    //calculate the dot product of the coefficients and the neighborhood for this pixel
-    if (x < width && y < height) 
+	__shared__ float region[16 + 2][16 + 2]; //hold the 18 x 18 region for this 16 x 16 block
+
+    region[shY][shX] = tex2D<float>(texObj, y, x);
+
+    // Load the halo regions
+    if (threadIdx.x == 0)
+        region[shY - 1][shX] = tex2D<float>(texObj, y - 1, x);
+    if (threadIdx.x == 15)
+        region[shY + 1][shX] = tex2D<float>(texObj, y + 1, x);
+    if (threadIdx.y == 0)
+        region[shY][shX - 1] = tex2D<float>(texObj, y, x - 1);
+    if (threadIdx.y == 15)
+        region[shY][shX + 1] = tex2D<float>(texObj, y, x + 1);
+
+    // Load the corners of the halo region
+    if (threadIdx.x == 0 && threadIdx.y == 0)
+        region[shY - 1][shX - 1] = tex2D<float>(texObj, y - 1, x - 1);
+    if (threadIdx.x == 15 && threadIdx.y == 15)
+        region[shY + 1][shX + 1] = tex2D<float>(texObj, y + 1, x + 1);
+    if (threadIdx.x == 0 && threadIdx.y == 15)
+        region[shY - 1][shX + 1] = tex2D<float>(texObj, y - 1, x + 1);
+    if (threadIdx.x == 15 && threadIdx.y == 0)
+        region[shY + 1][shX - 1] = tex2D<float>(texObj, y + 1, x - 1);
+
+    __syncthreads();
+
+     //calculate the dot product of the coefficients and the neighborhood for this pixel
+    if (x < width && y < height)
     {
         float dot = 0.0f;
-        dot += coeffs[0] * tex2D<float>(texObj, y - 1, x - 1);
-        dot += coeffs[1] * tex2D<float>(texObj, y - 1, x);
-        dot += coeffs[2] * tex2D<float>(texObj, y - 1, x + 1);
-        dot += coeffs[3] * tex2D<float>(texObj, y, x - 1);
-        dot += coeffs[4] * tex2D<float>(texObj, y, x + 1);
-        dot += coeffs[5] * tex2D<float>(texObj, y + 1, x - 1);
-        dot += coeffs[6] * tex2D<float>(texObj, y + 1, x);
-        dot += coeffs[7] * tex2D<float>(texObj, y + 1, x + 1);
-		x_[outputIndex] = dot;
+        dot += coeffs[0] * region[shY - 1][shX - 1];
+        dot += coeffs[1] * region[shY - 1][shX];
+        dot += coeffs[2] * region[shY - 1][shX + 1];
+        dot += coeffs[3] * region[shY][shX - 1];
+        dot += coeffs[4] * region[shY][shX + 1];
+        dot += coeffs[5] * region[shY + 1][shX - 1];
+        dot += coeffs[6] * region[shY + 1][shX];
+        dot += coeffs[7] * region[shY + 1][shX + 1];
+        x_[outputIndex] = dot;
     }
 }
