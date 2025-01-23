@@ -17,7 +17,8 @@ __device__ half8 make_half8(const half a, const half b, const half c, const half
 __device__ void me_p3_rxCalculate(half8* RxLocalVec, const half x_0, const half x_1, const half x_2, const half x_3, const half x_4, const half x_5, const half x_6, const half x_7, const half x_8);
 __device__ void me_p3_RxCalculate(half8* RxLocalVec, const half x_0, const half x_1, const half x_2, const half x_3, const half x_5, const half x_6, const half x_7, const half x_8);
 
-//NVF kernel, calculates NVF values for each pixel in the image
+// NVF kernel, calculates NVF values for each pixel in the image
+// works for all p values (3,5,7 and 9)
 template<int p, int pSquared = p * p, int pad = p / 2>
 __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int width, const unsigned int height)
 {
@@ -34,62 +35,66 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int w
     // Load the padded regions (only edge threads)
     if (threadIdx.x == 0)
     {
-        #pragma unroll
 		for (int i = pad; i > 0; i--)
 			region[shY - i][shX] = tex2D<float>(texObj, y - i, x);
     }
     if (threadIdx.x == 15)
     {
-        #pragma unroll
         for (int i = pad; i > 0; i--)
             region[shY + i][shX] = tex2D<float>(texObj, y + i, x);
     }
     if (threadIdx.y == 0)
     {
-        #pragma unroll
         for (int i = pad; i > 0; i--)
             region[shY][shX - i] = tex2D<float>(texObj, y, x - i);
     }
     if (threadIdx.y == 15) 
     {
-        #pragma unroll
         for (int i = pad; i > 0; i--)
             region[shY][shX + i] = tex2D<float>(texObj, y, x + i);
     }
 
     // Load the corners of the padded region (only edge threads)
-    //TODO MAKE IT WORK FOR P>3
     if (threadIdx.x == 0 && threadIdx.y == 0)
-        region[shY - 1][shX - 1] = tex2D<float>(texObj, y - 1, x - 1);
+    {
+        for (int i = -1; i >= -pad; i--)
+            for (int j = -1; j >= -pad; j--)
+                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
+    }
     if (threadIdx.x == 15 && threadIdx.y == 15)
-        region[shY + 1][shX + 1] = tex2D<float>(texObj, y + 1, x + 1);
+    {
+        for (int i = 1; i <= pad; i++)
+            for (int j = 1; j <= pad; j++)
+                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
+    }
     if (threadIdx.x == 0 && threadIdx.y == 15)
-        region[shY - 1][shX + 1] = tex2D<float>(texObj, y - 1, x + 1);
+    {
+        for (int i = -1; i >= -pad; i--)
+            for (int j = 1; j <= pad; j++)
+                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
+    }
     if (threadIdx.x == 15 && threadIdx.y == 0)
-        region[shY + 1][shX - 1] = tex2D<float>(texObj, y + 1, x - 1);
-
+    {
+        for (int i = 1; i <= pad; i++)
+            for (int j = -1; j >= -pad; j--)
+                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
+    }
     __syncthreads();
-
 
 	if (x >= width || y >= height)
 		return;
 
+	//load the neighbors to calculate the region's parameters for this pixel
 	float sum = 0.0f, sumSq = 0.0f;
 	for (int i = -pad; i <= pad; i++)
 	{
 		for (int j = -pad; j <= pad; j++)
 		{
-            if (x == 0 && y == 0) {
-				printf("%f\n",region[shY + i][shX + j]);
-            }
             float pixelValue = region[shY + i][shX + j];
 			sum += pixelValue;
 			sumSq += pixelValue * pixelValue;
 		}
 	}
-    if (x == 0 && y == 0) {
-        printf("\n");
-    }
 	float mean = sum / pSquared;
 	float variance = (sumSq / pSquared) - (mean * mean);
 	//calculate mask and write pixel value
