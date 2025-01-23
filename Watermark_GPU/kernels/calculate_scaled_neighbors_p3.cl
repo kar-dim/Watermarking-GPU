@@ -39,14 +39,6 @@ __kernel void calculate_scaled_neighbors_p3(
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-   /* if (x == 0 && y == 0) {
-        for (int i = 0; i < 18; i++) {
-            for (int j = 0; j < 18; j++) {
-                printf("%.3f ", region[i][j]);
-            }
-        }
-        printf("\n");
-    }*/
     //calculate the dot product of the coefficients and the neighborhood for this pixel
     if (x < width && y < height) 
     {
