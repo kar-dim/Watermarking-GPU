@@ -2,6 +2,7 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <cstdio>
 
 struct alignas(16) half8
 {
@@ -20,22 +21,75 @@ __device__ void me_p3_RxCalculate(half8* RxLocalVec, const half x_0, const half 
 template<int p, int pSquared = p * p, int pad = p / 2>
 __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int width, const unsigned int height)
 {
-	const int x = blockIdx.y * blockDim.y + threadIdx.y;
-	const int y = blockIdx.x * blockDim.x + threadIdx.x;
+    const int x = blockIdx.y * blockDim.y + threadIdx.y;
+    const int y = blockIdx.x * blockDim.x + threadIdx.x;
+    const int shX = threadIdx.y + pad;
+    const int shY = threadIdx.x + pad;
+
+    __shared__ float region[16 + (2 * pad)][16 + (2 * pad)]; //hold the 18 x 18 region for this 16 x 16 block
+
+    //load current pixel value
+    region[shY][shX] = tex2D<float>(texObj, y, x);
+
+    // Load the padded regions (only edge threads)
+    if (threadIdx.x == 0)
+    {
+        #pragma unroll
+		for (int i = pad; i > 0; i--)
+			region[shY - i][shX] = tex2D<float>(texObj, y - i, x);
+    }
+    if (threadIdx.x == 15)
+    {
+        #pragma unroll
+        for (int i = pad; i > 0; i--)
+            region[shY + i][shX] = tex2D<float>(texObj, y + i, x);
+    }
+    if (threadIdx.y == 0)
+    {
+        #pragma unroll
+        for (int i = pad; i > 0; i--)
+            region[shY][shX - i] = tex2D<float>(texObj, y, x - i);
+    }
+    if (threadIdx.y == 15) 
+    {
+        #pragma unroll
+        for (int i = pad; i > 0; i--)
+            region[shY][shX + i] = tex2D<float>(texObj, y, x + i);
+    }
+
+    // Load the corners of the padded region (only edge threads)
+    //TODO MAKE IT WORK FOR P>3
+    if (threadIdx.x == 0 && threadIdx.y == 0)
+        region[shY - 1][shX - 1] = tex2D<float>(texObj, y - 1, x - 1);
+    if (threadIdx.x == 15 && threadIdx.y == 15)
+        region[shY + 1][shX + 1] = tex2D<float>(texObj, y + 1, x + 1);
+    if (threadIdx.x == 0 && threadIdx.y == 15)
+        region[shY - 1][shX + 1] = tex2D<float>(texObj, y - 1, x + 1);
+    if (threadIdx.x == 15 && threadIdx.y == 0)
+        region[shY + 1][shX - 1] = tex2D<float>(texObj, y + 1, x - 1);
+
+    __syncthreads();
+
 
 	if (x >= width || y >= height)
 		return;
 
 	float sum = 0.0f, sumSq = 0.0f;
-	for (int i = y - pad; i <= y + pad; i++)
+	for (int i = -pad; i <= pad; i++)
 	{
-		for (int j = x - pad; j <= x + pad; j++)
+		for (int j = -pad; j <= pad; j++)
 		{
-			float pixelValue = tex2D<float>(texObj, i, j);
+            if (x == 0 && y == 0) {
+				printf("%f\n",region[shY + i][shX + j]);
+            }
+            float pixelValue = region[shY + i][shX + j];
 			sum += pixelValue;
 			sumSq += pixelValue * pixelValue;
 		}
 	}
+    if (x == 0 && y == 0) {
+        printf("\n");
+    }
 	float mean = sum / pSquared;
 	float variance = (sumSq / pSquared) - (mean * mean);
 	//calculate mask and write pixel value

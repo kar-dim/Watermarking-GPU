@@ -119,7 +119,6 @@ __global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float*
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
     const int shX = threadIdx.y + 1;
     const int shY = threadIdx.x + 1;
-    const int outputIndex = (x * height + y);
 
 	__shared__ float region[16 + 2][16 + 2]; //hold the 18 x 18 region for this 16 x 16 block
 
@@ -160,6 +159,6 @@ __global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float*
         dot += coeffs[5] * region[shY + 1][shX - 1];
         dot += coeffs[6] * region[shY + 1][shX];
         dot += coeffs[7] * region[shY + 1][shX + 1];
-        x_[outputIndex] = dot;
+        x_[(x * height + y)] = dot;
     }
 }
