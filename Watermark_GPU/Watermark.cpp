@@ -88,12 +88,13 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 	const af::array customMask(dims.rows, dims.cols);
 	const std::unique_ptr<cl_mem> imageMem(image.device<cl_mem>());
 	const std::unique_ptr<cl_mem> outputMem(customMask.device<cl_mem>());
+	const int pad = p / 2;
 	//copy to texture cache and execute kernel
 	try {
 		cl_utils::copyBufferToImage(queue, image2d, imageMem.get(), dims.cols, dims.rows);
 		cl::Buffer buff(*outputMem.get(), true);
 		queue.enqueueNDRangeKernel(
-			cl_utils::KernelBuilder(programs[0],"nvf").args(image2d, buff).build(),
+			cl_utils::KernelBuilder(programs[0],"nvf").args(image2d, buff, cl::Local(sizeof(float) * ( (16 + (2 * pad)) * (16 + (2 * pad)) ) )).build(),
 			cl::NDRange(), cl::NDRange(texKernelDims.rows, texKernelDims.cols), cl::NDRange(16, 16));
 		queue.finish();
 		unlockArrays(image, customMask);
@@ -115,7 +116,7 @@ af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 		cl::Buffer neighborsBuff(*neighborsMem.get(), true);
 		cl::Buffer coeffsBuff(*coeffsMem.get(), true);
 		queue.enqueueNDRangeKernel(
-			cl_utils::KernelBuilder(programs[2], "calculate_scaled_neighbors_p3").args(image2d, neighborsBuff, coeffsBuff).build(),
+			cl_utils::KernelBuilder(programs[2], "calculate_scaled_neighbors_p3").args(image2d, neighborsBuff, coeffsBuff, cl::Local(sizeof(float) * 324)).build(),
 			cl::NDRange(), cl::NDRange(texKernelDims.rows, texKernelDims.cols), cl::NDRange(16, 16));
 		queue.finish();
 		unlockArrays(coefficients, neighbors);
