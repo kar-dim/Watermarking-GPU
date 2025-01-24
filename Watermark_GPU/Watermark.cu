@@ -57,6 +57,13 @@ void Watermark::copyParams(const Watermark& other) noexcept
 	strengthFactor = other.strengthFactor;
 }
 
+//copy data to texture and transfer ownership back to arrayfire
+void Watermark::copyDataToTexture(const af::array& image) const
+{
+	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
+	unlockArrays(image);
+}
+
 //move assignment operator
 Watermark& Watermark::operator=(Watermark&& other) noexcept
 {
@@ -137,8 +144,7 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
 	const af::array customMask(dims.y, dims.x);
-	//transfer ownership from arrayfire and copy data to cuda array
-	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
+	//call NVF kernel
 	nvf<3> << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, customMask.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
 	unlockArrays(image, customMask);
@@ -149,7 +155,7 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
-	const af::array neighbors = af::array(dims.y, dims.x);
+	const af::array neighbors(dims.y, dims.x);
 	setCoeffs(coefficients.device<float>());
 	calculate_scaled_neighbors_p3 << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, neighbors.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
@@ -178,6 +184,7 @@ std::pair<af::array, af::array> Watermark::transformCorrelationArrays(const af::
 af::array Watermark::makeWatermark(const af::array& inputImage, const af::array& outputImage, float& watermarkStrength, MASK_TYPE maskType) const
 {
 	af::array errorSequence, coefficients;
+	copyDataToTexture(inputImage);
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		computeCustomMask(inputImage);
@@ -191,8 +198,6 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 af::array Watermark::computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(meKernelBlockSize, meKernelDims.y, meKernelDims.x);
-	//copy image to texture cache
-	cuda_utils::copyDataToCudaArray(image.device<float>(), dims.x, dims.y, texArray);
 	//call prediction error mask kernel
 	const af::array RxPartial(dims.y, meKernelDims.x);
 	const af::array rxPartial(dims.y, meKernelDims.x / 8);
@@ -214,8 +219,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 //Helper method that calculates the error sequence by using a supplied prediction filter coefficients
 af::array Watermark::computeErrorSequence(const af::array& u, const af::array& coefficients) const 
 {
-	cuda_utils::copyDataToCudaArray(u.device<float>(), dims.x, dims.y, texArray);
-	unlockArrays(u);
+	copyDataToTexture(u);
 	return u - computeScaledNeighbors(coefficients);
 }
 
@@ -229,6 +233,7 @@ float Watermark::computeCorrelation(const af::array& e_u, const af::array& e_z) 
 float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE maskType) const
 {
 	af::array mask, errorSequenceW, coefficients;
+	copyDataToTexture(watermarkedImage);
 	if (maskType == MASK_TYPE::NVF)
 	{
 		computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_NO);

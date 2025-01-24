@@ -36,6 +36,7 @@ private:
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
 	void copyParams(const Watermark& other) noexcept;
+	void copyDataToTexture(const af::array& image) const;
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 
