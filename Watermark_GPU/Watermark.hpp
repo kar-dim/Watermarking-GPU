@@ -54,8 +54,10 @@ private:
 	af::array computeScaledNeighbors(const af::array& coefficients) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;
+	void copyDataToTexture(const af::array& image) const;
 	template<std::same_as<af::array>... Args>
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
+
 public:
 	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program>& programs);
 	Watermark(const Watermark& other);
