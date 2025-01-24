@@ -202,7 +202,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	const af::array RxPartial(dims.y, meKernelDims.x);
 	const af::array rxPartial(dims.y, meKernelDims.x / 8);
 	me_p3 <<<gridSize, meKernelBlockSize, 0, afStream >>> (texObj, RxPartial.device<float>(), rxPartial.device<float>(), dims.x, meKernelDims.x, dims.y);
-	unlockArrays(image, RxPartial, rxPartial);
+	unlockArrays(RxPartial, rxPartial);
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
