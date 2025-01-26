@@ -31,7 +31,7 @@ private:
 	void loadRandomMatrix(const std::string randomMatrixPath);
 	std::pair<af::array, af::array> transformCorrelationArrays(const af::array& RxPartial, const af::array& rxPartial) const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
-	af::array computeCustomMask(const af::array& image) const;
+	af::array computeCustomMask() const;
 	af::array computeScaledNeighbors(const af::array& coefficients) const;
 	af::array computePredictionErrorMask(const af::array& image, af::array& errorSequence, af::array& coefficients, const bool maskNeeded) const;
 	af::array computeErrorSequence(const af::array& u, const af::array& coefficients) const;

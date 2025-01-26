@@ -140,14 +140,14 @@ void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, co
 }
 
 //computes custom Mask (NVF)
-af::array Watermark::computeCustomMask(const af::array& image) const
+af::array Watermark::computeCustomMask() const
 {
 	const dim3 gridSize = cuda_utils::gridSizeCalculate(texKernelBlockSize, dims.y, dims.x, true);
 	const af::array customMask(dims.y, dims.x);
 	//call NVF kernel
 	nvf<3> << <gridSize, texKernelBlockSize, 0, afStream >> > (texObj, customMask.device<float>(), dims.x, dims.y);
 	//transfer ownership to arrayfire and return output array
-	unlockArrays(image, customMask);
+	unlockArrays(customMask);
 	return customMask;
 }
 
@@ -187,7 +187,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	copyDataToTexture(inputImage);
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		computeCustomMask(inputImage);
+		computeCustomMask();
 	const af::array u = mask * randomMatrix;
 	watermarkStrength = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
@@ -237,7 +237,7 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 	if (maskType == MASK_TYPE::NVF)
 	{
 		computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_NO);
-		mask = computeCustomMask(watermarkedImage);
+		mask = computeCustomMask();
 	}
 	else
 		mask = computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
