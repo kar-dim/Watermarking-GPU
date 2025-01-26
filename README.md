@@ -38,7 +38,7 @@ Needs to be parameterized from the corresponding ```settings.ini``` file. Here i
 | psnr                              | PSNR (Peak Signal-to-Noise Ratio). Higher values correspond to less watermark in the image, reducing noise, but making detection harder.   |
 | loops_for_test                    | Loops the algorithms many times, simulating more work. A value of 1000 produces almost identical execution times.                          |
 | test_for_video                    | \[true/false\]: If set to true, the sample will work for videos only, else it will work for images.                                        |
-
+| opencl_device                     | [Number]: Works only for OpenCL binary. If multiple OpenCL devices are found, then set this to the desired device. Set it to 0 if one device is found. |
 
 **Video-only settings:**
 
