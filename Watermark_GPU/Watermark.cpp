@@ -90,8 +90,8 @@ void Watermark::copyDataToTexture(const af::array& image) const
 	unlockArrays(image);
 }
 
-//computes the custom mask (NVF)
-af::array Watermark::computeCustomMask(const af::array& image) const
+//computes the custom mask (NVF).
+af::array Watermark::computeCustomMask() const
 {
 	const af::array customMask(dims.rows, dims.cols);
 	const std::unique_ptr<cl_mem> outputMem(customMask.device<cl_mem>());
@@ -111,7 +111,7 @@ af::array Watermark::computeCustomMask(const af::array& image) const
 	}
 }
 
-//can be called for computing a custom mask, or for a neighbors (x_) array, depending on the cl::Program param and kernel name
+//Computes scaled neighbors array, which calculates the dot product of the coefficients with the neighbors of each pixel
 af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 {
 	const af::array neighbors(dims.rows, dims.cols);
@@ -157,7 +157,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	copyDataToTexture(inputImage);
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		computeCustomMask(inputImage);
+		computeCustomMask();
 	const af::array u = mask * randomMatrix;
 	watermarkStrength = strengthFactor / sqrt(af::sum<float>(af::pow(u, 2)) / (inputImage.elements()));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
@@ -221,7 +221,7 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 	if (maskType == MASK_TYPE::NVF)
 	{
 		computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_NO);
-		mask = computeCustomMask(watermarkedImage);
+		mask = computeCustomMask();
 	}
 	else
 		mask = computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
