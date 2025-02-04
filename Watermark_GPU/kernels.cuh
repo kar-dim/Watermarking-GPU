@@ -2,7 +2,6 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <cstdio>
 
 struct alignas(16) half8
 {
@@ -10,12 +9,12 @@ struct alignas(16) half8
 };
 __host__ void setCoeffs(const float* c);
 
-__device__ half8 make_half8(const float a, const float b, const float c, const float d, const float e, const float f, const float g, const float h);
-__device__ half8 make_half8(const half a, const half b, const half c, const half d, const half e, const half f, const half g, const half h);
+__device__ half8 make_half8(const float& a, const float& b, const float& c, const float& d, const float& e, const float& f, const float& g, const float& h);
+__device__ half8 make_half8(const half& a, const half& b, const half& c, const half& d, const half& e, const half& f, const half& g, const half& h);
 
 //helper methods of ME kernel, to calculate block-wide Rx/rx values in shared memory
-__device__ void me_p3_rxCalculate(half8* RxLocalVec, const half x_0, const half x_1, const half x_2, const half x_3, const half x_4, const half x_5, const half x_6, const half x_7, const half x_8);
-__device__ void me_p3_RxCalculate(half8* RxLocalVec, const half x_0, const half x_1, const half x_2, const half x_3, const half x_5, const half x_6, const half x_7, const half x_8);
+__device__ void me_p3_rxCalculate(half8* RxLocalVec, const half& x_0, const half& x_1, const half& x_2, const half& x_3, const half& x_4, const half& x_5, const half& x_6, const half& x_7, const half& x_8);
+__device__ void me_p3_RxCalculate(half8* RxLocalVec, const half& x_0, const half& x_1, const half& x_2, const half& x_3, const half& x_5, const half& x_6, const half& x_7, const half& x_8);
 
 // NVF kernel, calculates NVF values for each pixel in the image
 // works for all p values (3,5,7 and 9)
