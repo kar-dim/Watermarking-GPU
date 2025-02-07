@@ -1,29 +1,31 @@
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+
 //manual loop unrolled calculation of rx in local memory
-void me_p3_rxCalculate(__local float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8)
+void me_p3_rxCalculate(__local half RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float currentPixel, const float x_5, const float x_6, const float x_7, const float x_8)
 {
-    vstore4((float4)(x_0 * currentPixel, x_1 * currentPixel, x_2 * currentPixel, x_3 * currentPixel), 0, (__local float*) & RxLocal[localId][0]);
-    vstore4((float4)(x_5 * currentPixel, x_6 * currentPixel, x_7 * currentPixel, x_8 * currentPixel), 0, (__local float*) & RxLocal[localId][4]);
+    vstore_half4((float4)(x_0 * currentPixel, x_1 * currentPixel, x_2 * currentPixel, x_3 * currentPixel), 0, (__local half*) & RxLocal[localId][0]);
+    vstore_half4((float4)(x_5 * currentPixel, x_6 * currentPixel, x_7 * currentPixel, x_8 * currentPixel), 0, (__local half*) & RxLocal[localId][4]);
 }
 
 //manual loop unrolled calculation of Rx in local memory
-void me_p3_RxCalculate(__local float RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8)
+void me_p3_RxCalculate(__local half RxLocal[64][36], const int localId, const float x_0, const float x_1, const float x_2, const float x_3, const float x_5, const float x_6, const float x_7, const float x_8)
 {
-    vstore4((float4)(x_0 * x_0, x_0 * x_1, x_0 * x_2, x_0 * x_3), 0, (__local float*) & RxLocal[localId][0]);
-    vstore4((float4)(x_0 * x_5, x_0 * x_6, x_0 * x_7, x_0 * x_8), 0, (__local float*) & RxLocal[localId][4]);
-    vstore4((float4)(x_1 * x_1, x_1 * x_2, x_1 * x_3, x_1 * x_5), 0, (__local float*) & RxLocal[localId][8]);
-    vstore4((float4)(x_1 * x_6, x_1 * x_7, x_1 * x_8, x_2 * x_2), 0, (__local float*) & RxLocal[localId][12]);
-    vstore4((float4)(x_2 * x_3, x_2 * x_5, x_2 * x_6, x_2 * x_7), 0, (__local float*) & RxLocal[localId][16]);
-    vstore4((float4)(x_2 * x_8, x_3 * x_3, x_3 * x_5, x_3 * x_6), 0, (__local float*) & RxLocal[localId][20]);
-    vstore4((float4)(x_3 * x_7, x_3 * x_8, x_5 * x_5, x_5 * x_6), 0, (__local float*) & RxLocal[localId][24]);
-    vstore4((float4)(x_5 * x_7, x_5 * x_8, x_6 * x_6, x_6 * x_7), 0, (__local float*) & RxLocal[localId][28]);
-    vstore4((float4)(x_6 * x_8, x_7 * x_7, x_7 * x_8, x_8 * x_8), 0, (__local float*) & RxLocal[localId][32]);
+    vstore_half4((float4)(x_0 * x_0, x_0 * x_1, x_0 * x_2, x_0 * x_3), 0, (__local half*) & RxLocal[localId][0]);
+    vstore_half4((float4)(x_0 * x_5, x_0 * x_6, x_0 * x_7, x_0 * x_8), 0, (__local half*) & RxLocal[localId][4]);
+    vstore_half4((float4)(x_1 * x_1, x_1 * x_2, x_1 * x_3, x_1 * x_5), 0, (__local half*) & RxLocal[localId][8]);
+    vstore_half4((float4)(x_1 * x_6, x_1 * x_7, x_1 * x_8, x_2 * x_2), 0, (__local half*) & RxLocal[localId][12]);
+    vstore_half4((float4)(x_2 * x_3, x_2 * x_5, x_2 * x_6, x_2 * x_7), 0, (__local half*) & RxLocal[localId][16]);
+    vstore_half4((float4)(x_2 * x_8, x_3 * x_3, x_3 * x_5, x_3 * x_6), 0, (__local half*) & RxLocal[localId][20]);
+    vstore_half4((float4)(x_3 * x_7, x_3 * x_8, x_5 * x_5, x_5 * x_6), 0, (__local half*) & RxLocal[localId][24]);
+    vstore_half4((float4)(x_5 * x_7, x_5 * x_8, x_6 * x_6, x_6 * x_7), 0, (__local half*) & RxLocal[localId][28]);
+    vstore_half4((float4)(x_6 * x_8, x_7 * x_7, x_7 * x_8, x_8 * x_8), 0, (__local half*) & RxLocal[localId][32]);
 }
 
 __kernel void me(__read_only image2d_t image,
     __global float* __restrict__ Rx,
     __global float* __restrict__ rx,
     __constant int* __restrict__ RxMappings,
-    __local float RxLocal[64][36] __attribute__((aligned(16)))) //64 local threads, 36 values each (8 for rx, this is a shared memory for both Rx,rx)
+    __local half RxLocal[64][36] __attribute__((aligned(8)))) //64 local threads, 36 values each (8 for rx, this is a shared memory for both Rx,rx)
 
 {
     const int x = get_global_id(0), y = get_global_id(1);
@@ -33,9 +35,9 @@ __kernel void me(__read_only image2d_t image,
     const int outputIndex = (y * paddedWidth) + x;
 
     //initialize shared memory, assign a portion for all threads for parallelism
-#pragma unroll
-    for (int i = 0; i < 36; i++)
-        RxLocal[localId][i] = 0.0f;
+    #pragma unroll
+    for (int i = 0; i < 9; i++)
+        vstore_half4((float4)(0.0f, 0.0f, 0.0f, 0.0f), 0, &RxLocal[localId][i * 4]);
 
     float x_0, x_1, x_2, x_3, currentPixel, x_5, x_6, x_7, x_8;
     if (x < width)
