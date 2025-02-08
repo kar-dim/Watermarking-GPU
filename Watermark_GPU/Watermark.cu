@@ -189,7 +189,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		computeCustomMask();
 	const af::array u = mask * randomMatrix;
-	watermarkStrength = strengthFactor / (af::norm(u) / sqrt(inputImage.elements()));
+	watermarkStrength = strengthFactor / static_cast<float>((af::norm(u) / sqrt(inputImage.elements())));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
 }
 
