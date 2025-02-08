@@ -31,8 +31,9 @@ __kernel void me(__read_only image2d_t image,
 
     //initialize shared memory, assign a portion for all threads for parallelism
     #pragma unroll
-    for (int i = 0; i < 9; i++)
-        vstore_half4((float4)(0.0f, 0.0f, 0.0f, 0.0f), 0, &RxLocal[localId][i * 4]);
+    for (int i = 0; i < 4; i++)
+        vstore_half8((float8)(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f), 0, &RxLocal[localId][i * 8]);
+    vstore_half4((float4)(0.0f, 0.0f, 0.0f, 0.0f), 0, &RxLocal[localId][32]);
 
     float x_0, x_1, x_2, x_3, currentPixel, x_5, x_6, x_7, x_8;
     if (x < width)
