@@ -26,7 +26,7 @@ __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int w
     const int shX = threadIdx.y + pad;
     const int shY = threadIdx.x + pad;
 
-    __shared__ float region[16 + (2 * pad)][16 + (2 * pad)]; //hold the 18 x 18 region for this 16 x 16 block
+    __shared__ float region[16 + (2 * pad)][16 + (2 * pad)]; //hold the region for this 16 x 16 block (16 + padding)
 
     //load current pixel value
     region[shY][shX] = tex2D<float>(texObj, y, x);
