@@ -12,12 +12,14 @@
 
 #define ME_MASK_CALCULATION_REQUIRED_NO false
 #define ME_MASK_CALCULATION_REQUIRED_YES true
+#define ALIGN_UP_16(x) (x + 15) & ~15
+#define ALIGN_UP_64(x) (x + 63) & ~63
 
 using std::string;
 
 //initialize data and memory
 Watermark::Watermark(const dim_t rows, const dim_t cols, const string randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program>& programs)
-	: dims({ rows, cols }), texKernelDims({ (rows + 15) & ~15, (cols + 15) & ~15 }), meKernelDims({ rows, (cols + 63) & ~63 }), programs(programs), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
+	: dims({ rows, cols }), texKernelDims({ ALIGN_UP_16(rows), ALIGN_UP_16(cols) }), meKernelDims({ rows, ALIGN_UP_64(cols) }), programs(programs), p(p), strengthFactor((255.0f / sqrt(pow(10.0f, psnr / 10.0f))))
 {
 	if (p != 3 && p != 5 && p != 7 && p != 9)
 		throw std::runtime_error(string("Wrong p parameter: ") + std::to_string(p) + "!\n");
@@ -76,8 +78,8 @@ void Watermark::loadRandomMatrix(const string randomMatrixPath)
 void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, const dim_t cols)
 {
 	dims = { rows, cols };
-	texKernelDims = { (rows + 15) & ~15, (cols + 15) & ~15 };
-	meKernelDims = { rows, (cols + 63) & ~63 };
+	texKernelDims = { ALIGN_UP_16(rows), ALIGN_UP_16(cols) };
+	meKernelDims = { rows, ALIGN_UP_64(cols) };
 	initializeMemory();
 	loadRandomMatrix(randomMatrixPath);
 }
