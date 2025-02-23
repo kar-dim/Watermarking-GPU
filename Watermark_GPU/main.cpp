@@ -8,18 +8,16 @@
 #include <format>
 #include <INIReader.h>
 #include <iostream>
-#include <memory>
 #include <omp.h>
+#include <sstream>
 #include <stdio.h>
 #include <string>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <libswscale/swscale.h>
-#include <libavutil/imgutils.h>
-#include <libavutil/opt.h>
 }
+
 using std::cout;
 using std::string;
 
@@ -232,11 +230,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	}
 
 	//Open input video decoder
-	const AVCodecParameters* inputCodecParams = inputFormatCtx->streams[videoStreamIndex]->codecpar;
-	const AVCodec* inputDecoder = avcodec_find_decoder(inputCodecParams->codec_id);
-	AVCodecContext* inputDecoderCtx = avcodec_alloc_context3(inputDecoder);
-	avcodec_parameters_to_context(inputDecoderCtx, inputCodecParams);
-	avcodec_open2(inputDecoderCtx, inputDecoder, nullptr);
+	AVCodecContext* inputDecoderCtx = openDecoderContext(inputFormatCtx->streams[videoStreamIndex]->codecpar);
 
 	//initialize watermark functions class
 	const int height = inputFormatCtx->streams[videoStreamIndex]->codecpar->height;
@@ -247,11 +241,11 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
 	if (makeWatermarkVideoPath != "")
 	{
+		//codec, preset, crf and any other useful option
 		const string ffmpegOptions = inir.Get("parameters_video", "encode_options", "-c:v libx265 -preset fast -crf 23");
-		// Build the FFmpeg command using std::ostringstream
+		// Build the FFmpeg command
 		std::ostringstream ffmpegCmd;
-		ffmpegCmd << "ffmpeg -y -f rawvideo -pix_fmt yuv420p "
-			<< "-s " << width << "x" << height
+		ffmpegCmd << "ffmpeg -y -f rawvideo -pix_fmt yuv420p " << "-s " << width << "x" << height 
 			<< " -r 30 -i - -i " << videoFile << " " << ffmpegOptions
 			<< " -map 0:v -map 1:a -shortest " << makeWatermarkVideoPath;
 
@@ -259,62 +253,58 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		FILE* ffmpeg = _popen(ffmpegCmd.str().c_str(), "wb");
 		if (!ffmpeg) 
 		{
-			std::cout << "Error: Could not open FFmpeg pipe." << std::endl;
+			std::cout << "Error: Could not open FFmpeg pipe\n";
 			return EXIT_FAILURE;
 		}
 
 		//read frames
-		int counter = 0;
+		int framesCount = 0;
 		float watermarkStrength;
 		uint8_t* frameFlatPinned = nullptr;
+		//host pinned memory for fast GPU<->CPU transfers
 		cudaHostAlloc((void**)&frameFlatPinned, width * height * sizeof(uint8_t), cudaHostAllocDefault);
 		af::array inputFrame, watermarkedFrame;
 		AVPacket* packet = av_packet_alloc();
 		AVFrame* frame = av_frame_alloc();
 		while (av_read_frame(inputFormatCtx, packet) >= 0) 
 		{
-			if (packet->stream_index == videoStreamIndex)
+			if (!receivedValidVideoFrame(inputDecoderCtx, packet, frame, videoStreamIndex))
+				continue;
+			//don't embed watermark after each frame because compression propagates the watermark and affects the video quality
+			if (framesCount % watermarkInterval == 0) 
 			{
-				avcodec_send_packet(inputDecoderCtx, packet);
-				if (avcodec_receive_frame(inputDecoderCtx, frame) == 0) 
+				//if there is row padding (for alignment), we must copy the data to a contiguous block!
+				if (frame->linesize[0] != width)
 				{
-					//don't write after each frame because compression propagates the watermark and affects the video quality
-					if (counter % watermarkInterval == 0) 
-					{
-						//if there is row padding (for alignment), we must copy the data to a contiguous block!
-						if (frame->linesize[0] != width)
-						{
-							//TODO check if it works? + benchmark with openmp
-							for (int y = 0; y < height; y++)
-							{
-								memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
-							}
-							inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
-							watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8);
-							watermarkedFrame.host(frameFlatPinned);
-							//TODO check if it works? + benchmark with openmp
-							for (int y = 0; y < height; y++)
-							{
-								memcpy(frame->data[0] + y * frame->linesize[0], frameFlatPinned + y * width, width);
-							}
-						}
-						//else, use original pointer, no need to copy data
-						else
-						{
-							inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
-							watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
-							watermarkedFrame.host(frame->data[0]);
-						}
-					}
-
+					for (int y = 0; y < height; y++)
+						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
+					inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
+					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
+					watermarkedFrame.host(frameFlatPinned);
+					//write from pinned memory directly (plus UV planes)
+					for (int y = 0; y < height; y++)
+						fwrite(frameFlatPinned + y * width, 1, width, ffmpeg);
+					for (int y = 0; y < height / 2; y++)
+						fwrite(frame->data[1] + y * frame->linesize[1], 1, width / 2, ffmpeg);
+					for (int y = 0; y < height / 2; y++)
+						fwrite(frame->data[2] + y * frame->linesize[2], 1, width / 2, ffmpeg);
+					
+				}
+				//else, use original pointer, no need to copy data to intermediate pinned buffer
+				else
+				{
+					inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
+					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
+					watermarkedFrame.host(frame->data[0]);
 					// Write modified frame to ffmpeg (pipe)
-					fwrite(frame->data[0], 1, frame->linesize[0] * frame->height, ffmpeg);
-					fwrite(frame->data[1], 1, frame->linesize[1] * frame->height / 2, ffmpeg);
-					fwrite(frame->data[2], 1, frame->linesize[2] * frame->height / 2, ffmpeg);
-					counter++;
+					fwrite(frame->data[0], 1, width * frame->height, ffmpeg);
+					fwrite(frame->data[1], 1, width * frame->height / 2, ffmpeg);
+					fwrite(frame->data[2], 1, width * frame->height / 2, ffmpeg);
 				}
 			}
 
+			
+			framesCount++;
 			av_packet_unref(packet);
 		}
 		av_frame_free(&frame);
@@ -329,7 +319,6 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		timer::start();
 
 		float correlation;
-		
 		uint8_t* frameFlatPinned = nullptr;
 		cudaHostAlloc((void**)&frameFlatPinned, width * height * sizeof(uint8_t), cudaHostAllocDefault);
 		AVPacket* packet = av_packet_alloc();
@@ -337,39 +326,30 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		af::array inputFrame;
 		int framesCount = 0;
 
-		//read all frames
 		while (av_read_frame(inputFormatCtx, packet) >= 0) 
 		{
-			if (packet->stream_index == videoStreamIndex) 
-			{
-				avcodec_send_packet(inputDecoderCtx, packet);
-				if (avcodec_receive_frame(inputDecoderCtx, frame) == 0) 
-				{
-					//detect watermark after X frames
-					if (framesCount % watermarkInterval == 0) 
-					{
-						//if there is row padding (for alignment), we must copy the data to a contiguous block!
-						if (frame->linesize[0] != width)
-						{
-							//TODO check if it works? + benchmark with openmp
-							for (int y = 0; y < height; y++)
-							{
-								memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
-							}
-							inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
-						}
-						//else, use original pointer, no need to copy data
-						else
-						{
-							inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
-						}
+			if (!receivedValidVideoFrame(inputDecoderCtx, packet, frame, videoStreamIndex))
+				continue;
 
-						correlation = watermarkObj.detectWatermark(inputFrame, MASK_TYPE::ME);
-						cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
-					}
-					framesCount++;
+			//detect watermark after X frames
+			if (framesCount % watermarkInterval == 0) 
+			{
+				//if there is row padding (for alignment), we must copy the data to a contiguous block!
+				if (frame->linesize[0] != width)
+				{
+					#pragma omp parallel for
+					for (int y = 0; y < height; y++)
+						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
+					inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
 				}
+				//else, use original pointer, no need to copy data
+				else
+					inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
+
+				correlation = watermarkObj.detectWatermark(inputFrame, MASK_TYPE::ME);
+				cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
 			}
+			framesCount++;
 			av_packet_unref(packet);
 		}
 		av_frame_free(&frame);
@@ -385,6 +365,30 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	avformat_close_input(&inputFormatCtx);
 	avcodec_free_context(&inputDecoderCtx);
 	return EXIT_SUCCESS;
+}
+
+//open decoder context for video
+AVCodecContext* openDecoderContext(AVCodecParameters* inputCodecParams)
+{
+	const AVCodec* inputDecoder = avcodec_find_decoder(inputCodecParams->codec_id);
+	AVCodecContext* inputDecoderCtx = avcodec_alloc_context3(inputDecoder);
+	avcodec_parameters_to_context(inputDecoderCtx, inputCodecParams);
+	avcodec_open2(inputDecoderCtx, inputDecoder, nullptr);
+	return inputDecoderCtx;
+}
+
+//supply a packet to the decoder and check if the received frame is valid by checking its format
+bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, AVFrame* frame, const int videoStreamIndex)
+{
+	if (packet->stream_index != videoStreamIndex)
+	{
+		av_packet_unref(packet);
+		return false;
+	}
+	avcodec_send_packet(inputDecoderCtx, packet);
+	if (avcodec_receive_frame(inputDecoderCtx, frame) != 0)
+		return false;
+	return frame->format == AV_PIX_FMT_YUV420P;
 }
 
 string executionTime(const bool showFps, const double seconds) 
