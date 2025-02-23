@@ -62,8 +62,8 @@ int main(void)
 	af::info();
 	cout << "\n";
 
-	const cl::Context context(afcl::getContext(true));
-	const cl::Device device({ afcl::getDeviceId() });
+	static cl::Context context(afcl::getContext(true));
+	static cl::Device device(afcl::getDeviceId());
 
 	const int p = inir.GetInteger("parameters", "p", -1);
 	const float psnr = inir.GetFloat("parameters", "psnr", -1.0f);
@@ -88,7 +88,7 @@ int main(void)
 	//compile opencl kernels
 	std::vector<cl::Program> programs(3);
 	try {
-		auto buildProgram = [&context, &device](auto& program, const std::string& kernelName, const std::string& buildOptions) {
+		auto buildProgram = [](auto& program, const std::string& kernelName, const std::string& buildOptions) {
 			program = cl::Program(context, Utilities::loadFileString(kernelName));
 			program.build(device, buildOptions.c_str());
 		};
@@ -154,7 +154,7 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr, programs);
+	Watermark watermarkObj(rows, cols, inir.Get("paths", "watermark", ""), p, psnr, programs);
 
 	float watermarkStrength;
 	//warmup for arrayfire
@@ -289,8 +289,10 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 		//host pinned memory for fast GPU<->CPU transfers
 		//cudaHostAlloc((void**)&frameFlatPinned, width * height * sizeof(uint8_t), cudaHostAllocDefault);
 		// Create a buffer with pinned memory
-		cl_mem pinnedBuff = clCreateBuffer(afcl::getContext(true), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, width * height * sizeof(cl_uchar), nullptr, &err);
-		cl_uchar* frameFlatPinned = (cl_uchar*)clEnqueueMapBuffer(afcl::getQueue(true), pinnedBuff, CL_TRUE, CL_MAP_WRITE, 0, width * height * sizeof(cl_uchar), 0, nullptr, nullptr, &err);
+		static cl_context context = afcl::getContext(true);
+		static cl_command_queue queue = afcl::getQueue(true);
+		cl_mem pinnedBuff = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, width * height * sizeof(cl_uchar), nullptr, &err);
+		cl_uchar* frameFlatPinned = (cl_uchar*)clEnqueueMapBuffer(queue, pinnedBuff, CL_TRUE, CL_MAP_WRITE, 0, width * height * sizeof(cl_uchar), 0, nullptr, nullptr, &err);
 
 		af::array inputFrame, watermarkedFrame;
 		const AVPacketPtr packet(av_packet_alloc(), [](AVPacket* pkt) { av_packet_free(&pkt); });
@@ -345,7 +347,7 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 		timer::end();
 		cout << "\nWatermark embeding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 
-		clReleaseMemObject(pinnedBuff);
+		//clReleaseMemObject(pinnedBuff);
 	}
 
 	//realtime watermarked video detection
