@@ -156,14 +156,17 @@ std::pair<af::array, af::array> Watermark::transformCorrelationArrays(const af::
 //into a new array based on "outputImage" (can be grayscale or RGB).
 af::array Watermark::makeWatermark(const af::array& inputImage, const af::array& outputImage, float& watermarkStrength, MASK_TYPE maskType) const
 {
-	af::array errorSequence, coefficients;
+	af::array mask, errorSequence, coefficients;
 	copyDataToTexture(inputImage);
-	const af::array mask = maskType == MASK_TYPE::ME ?
-		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
-		computeCustomMask();
-	//if the system is not solvable, don't waste time embeding the watermark, return output image without modification
-	if (af::anyTrue<bool>(af::isNaN(coefficients)))
-		return outputImage;
+	if (maskType == MASK_TYPE::ME)
+	{
+		mask = computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
+		//if the system is not solvable, don't waste time embeding the watermark, return output image without modification
+		if (af::anyTrue<bool>(af::isNaN(coefficients)))
+			return outputImage;
+	}
+	else
+		mask = computeCustomMask();
 	const af::array u = mask * randomMatrix;
 	watermarkStrength = strengthFactor / static_cast<float>(af::norm(u) / sqrt(inputImage.elements()));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
