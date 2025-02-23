@@ -189,6 +189,9 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		computeCustomMask();
+	//if the system is not solvable, don't waste time embeding the watermark, return output image without modification
+	if (af::anyTrue<bool>(af::isNaN(coefficients)))
+		return outputImage;
 	const af::array u = mask * randomMatrix;
 	watermarkStrength = strengthFactor / static_cast<float>(af::norm(u) / sqrt(inputImage.elements()));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
@@ -207,6 +210,10 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
 	coefficients = af::solve(correlationArrays.first, correlationArrays.second);
+	//if system is not solvable, don't waste computing the error sequence, there is no watermark to embed
+	if (af::anyTrue<bool>(af::isNaN(coefficients)))
+		return af::array();
+	
 	//call scaled neighbors kernel and compute error sequence
 	errorSequence = image - computeScaledNeighbors(coefficients);
 	if (maskNeeded)
@@ -242,6 +249,9 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 	}
 	else
 		mask = computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
+	//if the system is not solvable, don't waste time computing the correlation, there is no watermark
+	if (af::anyTrue<bool>(af::isNaN(coefficients)))
+		return 0.0f;
 	const af::array u = mask * randomMatrix;
 	return computeCorrelation(computeErrorSequence(u, coefficients), errorSequenceW);
 }
