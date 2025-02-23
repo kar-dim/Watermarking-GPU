@@ -1,23 +1,27 @@
-#define cimg_use_opencv
 #include "cuda_utils.hpp"
+#include "main_utils.hpp"
 #include "Utilities.hpp"
 #include "Watermark.cuh"
-#include "main_utils.hpp"
-#include <CImg.h>
-#include <cstdlib>
 #include <cstring>
 #include <cuda_runtime.h>
 #include <exception>
 #include <format>
 #include <INIReader.h>
 #include <iostream>
+#include <memory>
 #include <omp.h>
+#include <stdio.h>
 #include <string>
-#include <vector>
 
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
+#include <libavutil/imgutils.h>
+#include <libavutil/opt.h>
+}
 using std::cout;
 using std::string;
-using namespace cimg_library;
 
 #define R_WEIGHT 0.299f
 #define G_WEIGHT 0.587f
@@ -70,8 +74,9 @@ int main(void)
 
 	//test algorithms
 	try {
-		const int code = inir.GetBoolean("parameters_video", "test_for_video", false) ?
-			testForVideo(inir, properties, p, psnr) :
+		const string videoFile = inir.Get("paths", "video", "");
+		const int code = videoFile != "" ?
+			testForVideo(inir, videoFile, properties, p, psnr) :
 			testForImage(inir, properties, p, psnr);
 		exitProgram(code);
 	}
@@ -82,6 +87,7 @@ int main(void)
 	exitProgram(EXIT_SUCCESS);
 }
 
+//embed watermark for static images
 int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr) 
 {
 	const string imageFile = inir.Get("paths", "image", "NO_IMAGE");
@@ -112,7 +118,7 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 	}
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr);
+	Watermark watermarkObj(rows, cols, inir.Get("paths", "watermark", "w.txt"), p, psnr);
 
 	float watermarkStrength;
 	//warmup for arrayfire
@@ -190,171 +196,200 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 	return EXIT_SUCCESS;
 }
 
-int testForVideo(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr) 
+//embed watermark for a video or try to detect watermark in a video
+int testForVideo(const INIReader& inir, const string& videoFile, const cudaDeviceProp& properties, const int p, const float psnr) 
 {
-	const int rows = inir.GetInteger("parameters_video", "rows", -1);
-	const int cols = inir.GetInteger("parameters_video", "cols", -1);
 	const bool showFps = inir.GetBoolean("options", "execution_time_in_fps", false);
-	const int framesCount = inir.GetInteger("parameters_video", "frames", -1);
-	const int fps = inir.GetInteger("parameters_video", "fps", -1);
-	const bool watermarkFirstFrameOnly = inir.GetBoolean("parameters_video", "watermark_first_frame_only", false);
-	const bool displayFrames = inir.GetBoolean("parameters_video", "display_frames", false);
-	if (rows <= 64 || cols <= 64) 
+	const int watermarkInterval = inir.GetInteger("parameters_video", "watermark_interval", 30);
+
+	//Set ffmpeg log level
+	av_log_set_level(AV_LOG_INFO);
+
+	//Load input video
+	AVFormatContext* inputFormatCtx = nullptr;
+	if (avformat_open_input(&inputFormatCtx, videoFile.c_str(), nullptr, nullptr) < 0) 
 	{
-		cout << "Video dimensions too low\n";
+		std::cout << "ERROR: Failed to open input video file\n";
 		return EXIT_FAILURE;
 	}
-	if (rows > static_cast<dim_t>(properties.maxTexture2D[1]) || cols > static_cast<dim_t>(properties.maxTexture2D[0])) 
+	avformat_find_stream_info(inputFormatCtx, nullptr);
+	av_dump_format(inputFormatCtx, 0, videoFile.c_str(), 0);
+
+	//Find video stream
+	int videoStreamIndex = -1;
+	for (unsigned int i = 0; i < inputFormatCtx->nb_streams; i++) 
 	{
-		cout << "Video dimensions too high for this GPU\n";
-		return EXIT_FAILURE;
+		if (inputFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
+		{
+			videoStreamIndex = i;
+			break;
+		}
 	}
-	if (fps <= 15 || fps > 60) 
+	if (videoStreamIndex == -1)
 	{
-		cout << "Video FPS is too low or too high\n";
-		return EXIT_FAILURE;
-	}
-	if (framesCount <= 1) 
-	{
-		cout << "Frame count too low\n";
+		std::cout << "ERROR: No video stream found\n";
 		return EXIT_FAILURE;
 	}
 
-	CImgList<unsigned char> videoFrames;
-	std::vector<af::array> watermarkedFrames;
-	watermarkedFrames.reserve(framesCount);
-	const float framePeriod = 1.0f / fps;
-	float watermarkStrength;
+	//Open input video decoder
+	const AVCodecParameters* inputCodecParams = inputFormatCtx->streams[videoStreamIndex]->codecpar;
+	const AVCodec* inputDecoder = avcodec_find_decoder(inputCodecParams->codec_id);
+	AVCodecContext* inputDecoderCtx = avcodec_alloc_context3(inputDecoder);
+	avcodec_parameters_to_context(inputDecoderCtx, inputCodecParams);
+	avcodec_open2(inputDecoderCtx, inputDecoder, nullptr);
 
 	//initialize watermark functions class
-	Watermark watermarkObj(rows, cols, inir.Get("paths", "w_path", "w.txt"), p, psnr);
+	const int height = inputFormatCtx->streams[videoStreamIndex]->codecpar->height;
+	const int width = inputFormatCtx->streams[videoStreamIndex]->codecpar->width;
+	Watermark watermarkObj(height, width, inir.Get("paths", "watermark", ""), p, psnr);
 
 	//realtime watermarking of raw video
-	const bool makeWatermark = inir.GetBoolean("parameters_video", "watermark_make", false);
-	if (makeWatermark)
+	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
+	if (makeWatermarkVideoPath != "")
 	{
-		//load video from file
-		const string videoPath = inir.Get("paths", "video", "NO_VIDEO");
-		videoFrames = CImgList<unsigned char>::get_load_yuv(videoPath.c_str(), cols, rows, 420, 0, framesCount - 1, 1, false);
-		af::array afFrame;
-		if (!watermarkFirstFrameOnly) 
-		{
-			for (int i = 0; i < framesCount; i++) 
-			{
-				//copy from CImg to arrayfire and calculate watermarked frame
-				afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoFrames.at(i));
-				watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, watermarkStrength, MASK_TYPE::ME));
-			}
-		}
-		else
-		{
-			//add the watermark only in the first frame, rest of the frames will be as-is, no watermark
-			//NOTE this is useless if there is no compression
-			afFrame = Utilities::cimgYuvToAfarray<unsigned char>(videoFrames.at(0));
-			watermarkedFrames.push_back(watermarkObj.makeWatermark(afFrame, afFrame, watermarkStrength, MASK_TYPE::ME));
-			for (int i = 1; i < framesCount; i++)
-				watermarkedFrames.push_back(Utilities::cimgYuvToAfarray<unsigned char>(videoFrames.at(i)).as(f32));
-		}
-	}
+		const string ffmpegOptions = inir.Get("parameters_video", "encode_options", "-c:v libx265 -preset fast -crf 23");
+		// Build the FFmpeg command using std::ostringstream
+		std::ostringstream ffmpegCmd;
+		ffmpegCmd << "ffmpeg -y -f rawvideo -pix_fmt yuv420p "
+			<< "-s " << width << "x" << height
+			<< " -r 30 -i - -i " << videoFile << " " << ffmpegOptions
+			<< " -map 0:v -map 1:a -shortest " << makeWatermarkVideoPath;
 
-	//save watermarked video to raw YUV (must be processed with ffmpeg later to add file headers, then it can be compressed etc)
-	const string watermarkedVideoSavePath = inir.Get("parameters_video", "watermark_save_to_file_path", "NO_VIDEO");
-	if (watermarkedVideoSavePath != "NO_VIDEO")
-	{
-		if (!makeWatermark) 
+		// Open FFmpeg process
+		FILE* ffmpeg = _popen(ffmpegCmd.str().c_str(), "wb");
+		if (!ffmpeg) 
 		{
-			cout << "Please set 'watermark_make' to true in settings file, in order to be able to save it.\n";
+			std::cout << "Error: Could not open FFmpeg pipe." << std::endl;
+			return EXIT_FAILURE;
 		}
-		else 
-		{
-			CImgList<unsigned char> videoCimgWatermarked(framesCount, cols, rows, 1, 3);
-			CImg<unsigned char> cimgY(cols, rows);
-#pragma omp parallel for
-			for (int i = 0; i < framesCount; i++) 
-			{
-				unsigned char* watermarkedFramesPtr = af::clamp(watermarkedFrames[i].T(), 0, 255).as(u8).host<unsigned char>();
-				std::memcpy(cimgY.data(), watermarkedFramesPtr, sizeof(unsigned char) * rows * cols);
-				af::freeHost(watermarkedFramesPtr);
-				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 0, cimgY);
-				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 1, CImg<unsigned char>(videoFrames.at(i).get_channel(1)));
-				videoCimgWatermarked.at(i).draw_image(0, 0, 0, 2, CImg<unsigned char>(videoFrames.at(i).get_channel(2)));
-			}
-			//save watermark frames to file
-			videoCimgWatermarked.save_yuv(watermarkedVideoSavePath.c_str(), 420, false);
 
-			if (displayFrames) 
+		//read frames
+		int counter = 0;
+		float watermarkStrength;
+		uint8_t* frameFlatPinned = nullptr;
+		cudaHostAlloc((void**)&frameFlatPinned, width * height * sizeof(uint8_t), cudaHostAllocDefault);
+		af::array inputFrame, watermarkedFrame;
+		AVPacket* packet = av_packet_alloc();
+		AVFrame* frame = av_frame_alloc();
+		while (av_read_frame(inputFormatCtx, packet) >= 0) 
+		{
+			if (packet->stream_index == videoStreamIndex)
 			{
-				CImgDisplay window;
-				float timeDiff;
-				for (int i = 0; i < framesCount; i++)
+				avcodec_send_packet(inputDecoderCtx, packet);
+				if (avcodec_receive_frame(inputDecoderCtx, frame) == 0) 
 				{
-					timer::start();
-					window.display(videoCimgWatermarked.at(i).get_channel(0));
-					timer::end();
-					if ((timeDiff = framePeriod - timer::elapsedSeconds()) > 0)
-						Utilities::accurateSleep(timeDiff);
+					//don't write after each frame because compression propagates the watermark and affects the video quality
+					if (counter % watermarkInterval == 0) 
+					{
+						//if there is row padding (for alignment), we must copy the data to a contiguous block!
+						if (frame->linesize[0] != width)
+						{
+							//TODO check if it works? + benchmark with openmp
+							for (int y = 0; y < height; y++)
+							{
+								memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
+							}
+							inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
+							watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8);
+							watermarkedFrame.host(frameFlatPinned);
+							//TODO check if it works? + benchmark with openmp
+							for (int y = 0; y < height; y++)
+							{
+								memcpy(frame->data[0] + y * frame->linesize[0], frameFlatPinned + y * width, width);
+							}
+						}
+						//else, use original pointer, no need to copy data
+						else
+						{
+							inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
+							watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
+							watermarkedFrame.host(frame->data[0]);
+						}
+					}
+
+					// Write modified frame to ffmpeg (pipe)
+					fwrite(frame->data[0], 1, frame->linesize[0] * frame->height, ffmpeg);
+					fwrite(frame->data[1], 1, frame->linesize[1] * frame->height / 2, ffmpeg);
+					fwrite(frame->data[2], 1, frame->linesize[2] * frame->height / 2, ffmpeg);
+					counter++;
 				}
 			}
+
+			av_packet_unref(packet);
 		}
+		av_frame_free(&frame);
+		av_packet_free(&packet);
+		cudaFreeHost(frameFlatPinned);
+		_pclose(ffmpeg);
 	}
 
 	//realtime watermarked video detection
-	if (inir.GetBoolean("parameters_video", "watermark_detection", false)) 
+	else if (inir.GetBoolean("parameters_video", "watermark_detection", false)) 
 	{
-		if (!makeWatermark)
-			cout << "Please set 'watermark_make' to true in settings file, in order to be able to detect the watermark.\n";
-		else
-			realtimeDetection(watermarkObj, watermarkedFrames, framesCount, displayFrames, framePeriod, showFps);
-	}
-	
+		timer::start();
 
-	//realtimne watermark detection of a compressed file
-	const string videoCompressedPath = inir.Get("parameters_video", "video_compressed", "NO_VIDEO");
-	if (videoCompressedPath != "NO_VIDEO")
-	{
-		//read compressed file
-		CImgList<unsigned char>videoCimgW = CImgList<unsigned char>::get_load_video(videoCompressedPath.c_str(), 0, framesCount - 1);
-		std::vector<af::array> watermarkedFrames(framesCount);
-		for (int i = 0; i < framesCount; i++)
-			watermarkedFrames[i] = Utilities::cimgYuvToAfarray<unsigned char>(videoCimgW.at(i));
-		realtimeDetection(watermarkObj, watermarkedFrames, framesCount, displayFrames, framePeriod, showFps);
+		float correlation;
+		
+		uint8_t* frameFlatPinned = nullptr;
+		cudaHostAlloc((void**)&frameFlatPinned, width * height * sizeof(uint8_t), cudaHostAllocDefault);
+		AVPacket* packet = av_packet_alloc();
+		AVFrame* frame = av_frame_alloc();
+		af::array inputFrame;
+		int framesCount = 0;
+
+		//read all frames
+		while (av_read_frame(inputFormatCtx, packet) >= 0) 
+		{
+			if (packet->stream_index == videoStreamIndex) 
+			{
+				avcodec_send_packet(inputDecoderCtx, packet);
+				if (avcodec_receive_frame(inputDecoderCtx, frame) == 0) 
+				{
+					//detect watermark after X frames
+					if (framesCount % watermarkInterval == 0) 
+					{
+						//if there is row padding (for alignment), we must copy the data to a contiguous block!
+						if (frame->linesize[0] != width)
+						{
+							//TODO check if it works? + benchmark with openmp
+							for (int y = 0; y < height; y++)
+							{
+								memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
+							}
+							inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
+						}
+						//else, use original pointer, no need to copy data
+						else
+						{
+							inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
+						}
+
+						correlation = watermarkObj.detectWatermark(inputFrame, MASK_TYPE::ME);
+						cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
+					}
+					framesCount++;
+				}
+			}
+			av_packet_unref(packet);
+		}
+		av_frame_free(&frame);
+		av_packet_free(&packet);
+		cudaFreeHost(frameFlatPinned);
+
+		timer::end();
+		cout << "\nWatermark detection total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
+		cout << "\nWatermark detection average execution time per frame: " << executionTime(showFps, timer::elapsedSeconds() / framesCount) << "\n";
 	}
+
+	// Cleanup
+	avformat_close_input(&inputFormatCtx);
+	avcodec_free_context(&inputDecoderCtx);
 	return EXIT_SUCCESS;
 }
 
-std::string executionTime(bool showFps, double seconds) 
+string executionTime(const bool showFps, const double seconds) 
 {
 	return showFps ? std::format("FPS: {:.2f} FPS", 1.0 / seconds) : std::format("{:.6f} seconds", seconds);
-}
-
-//main detection method of a watermarked sequence thats calls the watermark detector and optionally prints correlation and time passed
-void realtimeDetection(Watermark& watermarkFunctions, const std::vector<af::array>& watermarkedFrames, const int frames, const bool displayFrames, const float framePeriod, const bool showFps) 
-{
-	const auto rows = static_cast<unsigned int>(watermarkedFrames[0].dims(0));
-	const auto cols = static_cast<unsigned int>(watermarkedFrames[0].dims(1));
-	CImgDisplay window;
-	CImg<unsigned char> cimgWatermarked(cols, rows);
-	float timeDiff, watermarkTimeSecs, correlation;
-	for (int i = 0; i < frames; i++) 
-	{
-		timer::start();
-		correlation = watermarkFunctions.detectWatermark(watermarkedFrames[i], MASK_TYPE::ME);
-		timer::end();
-		watermarkTimeSecs = timer::elapsedSeconds();
-		cout << "Watermark detection execution time: " << executionTime(showFps, watermarkTimeSecs) << "\n";
-		if (displayFrames) 
-		{
-			timer::start();
-			unsigned char* watermarkedFramePtr = af::clamp(watermarkedFrames[i], 0, 255).T().as(u8).host<unsigned char>();
-			std::memcpy(cimgWatermarked.data(), watermarkedFramePtr, rows * cols * sizeof(unsigned char));
-			af::freeHost(watermarkedFramePtr);
-			timer::end();
-			if ((timeDiff = framePeriod - (watermarkTimeSecs + timer::elapsedSeconds())) > 0)
-				Utilities::accurateSleep(timeDiff);
-			window.display(cimgWatermarked);
-		}
-		cout << "Correlation of " << i + 1 << " frame: " << correlation << "\n\n";
-	}
 }
 
 void exitProgram(const int exitCode) 

@@ -62,7 +62,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.5.0;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\inih;$(ProjectDir)libs\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -71,8 +71,8 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;afcuda.lib;opencv_world4100d.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;afcuda.lib;avutil.lib;avformat.lib;swscale.lib;avcodec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(ProjectDir)libs\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
@@ -82,8 +82,11 @@
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100d.dll" "$(SolutionDir)x64\Debug\" /y /D
-xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\avcodec-61.dll" "$(SolutionDir)x64\Debug\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\avformat-61.dll" "$(SolutionDir)x64\Debug\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\avutil-59.dll" "$(SolutionDir)x64\Debug\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\swscale-8.dll" "$(SolutionDir)x64\Debug\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -93,7 +96,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.5.0;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\inih;$(ProjectDir)libs\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -104,8 +107,8 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;afcuda.lib;opencv_world4100.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;afcuda.lib;avutil.lib;avformat.lib;swscale.lib;avcodec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(ProjectDir)libs\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
@@ -115,8 +118,11 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100.dll" "$(SolutionDir)x64\Release\" /y /D
-xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\avcodec-61.dll" "$(SolutionDir)x64\Release\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\avformat-61.dll" "$(SolutionDir)x64\Release\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\avutil-59.dll" "$(SolutionDir)x64\Release\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\swscale-8.dll" "$(SolutionDir)x64\Release\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release LineInfo|x64'">
@@ -126,7 +132,7 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\CImg-3.5.0;$(OPENCV_DIR)\..\..\include;$(ProjectDir)libs\zlib\include;$(ProjectDir)libs\inih;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AF_PATH)\include;$(CUDA_PATH)\include;$(ProjectDir)libs\inih;$(ProjectDir)libs\ffmpeg\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <AdditionalOptions>/wd4275 /wd4996 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -137,8 +143,8 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;afcuda.lib;opencv_world4100.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(OPENCV_DIR)\lib;$(ProjectDir)libs\zlib/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;afcuda.lib;avutil.lib;avformat.lib;swscale.lib;avcodec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(ProjectDir)libs\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
@@ -149,8 +155,11 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Re
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
-xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\avcodec-61.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\avformat-61.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\avutil-59.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\swscale-8.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
+xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
