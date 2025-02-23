@@ -196,15 +196,14 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	unlockArrays(RxPartial, rxPartial);
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
-	//solve() may crash in OpenCL ArrayFire implementation if the system is not solvable. 
-	//It is better to return "nan" values in the coefficients array
+	//solve() may crash in OpenCL ArrayFire implementation if the system is not solvable.
+	// in CUDA backend it simply returns NaN values in the coefficients which is safer, so we mirror this behavior here
 	try {
 		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
 	}
 	catch (const af::exception& ex) {
 		coefficients = af::constant(std::numeric_limits<float>::quiet_NaN(), correlationArrays.first.dims(0));
-		errorSequence = af::constant<float>(0, dims.rows, dims.cols);
-		return errorSequence;
+		return af::array();
 	}
 	//call scaled neighbors kernel and compute error sequence
 	errorSequence = image - computeScaledNeighbors(coefficients);
