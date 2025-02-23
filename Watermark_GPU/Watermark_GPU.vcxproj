@@ -82,11 +82,7 @@
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\avcodec-61.dll" "$(SolutionDir)x64\Debug\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\avformat-61.dll" "$(SolutionDir)x64\Debug\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\avutil-59.dll" "$(SolutionDir)x64\Debug\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\swscale-8.dll" "$(SolutionDir)x64\Debug\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -118,11 +114,7 @@ xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Debug\
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\avcodec-61.dll" "$(SolutionDir)x64\Release\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\avformat-61.dll" "$(SolutionDir)x64\Release\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\avutil-59.dll" "$(SolutionDir)x64\Release\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\swscale-8.dll" "$(SolutionDir)x64\Release\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release LineInfo|x64'">
@@ -155,11 +147,7 @@ xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Releas
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\avcodec-61.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\avformat-61.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\avutil-59.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\swscale-8.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\swresample-5.dll" "$(SolutionDir)x64\Release LineInfo\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
