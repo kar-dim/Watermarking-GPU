@@ -278,11 +278,11 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		{
 			if (!receivedValidVideoFrame(inputDecoderCtx.get(), packet.get(), frame.get(), videoStreamIndex))
 				continue;
-			//don't embed watermark after each frame because compression propagates the watermark and affects the video quality
-			if (framesCount % watermarkInterval == 0) 
+			const bool embedWatermark = framesCount % watermarkInterval == 0;
+			//if there is row padding (for alignment), we must copy the data to a contiguous block!
+			if (frame->linesize[0] != width)
 			{
-				//if there is row padding (for alignment), we must copy the data to a contiguous block!
-				if (frame->linesize[0] != width)
+				if (embedWatermark)
 				{
 					//#pragma omp parallel for //if multi-threaded encoder don't parallelize!
 					for (int y = 0; y < height; y++)
@@ -290,32 +290,37 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 					inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
 					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
 					watermarkedFrame.host(frameFlatPinned);
-					//write from pinned memory directly (plus UV planes)
-					for (int y = 0; y < height; y++)
-						fwrite(frameFlatPinned + y * width, 1, width, ffmpegPipe.get());
-					for (int y = 0; y < height / 2; y++)
-						fwrite(frame->data[1] + y * frame->linesize[1], 1, width / 2, ffmpegPipe.get());
-					for (int y = 0; y < height / 2; y++)
-						fwrite(frame->data[2] + y * frame->linesize[2], 1, width / 2, ffmpegPipe.get());
-					
 				}
-				//else, use original pointer, no need to copy data to intermediate pinned buffer
-				else
+				//write from pinned memory directly (plus UV planes)
+				for (int y = 0; y < height; y++)
+					fwrite((embedWatermark ? frameFlatPinned  + y * width : frame->data[0] + y * frame->linesize[0]), 1, width, ffmpegPipe.get());
+				for (int y = 0; y < height / 2; y++)
+					fwrite(frame->data[1] + y * frame->linesize[1], 1, width / 2, ffmpegPipe.get());
+				for (int y = 0; y < height / 2; y++)
+					fwrite(frame->data[2] + y * frame->linesize[2], 1, width / 2, ffmpegPipe.get());
+					
+			}
+			//else, use original pointer, no need to copy data to intermediate pinned buffer
+			else
+			{
+				if (embedWatermark)
 				{
 					inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
 					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
 					watermarkedFrame.host(frame->data[0]);
-					// Write modified frame to ffmpeg (pipe)
-					fwrite(frame->data[0], 1, width * frame->height, ffmpegPipe.get());
-					fwrite(frame->data[1], 1, width * frame->height / 2, ffmpegPipe.get());
-					fwrite(frame->data[2], 1, width * frame->height / 2, ffmpegPipe.get());
 				}
+				// Write modified frame to ffmpeg (pipe)
+				fwrite(frame->data[0], 1, width * frame->height, ffmpegPipe.get());
+				fwrite(frame->data[1], 1, width * frame->height / 4, ffmpegPipe.get());
+				fwrite(frame->data[2], 1, width * frame->height / 4, ffmpegPipe.get());
 			}
+			
 			framesCount++;
 			av_packet_unref(packet.get());
 		}
 		timer::end();
 		cout << "\nWatermark embeding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
+
 		cudaFreeHost(frameFlatPinned);
 	}
 
@@ -358,11 +363,11 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 			framesCount++;
 			av_packet_unref(packet.get());
 		}
-		cudaFreeHost(frameFlatPinned);
-
 		timer::end();
 		cout << "\nWatermark detection total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 		cout << "\nWatermark detection average execution time per frame: " << executionTime(showFps, timer::elapsedSeconds() / framesCount) << "\n";
+
+		cudaFreeHost(frameFlatPinned);
 	}
 
 	// Cleanup
