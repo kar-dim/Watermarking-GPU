@@ -4,6 +4,7 @@
 #include <arrayfire.h>
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -160,6 +161,9 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	const af::array mask = maskType == MASK_TYPE::ME ?
 		computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES) :
 		computeCustomMask();
+	//if the system is not solvable, don't waste time embeding the watermark, return output image without modification
+	if (af::anyTrue<bool>(af::isNaN(coefficients)))
+		return outputImage;
 	const af::array u = mask * randomMatrix;
 	watermarkStrength = strengthFactor / static_cast<float>(af::norm(u) / sqrt(inputImage.elements()));
 	return af::clamp(outputImage + (u * watermarkStrength), 0, 255);
@@ -184,22 +188,33 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 			cl::NDRange(), cl::NDRange(meKernelDims.cols, meKernelDims.rows), cl::NDRange(64, 1));
 		//finish and return memory to arrayfire
 		queue.finish();
-		unlockArrays(RxPartial, rxPartial);
-		//calculation of coefficients, error sequence and mask
-		const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
-		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
-		//call scaled neighbors kernel and compute error sequence
-		errorSequence = image - computeScaledNeighbors(coefficients);
-		if (maskNeeded) 
-		{
-			const af::array errorSequenceAbs = af::abs(errorSequence);
-			return errorSequenceAbs / af::max<float>(errorSequenceAbs);
-		}
-		return af::array();
 	}
 	catch (const cl::Error& ex) {
 		throw std::runtime_error(string("ERROR in compute_me_mask(): " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n"));
 	}
+
+	unlockArrays(RxPartial, rxPartial);
+	//calculation of coefficients, error sequence and mask
+	const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
+	//solve() may crash in OpenCL ArrayFire implementation if the system is not solvable. 
+	//It is better to return "nan" values in the coefficients array
+	try {
+		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
+	}
+	catch (const af::exception& ex) {
+		coefficients = af::constant(std::numeric_limits<float>::quiet_NaN(), correlationArrays.first.dims(0));
+		errorSequence = af::constant<float>(0, dims.rows, dims.cols);
+		return errorSequence;
+	}
+	//call scaled neighbors kernel and compute error sequence
+	errorSequence = image - computeScaledNeighbors(coefficients);
+	if (maskNeeded) 
+	{
+		const af::array errorSequenceAbs = af::abs(errorSequence);
+		return errorSequenceAbs / af::max<float>(errorSequenceAbs);
+	}
+	return af::array();
+	
 }
 
 //helper method that calculates the error sequence by using a supplied prediction filter coefficients
@@ -227,6 +242,9 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 	}
 	else
 		mask = computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
+	//if the system is not solvable, don't waste time computing the correlation, there is no watermark
+	if (af::anyTrue<bool>(af::isNaN(coefficients)))
+		return 0.0f;
 	const af::array u = mask * randomMatrix;
 	return computeCorrelation(computeErrorSequence(u, coefficients), errorSequenceW);
 }
