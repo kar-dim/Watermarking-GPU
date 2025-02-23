@@ -19,5 +19,6 @@ void exitProgram(const int exitCode);
 std::string executionTime(const bool showFps, const double seconds);
 int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr);
 int testForVideo(const INIReader& inir, const std::string& videoFile, const cudaDeviceProp& properties, const int p, const float psnr);
-AVCodecContext* openDecoderContext(AVCodecParameters* params);
+int findVideoStreamIndex(const AVFormatContext* inputFormatCtx);
+AVCodecContext* openDecoderContext(const AVCodecParameters* params);
 bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, AVFrame* frame, const int videoStreamIndex);

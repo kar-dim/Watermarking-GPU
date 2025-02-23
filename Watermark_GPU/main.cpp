@@ -214,28 +214,13 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	if (avformat_open_input(&inputFormatCtx, videoFile.c_str(), nullptr, nullptr) < 0) 
 	{
 		std::cout << "ERROR: Failed to open input video file\n";
-		return EXIT_FAILURE;
+		exitProgram(EXIT_FAILURE);
 	}
 	avformat_find_stream_info(inputFormatCtx, nullptr);
 	av_dump_format(inputFormatCtx, 0, videoFile.c_str(), 0);
 
-	//Find video stream
-	int videoStreamIndex = -1;
-	for (unsigned int i = 0; i < inputFormatCtx->nb_streams; i++) 
-	{
-		if (inputFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
-		{
-			videoStreamIndex = i;
-			break;
-		}
-	}
-	if (videoStreamIndex == -1)
-	{
-		std::cout << "ERROR: No video stream found\n";
-		return EXIT_FAILURE;
-	}
-
-	//Open input video decoder
+	//Find video stream and open video decoder
+	const int videoStreamIndex = findVideoStreamIndex(inputFormatCtx);
 	const AVCodecContextPtr inputDecoderCtx(openDecoderContext(inputFormatCtx->streams[videoStreamIndex]->codecpar), [](AVCodecContext* ctx) { avcodec_free_context(&ctx); });
 
 	//initialize watermark functions class
@@ -247,8 +232,8 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
 	if (makeWatermarkVideoPath != "")
 	{
-		//codec, preset, crf and any other useful option
 		const string ffmpegOptions = inir.Get("parameters_video", "encode_options", "-c:v libx265 -preset fast -crf 23");
+		
 		// Build the FFmpeg command
 		std::ostringstream ffmpegCmd;
 		ffmpegCmd << "ffmpeg -y -f rawvideo -pix_fmt yuv420p " << "-s " << width << "x" << height 
@@ -260,7 +245,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		if (!ffmpegPipe.get()) 
 		{
 			std::cout << "Error: Could not open FFmpeg pipe\n";
-			return EXIT_FAILURE;
+			exitProgram(EXIT_FAILURE);
 		}
 
 		timer::start();
@@ -346,17 +331,15 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 			if (framesCount % watermarkInterval == 0) 
 			{
 				//if there is row padding (for alignment), we must copy the data to a contiguous block!
-				if (frame->linesize[0] != width)
+				const bool rowPadding = frame->linesize[0] != width;
+				if (rowPadding)
 				{
 					#pragma omp parallel for
 					for (int y = 0; y < height; y++)
 						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
-					inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
 				}
-				//else, use original pointer, no need to copy data
-				else
-					inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
-
+				//supply the input frame to the GPU and run the detection of the watermark
+				inputFrame = af::array(width, height, rowPadding ? frameFlatPinned : frame->data[0], afHost).T().as(f32);
 				correlation = watermarkObj.detectWatermark(inputFrame, MASK_TYPE::ME);
 				cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
 			}
@@ -375,8 +358,27 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	return EXIT_SUCCESS;
 }
 
+int findVideoStreamIndex(const AVFormatContext* inputFormatCtx)
+{
+	int videoStreamIndex = -1;
+	for (unsigned int i = 0; i < inputFormatCtx->nb_streams; i++)
+	{
+		if (inputFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
+		{
+			videoStreamIndex = i;
+			break;
+		}
+	}
+	if (videoStreamIndex == -1)
+	{
+		std::cout << "ERROR: No video stream found\n";
+		exitProgram(EXIT_FAILURE);
+	}
+	return videoStreamIndex;
+}
+
 //open decoder context for video
-AVCodecContext* openDecoderContext(AVCodecParameters* inputCodecParams)
+AVCodecContext* openDecoderContext(const AVCodecParameters* inputCodecParams)
 {
 	const AVCodec* inputDecoder = avcodec_find_decoder(inputCodecParams->codec_id);
 	AVCodecContext* inputDecoderCtx = avcodec_alloc_context3(inputDecoder);
