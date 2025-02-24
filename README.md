@@ -61,3 +61,4 @@ Needs to be parameterized from the corresponding ```settings.ini``` file. Here i
 - OpenCL implementation: The [OpenCL Headers](https://github.com/KhronosGroup/OpenCL-Headers), [OpenCL C++ Bindings](https://github.com/KhronosGroup/OpenCL-CLHPP) and [OpenCL Library file](https://github.com/KhronosGroup/OpenCL-SDK) are already included and configured for this project.
 - CUDA implementation: NVIDIA CUDA Toolkit.
 - ArrayFire should be installed globally, with default installation options. Environment Variable "AF_PATH" will be defined automatically.
+- FFMpeg must exist on system PATH (Pre-build binaries already include FFMpeg binaries and DLLs).
