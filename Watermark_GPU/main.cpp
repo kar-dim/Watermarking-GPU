@@ -313,7 +313,6 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 					for (int y = 0; y < height; y++)
 						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
 					inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
-					watermarkObj.displayArray(inputFrame);
 					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
 					watermarkedFrame.host(frameFlatPinned);
 				}
