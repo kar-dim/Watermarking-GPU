@@ -82,8 +82,8 @@
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
+xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -115,8 +115,8 @@ xcopy "$(ProjectDir)\libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
+xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release LineInfo|x64'">
@@ -149,8 +149,8 @@ xcopy "$(ProjectDir)\libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
       <CodeGeneration>compute_52,sm_52;compute_86,sm_86</CodeGeneration>
     </CudaCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)\libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
-xcopy "$(ProjectDir)\libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
+xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
