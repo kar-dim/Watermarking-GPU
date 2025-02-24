@@ -4,7 +4,6 @@
 #include <arrayfire.h>
 #include <cmath>
 #include <fstream>
-#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -162,7 +161,7 @@ af::array Watermark::makeWatermark(const af::array& inputImage, const af::array&
 	{
 		mask = computePredictionErrorMask(inputImage, errorSequence, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
 		//if the system is not solvable, don't waste time embeding the watermark, return output image without modification
-		if (af::anyTrue<bool>(af::isNaN(coefficients)))
+		if (coefficients.elements() == 0)
 			return outputImage;
 	}
 	else
@@ -200,12 +199,11 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	//calculation of coefficients, error sequence and mask
 	const auto correlationArrays = transformCorrelationArrays(RxPartial, rxPartial);
 	//solve() may crash in OpenCL ArrayFire implementation if the system is not solvable.
-	// in CUDA backend it simply returns NaN values in the coefficients which is safer, so we mirror this behavior here
 	try {
 		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
 	}
 	catch (const af::exception& ex) {
-		coefficients = af::constant(std::numeric_limits<float>::quiet_NaN(), correlationArrays.first.dims(0));
+		coefficients = af::array(0, f32);
 		return af::array();
 	}
 	//call scaled neighbors kernel and compute error sequence
@@ -245,7 +243,7 @@ float Watermark::detectWatermark(const af::array& watermarkedImage, MASK_TYPE ma
 	else
 		mask = computePredictionErrorMask(watermarkedImage, errorSequenceW, coefficients, ME_MASK_CALCULATION_REQUIRED_YES);
 	//if the system is not solvable, don't waste time computing the correlation, there is no watermark
-	if (af::anyTrue<bool>(af::isNaN(coefficients)))
+	if (coefficients.elements() == 0)
 		return 0.0f;
 	const af::array u = mask * randomMatrix;
 	return computeCorrelation(computeErrorSequence(u, coefficients), errorSequenceW);
