@@ -13,13 +13,13 @@ The aim of this project is to compare the performance (primarily execution speed
 
 # Key Features
 
-- Implementation of watermark embedding and detection algorithms for images.
+- Implementation of watermark embedding and detection algorithms for images and video.
 - Comparative performance analysis between CPU and GPU implementations.
 
 # Run the pre-build binaries
 - Get the latest binaries [here](https://github.com/kar-dim/Watermarking-GPU/releases) for OpenCL or CUDA platform. The binary contains the sample application and the CUDA kernels (OpenCL builds the kernels at runtime, so the kernels are provided in the corresponding folder). Before we can emded the watermark, we have to create it first.
 - This implementation is based on Normal-distributed random values with zero mean and standard deviation of one. The ```CommonRandomMatrix``` produces pseudo-random values. A bat file is included to generate the watermarks, with sizes exactly the same as the provided sample images. Of course, one can generate a random watermark for any desired image size like this:  
-```CommonRandomMatrix.exe [rows] [cols] [seed] [fileName]``` .Then pass the provided watermark file path in the sample project configuration.
+```CommonRandomMatrix.exe [rows] [cols] [seed] [fileName]```  then pass the provided watermark file path in the sample project configuration.
 
 The sample application:
    - Embeds the watermark using the NVF and the proposed Prediction-Error mask.
@@ -30,40 +30,34 @@ Needs to be parameterized from the corresponding ```settings.ini``` file. Here i
 | Parameter                         | Description                                                                                                                 |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------               |
 | image                             | Path to the input image.                                                                                                                   |
-| w_path                            | Path to the Random Matrix (watermark). This is produced by the CommonRandomMatrix project. Watermark and Image sizes should match exactly. |
-| video                             | Path to the video file, if we want to embed the watermark for a raw YUV video.                                                             |
+| watermark                         | Path to the Random Matrix (watermark). This is produced by the CommonRandomMatrix project. Watermark and Image sizes should match exactly. |
 | save_watermarked_files_to_disk    | \[true/false\]: Set to true to save the watermarked NVF and Prediction-Error files to disk.                                                |
 | execution_time_in_fps             | \[true/false\]: Set to true to display execution times in FPS. Else, it will display execution time in seconds.                            |
-| p                                 | Window size for masking algorithms. Currently only ```p=3``` is allowed.                                                                         |
+| p                                 | Window size for masking algorithms. Currently only ```p=3``` is allowed.                                                                   |
 | psnr                              | PSNR (Peak Signal-to-Noise Ratio). Higher values correspond to less watermark in the image, reducing noise, but making detection harder.   |
 | loops_for_test                    | Loops the algorithms many times, simulating more work. A value of 1000 produces almost identical execution times.                          |
-| test_for_video                    | \[true/false\]: If set to true, the sample will work for videos only, else it will work for images.                                        |
 | opencl_device                     | [Number]: Works only for OpenCL binary. If multiple OpenCL devices are found, then set this to the desired device. Set it to 0 if one device is found. |
 
 **Video-only settings:**
 
 
 | Parameter                         | Description                                                                                                                 |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------               |
-| display_frames                    | \[true/false\]: Set to true to display the video frames as they are processed. This "simulates" video playback to display frames based on the original video's FPS. |
-| watermark_make                    | \[true/false\]: Set to true to embed the watermark in the raw YUV video provided by the ```video``` parameter.                              |
-| watermark_first_frame_only        | \[true/false\]: Set to true to embed the watermark only in the first frame. Mostly obsolete after the algorithms' execution speed were improved. Useful for inspecting how long the watermark "survives" compression. |
-| watermark_detection               | \[true/false\]: Set to true to try to detect the watermark created with the ```watermark_make``` flag (works only if ```watermark_make = true``` .|
-| rows                              | Height of the raw YUV video file frames (raw YUV lacks any metadata like rows, columns, fps and total frame count).                         |
-| cols                              | Width of the raw YUV video file frames (raw YUV lacks any metadata like rows, columns, fps and total frame count).                          |
-| frames                            | Total frame count of the raw YUV video file frames (raw YUV lacks any metadata like rows, columns, fps and total frame count).              |
-| fps                               | FPS of the raw YUV video file frames (raw YUV lacks any metadata like rows, columns, fps and total frame count).                            |
+|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------                |
+| video                             | Path to the video file, if we want to embed the watermark for a video, or try to detect its watermark.                                      |
+| watermark_interval                | [Number]: Embed/Try to detect the watermark every X frames. If set to 1 then the watermark will be embedded for each frame, which degrades video quality.|
+| encode_watermark_file_path        | Set this value to a file path, in order to embed watermark and save the watermarked file to disk.                                           |
+| encode_options                    | These are ffmpeg options for encoding. Example: ```-c:v libx265 -preset fast -crf 23```  will pass these encoding options to ffmpeg.
+| watermark_detection               | \[true/false\]: Set to true to try to detect the watermark of the "video" parameter. The detection occurs after "watermark_interval" frames.|
 
 
 # Libraries Used
 
 - [ArrayFire](https://arrayfire.org): A C++ library for fast GPU computing.
-- [CImg](https://cimg.eu/): A C++ library for image processing.
+- [FFMpeg](https://www.ffmpeg.org/): A complete, cross-platform solution to record, convert and stream audio and video.
 - [inih](https://github.com/jtilly/inih): A lightweight C++ library for parsing .ini configuration files.
 
-# Additional Dependencies
+# Additional Dependencies For Building
 
 - OpenCL implementation: The [OpenCL Headers](https://github.com/KhronosGroup/OpenCL-Headers), [OpenCL C++ Bindings](https://github.com/KhronosGroup/OpenCL-CLHPP) and [OpenCL Library file](https://github.com/KhronosGroup/OpenCL-SDK) are already included and configured for this project.
 - CUDA implementation: NVIDIA CUDA Toolkit.
 - ArrayFire should be installed globally, with default installation options. Environment Variable "AF_PATH" will be defined automatically.
-- OpenCV (for video testing, used internally by CImg), with default installation options. Environment Variable "OPENCV_DIR" should be defined in the "build" directory (for example: C:\opencv\build\x64\vc16).
