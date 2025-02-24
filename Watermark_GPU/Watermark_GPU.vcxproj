@@ -62,8 +62,8 @@
       <AdditionalDependencies>afopencl.lib;OpenCL.lib;avutil.lib;avformat.lib;swscale.lib;avcodec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100d.dll" "$(SolutionDir)x64\Debug\" /y /D
-xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Debug\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
+xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -89,8 +89,8 @@ xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\De
       <AdditionalLibraryDirectories>$(AF_PATH)\lib;$(ProjectDir)libs\opencl\lib;$(ProjectDir)libs\ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(OPENCV_DIR)\bin\opencv_world4100.dll" "$(SolutionDir)x64\Release\" /y /D
-xcopy "$(OPENCV_DIR)\bin\opencv_videoio_ffmpeg4100_64.dll" "$(SolutionDir)x64\Release\" /y /D</Command>
+      <Command>xcopy "$(ProjectDir)libs\ffmpeg\bin\*.dll" "$(OutDir)" /y /D
+xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
