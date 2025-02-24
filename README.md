@@ -22,9 +22,9 @@ The aim of this project is to compare the performance (primarily execution speed
 ```CommonRandomMatrix.exe [rows] [cols] [seed] [fileName]```  then pass the provided watermark file path in the sample project configuration.
 
 The sample application:
-   - Embeds the watermark using the NVF and the proposed Prediction-Error mask.
-   - Detects the watermark using the proposed Prediction-Error based detector.
-   - Prints FPS for both operations, and both masks.
+   - Embeds the watermark using the NVF and the proposed Prediction-Error mask for a video or image.
+   - Detects the watermark using the proposed Prediction-Error based detector for a video or image.
+   - Prints FPS for both operations, and both masks (image only mode, for video ME masking is used only).
 Needs to be parameterized from the corresponding ```settings.ini``` file. Here is a detailed explanation for each parameter:
 
 | Parameter                         | Description                                                                                                                 |
