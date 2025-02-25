@@ -36,8 +36,8 @@ private:
 		6,  13, 19, 24, 28, 31, 33, 34,
 		7,  14, 20, 25, 29, 32, 34, 35
 	};
-	const cl::Context context{ afcl::getContext(true) };
-	const cl::CommandQueue queue{ afcl::getQueue(true) };
+	const cl::Context context{ afcl::getContext(false) };
+	const cl::CommandQueue queue{ afcl::getQueue(false) };
 	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
 	dim2 dims, meKernelDims, texKernelDims;
 	std::vector<cl::Program> programs;

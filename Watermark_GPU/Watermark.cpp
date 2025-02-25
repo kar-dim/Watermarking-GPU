@@ -202,7 +202,7 @@ af::array Watermark::computePredictionErrorMask(const af::array& image, af::arra
 	try {
 		coefficients = af::solve(correlationArrays.first, correlationArrays.second);
 	}
-	catch (const af::exception& ex) {
+	catch (const af::exception&) {
 		coefficients = af::array(0, f32);
 		return af::array();
 	}
