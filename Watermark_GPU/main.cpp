@@ -254,6 +254,11 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 
 	//Find video stream and open video decoder
 	const int videoStreamIndex = findVideoStreamIndex(inputFormatCtx);
+	if (videoStreamIndex == -1)
+	{
+		std::cout << "ERROR: No video stream found\n";
+		exitProgram(EXIT_FAILURE);
+	}
 	const AVCodecContextPtr inputDecoderCtx(openDecoderContext(inputFormatCtx->streams[videoStreamIndex]->codecpar), [](AVCodecContext* ctx) { avcodec_free_context(&ctx); });
 
 	//initialize watermark functions class
@@ -396,23 +401,13 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	return EXIT_SUCCESS;
 }
 
+// find the first video stream index
 int findVideoStreamIndex(const AVFormatContext* inputFormatCtx)
 {
-	int videoStreamIndex = -1;
 	for (unsigned int i = 0; i < inputFormatCtx->nb_streams; i++)
-	{
 		if (inputFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
-		{
-			videoStreamIndex = i;
-			break;
-		}
-	}
-	if (videoStreamIndex == -1)
-	{
-		std::cout << "ERROR: No video stream found\n";
-		exitProgram(EXIT_FAILURE);
-	}
-	return videoStreamIndex;
+			return i;
+	return -1;
 }
 
 //open decoder context for video
