@@ -262,17 +262,17 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 					fwrite(frame->data[2] + y * frame->linesize[2], 1, width / 2, ffmpegPipe.get());
 					
 			}
-			//else, use original pointer, no need to copy data to intermediate pinned buffer
+			//no row padding, read and write data directly
 			else
 			{
 				if (embedWatermark)
 				{
 					inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
 					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
-					watermarkedFrame.host(frame->data[0]);
+					watermarkedFrame.host(frameFlatPinned);
 				}
 				// Write modified frame to ffmpeg (pipe)
-				fwrite(frame->data[0], 1, width * frame->height, ffmpegPipe.get());
+				fwrite(embedWatermark ? frameFlatPinned : frame->data[0], 1, width * frame->height, ffmpegPipe.get());
 				fwrite(frame->data[1], 1, width * frame->height / 4, ffmpegPipe.get());
 				fwrite(frame->data[2], 1, width * frame->height / 4, ffmpegPipe.get());
 			}
@@ -281,7 +281,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 			av_packet_unref(packet.get());
 		}
 		timer::end();
-		cout << "\nWatermark embeding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
+		cout << "\nWatermark embedding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 	}
 
 	//realtime watermarked video detection
