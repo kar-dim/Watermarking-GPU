@@ -249,13 +249,20 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 					//#pragma omp parallel for //if multi-threaded encoder don't parallelize!
 					for (int y = 0; y < height; y++)
 						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
+					//embed the watermark and receive the watermarked data back to host
 					inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
 					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
 					watermarkedFrame.host(frameFlatPinned);
+					//write the watermarked image data
+					fwrite(frameFlatPinned, 1, width * frame->height, ffmpegPipe.get());
 				}
-				//write from pinned memory directly (plus UV planes)
-				for (int y = 0; y < height; y++)
-					fwrite((embedWatermark ? frameFlatPinned  + y * width : frame->data[0] + y * frame->linesize[0]), 1, width, ffmpegPipe.get());
+				else
+				{
+					//write from frame buffer row-by-row the the valid image data (and not the alignment bytes)
+					for (int y = 0; y < height; y++)
+						fwrite(frame->data[0] + y * frame->linesize[0], 1, width, ffmpegPipe.get());
+				}
+				//always write UI planes as-is
 				for (int y = 0; y < height / 2; y++)
 					fwrite(frame->data[1] + y * frame->linesize[1], 1, width / 2, ffmpegPipe.get());
 				for (int y = 0; y < height / 2; y++)
