@@ -1,5 +1,4 @@
-﻿#define cimg_use_opencv
-#include "main_utils.hpp"
+﻿#include "main_utils.hpp"
 #include "opencl_init.h"
 #include "Utilities.hpp"
 #include "Watermark.hpp"
