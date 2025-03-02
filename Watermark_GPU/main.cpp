@@ -9,6 +9,7 @@
 #include <functional>
 #include <INIReader.h>
 #include <iostream>
+#include <memory>
 #include <omp.h>
 #include <sstream>
 #include <stdio.h>
@@ -17,7 +18,6 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <memory>
 }
 
 using std::cout;
