@@ -327,9 +327,7 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 				fwrite(frame->data[1], 1, width * frame->height / 4, ffmpegPipe.get());
 				fwrite(frame->data[2], 1, width * frame->height / 4, ffmpegPipe.get());
 			}
-
 			framesCount++;
-			av_packet_unref(packet.get());
 		}
 		timer::end();
 		cout << "\nWatermark embedding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
@@ -366,7 +364,6 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 				cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
 			}
 			framesCount++;
-			av_packet_unref(packet.get());
 		}
 		timer::end();
 		cout << "\nWatermark detection total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
@@ -406,8 +403,9 @@ bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, 
 		av_packet_unref(packet);
 		return false;
 	}
-	avcodec_send_packet(inputDecoderCtx, packet);
-	if (avcodec_receive_frame(inputDecoderCtx, frame) != 0)
+	int sendPacketResult = avcodec_send_packet(inputDecoderCtx, packet);
+	av_packet_unref(packet);
+	if (sendPacketResult != 0 || avcodec_receive_frame(inputDecoderCtx, frame) != 0)
 		return false;
 	return frame->format == AV_PIX_FMT_YUV420P;
 }
