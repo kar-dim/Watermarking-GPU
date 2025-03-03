@@ -277,7 +277,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 					watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
 					watermarkedFrame.host(frameFlatPinned);
 				}
-				// Write modified frame to ffmpeg (pipe)
+				// Write original or modified frame to ffmpeg (pipe)
 				fwrite(embedWatermark ? frameFlatPinned : frame->data[0], 1, width * frame->height, ffmpegPipe.get());
 				fwrite(frame->data[1], 1, width * frame->height / 4, ffmpegPipe.get());
 				fwrite(frame->data[2], 1, width * frame->height / 4, ffmpegPipe.get());
