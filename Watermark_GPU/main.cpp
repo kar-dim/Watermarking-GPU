@@ -289,7 +289,6 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 			{
 				if (embedWatermark)
 				{
-					//#pragma omp parallel for //if multi-threaded encoder don't parallelize!
 					for (int y = 0; y < height; y++)
 						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
 					//embed the watermark and receive the watermarked data back to host
@@ -353,7 +352,6 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 				const bool rowPadding = frame->linesize[0] != width;
 				if (rowPadding)
 				{
-					#pragma omp parallel for
 					for (int y = 0; y < height; y++)
 						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
 				}
