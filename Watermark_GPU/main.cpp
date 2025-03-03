@@ -246,7 +246,6 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 			{
 				if (embedWatermark)
 				{
-					//#pragma omp parallel for //if multi-threaded encoder don't parallelize!
 					for (int y = 0; y < height; y++)
 						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
 					//embed the watermark and receive the watermarked data back to host
@@ -310,14 +309,13 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 				const bool rowPadding = frame->linesize[0] != width;
 				if (rowPadding)
 				{
-					#pragma omp parallel for
 					for (int y = 0; y < height; y++)
 						memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
 				}
 				//supply the input frame to the GPU and run the detection of the watermark
 				inputFrame = af::array(width, height, rowPadding ? frameFlatPinned : frame->data[0], afHost).T().as(f32);
 				correlation = watermarkObj.detectWatermark(inputFrame, MASK_TYPE::ME);
-				cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
+				//cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
 			}
 			framesCount++;
 		}
