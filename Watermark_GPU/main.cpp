@@ -2,6 +2,7 @@
 #include "main_utils.hpp"
 #include "Utilities.hpp"
 #include "Watermark.cuh"
+#include <cstdint>
 #include <cstring>
 #include <cuda_runtime.h>
 #include <exception>
