@@ -10,7 +10,6 @@
 class Utilities 
 {
 public:
-	static std::string loadFileString(const std::string& input);
 	static std::string addSuffixBeforeExtension(const std::string& file, const std::string& suffix);
 };
 

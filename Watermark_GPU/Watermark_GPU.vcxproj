@@ -100,16 +100,14 @@ xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="kernels\me_p3.hpp" />
+    <ClInclude Include="kernels\nvf.hpp" />
+    <ClInclude Include="kernels\scaled_neighbors_p3.hpp" />
     <ClInclude Include="opencl_init.h" />
     <ClInclude Include="opencl_utils.hpp" />
     <ClInclude Include="Utilities.hpp" />
     <ClInclude Include="Watermark.hpp" />
     <ClInclude Include="main_utils.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="kernels\calculate_scaled_neighbors_p3.cl" />
-    <None Include="kernels\me_p3.cl" />
-    <None Include="kernels\nvf.cl" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources.rc" />

@@ -1,3 +1,7 @@
+#pragma once
+#include <string>
+inline const std::string me_p3 = R"CLC(
+
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 
 //manual loop unrolled calculation of rx in local memory
@@ -77,3 +81,4 @@ __kernel void me(__read_only image2d_t image,
         sum += RxLocal[i][RxMappings[localId]];
     Rx[outputIndex] = sum;
 }
+)CLC";

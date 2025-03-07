@@ -1,4 +1,8 @@
-__kernel void calculate_scaled_neighbors_p3(
+#pragma once
+#include <string>
+inline const std::string scaled_neighbors_p3 = R"CLC(
+
+__kernel void scaled_neighbors_p3(
     __read_only image2d_t image, 
     __global float* __restrict__ x_,
     __constant float* __restrict__ coeffs,
@@ -54,3 +58,4 @@ __kernel void calculate_scaled_neighbors_p3(
 		x_[(x * height + y)] = dot;
     }
 }
+)CLC";

@@ -124,14 +124,14 @@ af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 		cl::Buffer neighborsBuff(*neighborsMem.get(), true);
 		cl::Buffer coeffsBuff(*coeffsMem.get(), true);
 		queue.enqueueNDRangeKernel(
-			cl_utils::KernelBuilder(programs[2], "calculate_scaled_neighbors_p3").args(image2d, neighborsBuff, coeffsBuff, cl::Local(sizeof(float) * 324)).build(),
+			cl_utils::KernelBuilder(programs[2], "scaled_neighbors_p3").args(image2d, neighborsBuff, coeffsBuff, cl::Local(sizeof(float) * 324)).build(),
 			cl::NDRange(), cl::NDRange(texKernelDims.rows, texKernelDims.cols), cl::NDRange(16, 16));
 		queue.finish();
 		unlockArrays(coefficients, neighbors);
 		return neighbors;
 	}
 	catch (const cl::Error& ex) {
-		throw std::runtime_error("ERROR in calculate_scaled_neighbors_p3: " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
+		throw std::runtime_error("ERROR in scaled_neighbors_p3: " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
 	}
 }
 

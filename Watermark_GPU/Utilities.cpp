@@ -1,19 +1,8 @@
 ﻿#include "Utilities.hpp"
 #include <chrono>
-#include <fstream>
-#include <iterator>
-#include <stdexcept>
 #include <string>
 
 using std::string;
-
-string Utilities::loadFileString(const string& input)
-{
-	std::ifstream stream(input.c_str());
-	if (!stream.is_open())
-		throw std::runtime_error("Could not load Program: " + input + "\n");
-	return string(std::istreambuf_iterator<char>(stream), (std::istreambuf_iterator<char>()));
-}
 
 string Utilities::addSuffixBeforeExtension(const string& file, const string& suffix) 
 {

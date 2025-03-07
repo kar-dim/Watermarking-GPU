@@ -1,4 +1,7 @@
-﻿#include "main_utils.hpp"
+﻿#include "kernels/me_p3.hpp"
+#include "kernels/nvf.hpp"
+#include "kernels/scaled_neighbors_p3.hpp"
+#include "main_utils.hpp"
 #include "opencl_init.h"
 #include "Utilities.hpp"
 #include "Watermark.hpp"
@@ -88,12 +91,12 @@ int main(void)
 	try {
 		auto buildProgram = [&context, &device](auto& program, const std::string& kernelName, const std::string& buildOptions) 
 		{
-			program = cl::Program(context, Utilities::loadFileString(kernelName));
+			program = cl::Program(context, kernelName);
 			program.build(device, buildOptions.c_str());
 		};
-		buildProgram(programs[0], "kernels/nvf.cl", std::format("-cl-mad-enable -Dp={}", p));
-		buildProgram(programs[1], "kernels/me_p3.cl", "-cl-mad-enable");
-		buildProgram(programs[2], "kernels/calculate_scaled_neighbors_p3.cl", "-cl-mad-enable");
+		buildProgram(programs[0], nvf, std::format("-cl-mad-enable -Dp={}", p));
+		buildProgram(programs[1], me_p3, "-cl-mad-enable");
+		buildProgram(programs[2], scaled_neighbors_p3, "-cl-mad-enable");
 	}
 	catch (const cl::Error& e) {
 		cout << "Could not build a kernel, Reason: " << e.what() << "\n\n";

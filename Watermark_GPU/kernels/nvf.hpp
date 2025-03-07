@@ -1,3 +1,7 @@
+#pragma once
+#include <string>
+inline const std::string nvf = R"CLC(
+
 __kernel void nvf(__read_only image2d_t image, 
 	__global float *nvf,
 	__local float region[16 + 2 * (p/2)][16 + 2 * (p/2)])
@@ -85,3 +89,4 @@ __kernel void nvf(__read_only image2d_t image,
 	//calculate mask and write pixel value
 	nvf[(x * height) + y] = variance / (1 + variance);
 }
+)CLC";

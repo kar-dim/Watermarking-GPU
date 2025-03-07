@@ -47,17 +47,15 @@
     <ClInclude Include="opencl_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="kernels\me_p3.cl">
+    <ClInclude Include="kernels\me_p3.hpp">
       <Filter>Kernels</Filter>
-    </None>
-    <None Include="kernels\nvf.cl">
+    </ClInclude>
+    <ClInclude Include="kernels\nvf.hpp">
       <Filter>Kernels</Filter>
-    </None>
-    <None Include="kernels\calculate_scaled_neighbors_p3.cl">
+    </ClInclude>
+    <ClInclude Include="kernels\scaled_neighbors_p3.hpp">
       <Filter>Kernels</Filter>
-    </None>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources.rc">
