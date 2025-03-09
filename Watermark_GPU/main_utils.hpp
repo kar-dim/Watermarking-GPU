@@ -7,9 +7,9 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include "libavcodec/packet.h"
-#include "libavutil/frame.h"
-#include "libavcodec/codec_par.h"
+#include <libavcodec/packet.h>
+#include <libavutil/frame.h>
+#include <libavcodec/codec_par.h>
 }
 
 void exitProgram(const int exitCode);
