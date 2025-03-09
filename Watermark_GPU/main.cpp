@@ -19,6 +19,12 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include "libavcodec/packet.h"
+#include "libavutil/frame.h"
+#include "libavutil/log.h"
+#include "libavutil/avutil.h"
+#include "libavcodec/codec.h"
+#include "libavutil/pixfmt.h"
 }
 
 using std::cout;

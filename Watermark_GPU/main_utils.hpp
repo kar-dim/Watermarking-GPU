@@ -1,14 +1,14 @@
 #pragma once
-#include "Watermark.cuh"
-#include <arrayfire.h>
-#include <driver_types.h>
+#include <cuda_runtime.h>
 #include <INIReader.h>
 #include <string>
-#include <vector>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
+#include "libavformat/avformat.h"
+#include "libavcodec/packet.h"
+#include "libavutil/frame.h"
+#include "libavcodec/codec_par.h"
 }
 
 /*!
