@@ -1,4 +1,7 @@
 #pragma once
+#include "Watermark.cuh"
+#include <arrayfire.h>
+#include <cstdint>
 #include <cuda_runtime.h>
 #include <INIReader.h>
 #include <string>
@@ -22,3 +25,5 @@ int testForVideo(const INIReader& inir, const std::string& videoFile, const cuda
 int findVideoStreamIndex(const AVFormatContext* inputFormatCtx);
 AVCodecContext* openDecoderContext(const AVCodecParameters* params);
 bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, AVFrame* frame, const int videoStreamIndex);
+void embedWatermarkFrame(af::array& inputFrame, af::array& watermarkedFrame, const int height, const int width, const int watermarkInterval, int& framesCount, AVFrame* frame, uint8_t* frameFlatPinned, FILE* ffmpegPipe, const Watermark& watermarkObj);
+void detectFrameWatermark(af::array& inputFrame, const int height, const int width, const int watermarkInterval, int& framesCount, AVFrame* frame, uint8_t* frameFlatPinned, const Watermark& watermarkObj);
