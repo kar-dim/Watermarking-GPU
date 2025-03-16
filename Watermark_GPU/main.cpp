@@ -285,24 +285,11 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 		checkError(!ffmpegPipe.get(), "Error: Could not open FFmpeg pipe");
 
 		timer::start();
-		af::array inputFrame, watermarkedFrame;
 		int framesCount = 0;
-
-		//start reading video frames loop
-		while (av_read_frame(inputFormatCtx, packet.get()) >= 0)
-		{
-			if (!receivedValidVideoFrame(inputDecoderCtx.get(), packet.get(), frame.get(), videoStreamIndex))
-				continue;
-			embedWatermarkFrame(inputFrame, watermarkedFrame, height, width, watermarkInterval, framesCount, frame.get(), frameFlatPinned, ffmpegPipe.get(), watermarkObj);
-		}
-		// Ensure all remaining frames are flushed
-		avcodec_send_packet(inputDecoderCtx.get(), nullptr);
-		while (avcodec_receive_frame(inputDecoderCtx.get(), frame.get()) == 0)
-		{
-			if (frame->format == inputDecoderCtx->pix_fmt)
-				//embed watermark after X frames
-				embedWatermarkFrame(inputFrame, watermarkedFrame, height, width, watermarkInterval, framesCount, frame.get(), frameFlatPinned, ffmpegPipe.get(), watermarkObj);
-		}
+		af::array inputFrame, watermarkedFrame;
+		//embed watermark on the video frames
+		processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex, framesCount,
+			[&](AVFrame* frame, int& framesCount) { embedWatermarkFrame(inputFrame, watermarkedFrame, height, width, watermarkInterval, framesCount, frame, frameFlatPinned, ffmpegPipe.get(), watermarkObj); });
 		timer::end();
 		cout << "\nWatermark embedding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 	}
@@ -311,26 +298,13 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	else if (inir.GetBoolean("parameters_video", "watermark_detection", false))
 	{
 		timer::start();
-		af::array inputFrame;
 		int framesCount = 0;
-
-		//start reading video frames loop
-		while (av_read_frame(inputFormatCtx, packet.get()) >= 0)
-		{
-			if (!receivedValidVideoFrame(inputDecoderCtx.get(), packet.get(), frame.get(), videoStreamIndex))
-				continue;
-			//detect watermark after X frames
-			detectFrameWatermark(inputFrame, height, width, watermarkInterval, framesCount, frame.get(), frameFlatPinned, watermarkObj);
-		}
-		// Ensure all remaining frames are flushed
-		avcodec_send_packet(inputDecoderCtx.get(), nullptr);
-		while (avcodec_receive_frame(inputDecoderCtx.get(), frame.get()) == 0)
-		{
-			if (frame->format == inputDecoderCtx->pix_fmt)
-				//detect watermark after X frames
-				detectFrameWatermark(inputFrame, height, width, watermarkInterval, framesCount, frame.get(), frameFlatPinned, watermarkObj);
-		}
+		af::array inputFrame;
+		//detect watermark on the video frames
+		processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex, framesCount,
+			[&](AVFrame* frame, int& framesCount) { detectFrameWatermark(inputFrame, height, width, watermarkInterval, framesCount, frame, frameFlatPinned, watermarkObj); });
 		timer::end();
+
 		cout << "\nWatermark detection total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 		cout << "\nWatermark detection average execution time per frame: " << executionTime(showFps, timer::elapsedSeconds() / framesCount) << "\n";
 	}
@@ -341,6 +315,30 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	return EXIT_SUCCESS;
 }
 
+//Main frames loop logic for video watermark embedding and detection
+void processFrames(AVFormatContext* formatCtx, AVCodecContext* decoderCtx, const int videoStreamIndex, int& framesCount, std::function<void(AVFrame*, int&)> processFrame)
+{
+	AVPacket* packet = av_packet_alloc();
+	AVFrame* frame = av_frame_alloc();
+	// Read video frames loop
+	while (av_read_frame(formatCtx, packet) >= 0)
+	{
+		if (!receivedValidVideoFrame(decoderCtx, packet, frame, videoStreamIndex))
+			continue;
+		processFrame(frame, framesCount);
+	}
+	// Ensure all remaining frames are flushed
+	avcodec_send_packet(decoderCtx, nullptr);
+	while (avcodec_receive_frame(decoderCtx, frame) == 0)
+	{
+		if (frame->format == decoderCtx->pix_fmt)
+			processFrame(frame, framesCount);
+	}
+	av_packet_free(&packet);
+	av_frame_free(&frame);
+}
+
+// Embed watermark in a video frame
 void embedWatermarkFrame(af::array& inputFrame, af::array& watermarkedFrame, const int height, const int width, const int watermarkInterval, int& framesCount, AVFrame* frame, uint8_t* frameFlatPinned, FILE* ffmpegPipe, const Watermark& watermarkObj)
 {
 	float watermarkStrength;
