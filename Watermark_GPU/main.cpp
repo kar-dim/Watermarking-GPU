@@ -251,7 +251,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		timer::start();
 		af::array inputFrame;
 		//detect watermark on the video frames
-		int framesCount = processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex,
+		const int framesCount = processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex,
 			[&](AVFrame* frame, int& framesCount) { detectFrameWatermark(inputFrame, height, width, watermarkInterval, framesCount, frame, frameFlatPinned, watermarkObj); });
 		timer::end();
 
