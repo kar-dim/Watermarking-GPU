@@ -29,4 +29,4 @@ AVCodecContext* openDecoderContext(const AVCodecParameters* params);
 bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, AVFrame* frame, const int videoStreamIndex);
 void embedWatermarkFrame(af::array& inputFrame, af::array& watermarkedFrame, const int height, const int width, const int watermarkInterval, int& framesCount, AVFrame* frame, uint8_t* frameFlatPinned, FILE* ffmpegPipe, const Watermark& watermarkObj);
 void detectFrameWatermark(af::array& inputFrame, const int height, const int width, const int watermarkInterval, int& framesCount, AVFrame* frame, uint8_t* frameFlatPinned, const Watermark& watermarkObj);
-void processFrames(AVFormatContext* formatCtx, AVCodecContext* decoderCtx, const int videoStreamIndex, int& framesCount, std::function<void(AVFrame*, int&)> processFrame);
+int processFrames(AVFormatContext* formatCtx, AVCodecContext* decoderCtx, const int videoStreamIndex, std::function<void(AVFrame*, int&)> processFrame);

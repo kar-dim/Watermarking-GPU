@@ -216,11 +216,9 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	const int width = inputFormatCtx->streams[videoStreamIndex]->codecpar->width;
 	const Watermark watermarkObj(height, width, inir.Get("paths", "watermark", ""), p, psnr);
 
-	//initialize host pinned memory for fast GPU<->CPU transfers and necessary FFmpeg structures (packet, frame)
+	//initialize host pinned memory for fast GPU<->CPU transfers
 	uint8_t* frameFlatPinned = nullptr;
 	cudaHostAlloc((void**)&frameFlatPinned, width * height * sizeof(uint8_t), cudaHostAllocDefault);
-	const AVPacketPtr packet(av_packet_alloc(), [](AVPacket* pkt) { av_packet_free(&pkt); });
-	const AVFramePtr frame(av_frame_alloc(), [](AVFrame* frame) { av_frame_free(&frame); });
 
 	//realtime watermarking of raw video
 	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
@@ -238,10 +236,9 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		checkError(!ffmpegPipe.get(), "Error: Could not open FFmpeg pipe");
 
 		timer::start();
-		int framesCount = 0;
 		af::array inputFrame, watermarkedFrame;
 		//embed watermark on the video frames
-		processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex, framesCount,
+		processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex,
 			[&](AVFrame* frame, int& framesCount) { embedWatermarkFrame(inputFrame, watermarkedFrame, height, width, watermarkInterval, framesCount, frame, frameFlatPinned, ffmpegPipe.get(), watermarkObj); });
 		timer::end();
 
@@ -252,10 +249,9 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	else if (inir.GetBoolean("parameters_video", "watermark_detection", false)) 
 	{
 		timer::start();
-		int framesCount = 0;
 		af::array inputFrame;
 		//detect watermark on the video frames
-		processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex, framesCount,
+		int framesCount = processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex,
 			[&](AVFrame* frame, int& framesCount) { detectFrameWatermark(inputFrame, height, width, watermarkInterval, framesCount, frame, frameFlatPinned, watermarkObj); });
 		timer::end();
 
@@ -270,26 +266,27 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 }
 
 //Main frames loop logic for video watermark embedding and detection
-void processFrames(AVFormatContext* formatCtx, AVCodecContext* decoderCtx, const int videoStreamIndex, int& framesCount, std::function<void(AVFrame*, int&)> processFrame)
+int processFrames(AVFormatContext* formatCtx, AVCodecContext* decoderCtx, const int videoStreamIndex, std::function<void(AVFrame*, int&)> processFrame)
 {
-	AVPacket* packet = av_packet_alloc();
-	AVFrame* frame = av_frame_alloc();
+	const AVPacketPtr packet(av_packet_alloc(), [](AVPacket* pkt) { av_packet_free(&pkt); });
+	const AVFramePtr frame(av_frame_alloc(), [](AVFrame* frame) { av_frame_free(&frame); });
+	int framesCount = 0;
+
 	// Read video frames loop
-	while (av_read_frame(formatCtx, packet) >= 0)
+	while (av_read_frame(formatCtx, packet.get()) >= 0)
 	{
-		if (!receivedValidVideoFrame(decoderCtx, packet, frame, videoStreamIndex))
+		if (!receivedValidVideoFrame(decoderCtx, packet.get(), frame.get(), videoStreamIndex))
 			continue;
-		processFrame(frame, framesCount);
+		processFrame(frame.get(), framesCount);
 	}
 	// Ensure all remaining frames are flushed
 	avcodec_send_packet(decoderCtx, nullptr);
-	while (avcodec_receive_frame(decoderCtx, frame) == 0)
+	while (avcodec_receive_frame(decoderCtx, frame.get()) == 0)
 	{
 		if (frame->format == decoderCtx->pix_fmt)
-			processFrame(frame, framesCount);
+			processFrame(frame.get(), framesCount);
 	}
-	av_packet_free(&packet);
-	av_frame_free(&frame);
+	return framesCount;
 }
 
 // Embed watermark in a video frame
