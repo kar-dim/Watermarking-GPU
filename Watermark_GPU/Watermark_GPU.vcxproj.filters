@@ -30,6 +30,9 @@
     <ClCompile Include="opencl_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="videoprocessingcontext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utilities.hpp">
@@ -55,6 +58,9 @@
     </ClInclude>
     <ClInclude Include="kernels\scaled_neighbors_p3.hpp">
       <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="videoprocessingcontext.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

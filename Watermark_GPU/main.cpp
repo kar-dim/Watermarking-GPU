@@ -4,6 +4,7 @@
 #include "main_utils.hpp"
 #include "opencl_init.h"
 #include "Utilities.hpp"
+#include "videoprocessingcontext.hpp"
 #include "Watermark.hpp"
 #include <af/opencl.h>
 #include <cstdio>
@@ -31,14 +32,11 @@ extern "C" {
 #include <libavutil/pixfmt.h>
 }
 
-#define R_WEIGHT 0.299f
-#define G_WEIGHT 0.587f
-#define B_WEIGHT 0.114f
-
 using std::cout;
 using std::string;
 using AVPacketPtr = std::unique_ptr<AVPacket, std::function<void(AVPacket*)>>;
 using AVFramePtr = std::unique_ptr<AVFrame, std::function<void(AVFrame*)>>;
+using AVFormatContextPtr = std::unique_ptr<AVFormatContext, std::function<void(AVFormatContext*)>>;
 using AVCodecContextPtr = std::unique_ptr<AVCodecContext, std::function<void(AVCodecContext*)>>;
 using FILEPtr = std::unique_ptr<FILE, decltype(&_pclose)>;
 
@@ -137,6 +135,9 @@ int main(void)
 
 int testForImage(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr)
 {
+	constexpr float rPercent = 0.299f;
+	constexpr float gPercent = 0.587f;
+	constexpr float bPercent = 0.114f;
 	const string imageFile = inir.Get("paths", "image", "NO_IMAGE");
 	const bool showFps = inir.GetBoolean("options", "execution_time_in_fps", false);
 	int loops = inir.GetInteger("parameters", "loops_for_test", 5);
@@ -146,7 +147,7 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	//load image from disk into an arrayfire array
 	timer::start();
 	const af::array rgbImage = af::loadImage(imageFile.c_str(), true);
-	const af::array image = af::rgb2gray(rgbImage, R_WEIGHT, G_WEIGHT, B_WEIGHT);
+	const af::array image = af::rgb2gray(rgbImage, rPercent, gPercent, bPercent);
 	af::sync();
 	timer::end();
 	const auto rows = image.dims(0);
@@ -188,8 +189,8 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 	}
 	cout << std::format("Watermark strength (parameter a): {}\nCalculation of ME mask with {} rows and {} columns and parameters:\np = {}  PSNR(dB) = {}\n{}\n\n", watermarkStrength, rows, cols, p, psnr, executionTime(showFps, secs / loops));
 
-	const af::array watermarkedNVFgray = af::rgb2gray(watermarkNVF, R_WEIGHT, G_WEIGHT, B_WEIGHT);
-	const af::array watermarkedMEgray = af::rgb2gray(watermarkME, R_WEIGHT, G_WEIGHT, B_WEIGHT);
+	const af::array watermarkedNVFgray = af::rgb2gray(watermarkNVF, rPercent, gPercent, bPercent);
+	const af::array watermarkedMEgray = af::rgb2gray(watermarkME, rPercent, gPercent, bPercent);
 	//warmup for arrayfire
 	watermarkObj.detectWatermark(watermarkedNVFgray, MASK_TYPE::NVF);
 	watermarkObj.detectWatermark(watermarkedMEgray, MASK_TYPE::ME);
@@ -246,13 +247,14 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	av_log_set_level(AV_LOG_INFO);
 
 	//Load input video
-	AVFormatContext* inputFormatCtx = nullptr;
-	checkError(avformat_open_input(&inputFormatCtx, videoFile.c_str(), nullptr, nullptr) < 0, "ERROR: Failed to open input video file");
-	avformat_find_stream_info(inputFormatCtx, nullptr);
-	av_dump_format(inputFormatCtx, 0, videoFile.c_str(), 0);
+	AVFormatContext* rawInputCtx = nullptr;
+	checkError(avformat_open_input(&rawInputCtx, videoFile.c_str(), nullptr, nullptr) < 0, "ERROR: Failed to open input video file");
+	AVFormatContextPtr inputFormatCtx(rawInputCtx, [](AVFormatContext* ctx) { if (ctx) { avformat_close_input(&ctx); } });
+	avformat_find_stream_info(inputFormatCtx.get(), nullptr);
+	av_dump_format(inputFormatCtx.get(), 0, videoFile.c_str(), 0);
 
 	//Find video stream and open video decoder
-	const int videoStreamIndex = findVideoStreamIndex(inputFormatCtx);
+	const int videoStreamIndex = findVideoStreamIndex(inputFormatCtx.get());
 	checkError(videoStreamIndex == -1, "ERROR: No video stream found");
 	const AVCodecContextPtr inputDecoderCtx(openDecoderContext(inputFormatCtx->streams[videoStreamIndex]->codecpar), [](AVCodecContext* ctx) { avcodec_free_context(&ctx); });
 
@@ -266,6 +268,9 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	const cl::CommandQueue queue(afcl::getQueue(false));
 	cl::Buffer pinnedBuff(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, width * height * sizeof(cl_uchar), nullptr, nullptr);
 	cl_uchar* frameFlatPinned = static_cast<cl_uchar*>(queue.enqueueMapBuffer(pinnedBuff, CL_TRUE, CL_MAP_WRITE, 0, width * height * sizeof(cl_uchar), nullptr, nullptr, nullptr));
+
+	//group common video data for both embedding and detection
+	VideoProcessingContext videoData(inputFormatCtx.get(), inputDecoderCtx.get(), videoStreamIndex, &watermarkObj, height, width, watermarkInterval, frameFlatPinned);
 
 	//realtime watermarking of raw video
 	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
@@ -283,10 +288,8 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 		checkError(!ffmpegPipe.get(), "Error: Could not open FFmpeg pipe");
 
 		timer::start();
-		af::array inputFrame, watermarkedFrame;
 		//embed watermark on the video frames
-		processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex,
-			[&](AVFrame* frame, int& framesCount) { embedWatermarkFrame(inputFrame, watermarkedFrame, height, width, watermarkInterval, framesCount, frame, frameFlatPinned, ffmpegPipe.get(), watermarkObj); });
+		processFrames(videoData, [&](AVFrame* frame, int& framesCount) { embedWatermarkFrame(videoData, framesCount, frame, ffmpegPipe.get()); });
 		timer::end();
 		cout << "\nWatermark embedding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 	}
@@ -295,10 +298,8 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	else if (inir.GetBoolean("parameters_video", "watermark_detection", false))
 	{
 		timer::start();
-		af::array inputFrame;
 		//detect watermark on the video frames
-		const int framesCount = processFrames(inputFormatCtx, inputDecoderCtx.get(), videoStreamIndex,
-			[&](AVFrame* frame, int& framesCount) { detectFrameWatermark(inputFrame, height, width, watermarkInterval, framesCount, frame, frameFlatPinned, watermarkObj); });
+		const int framesCount = processFrames(videoData, [&](AVFrame* frame, int& framesCount) { detectFrameWatermark(videoData, framesCount, frame); });
 		timer::end();
 
 		cout << "\nWatermark detection total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
@@ -307,64 +308,63 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 
 	// Cleanup
 	queue.enqueueUnmapMemObject(pinnedBuff, frameFlatPinned);
-	avformat_close_input(&inputFormatCtx);
 	return EXIT_SUCCESS;
 }
 
 //Main frames loop logic for video watermark embedding and detection
-int processFrames(AVFormatContext* formatCtx, AVCodecContext* decoderCtx, const int videoStreamIndex, std::function<void(AVFrame*, int&)> processFrame)
+int processFrames(const VideoProcessingContext& data, std::function<void(AVFrame*, int&)> processFrame)
 {
 	const AVPacketPtr packet(av_packet_alloc(), [](AVPacket* pkt) { av_packet_free(&pkt); });
 	const AVFramePtr frame(av_frame_alloc(), [](AVFrame* frame) { av_frame_free(&frame); });
 	int framesCount = 0;
 
 	// Read video frames loop
-	while (av_read_frame(formatCtx, packet.get()) >= 0)
+	while (av_read_frame(data.inputFormatCtx, packet.get()) >= 0)
 	{
-		if (!receivedValidVideoFrame(decoderCtx, packet.get(), frame.get(), videoStreamIndex))
+		if (!receivedValidVideoFrame(data.inputDecoderCtx, packet.get(), frame.get(), data.videoStreamIndex))
 			continue;
 		processFrame(frame.get(), framesCount);
 	}
 	// Ensure all remaining frames are flushed
-	avcodec_send_packet(decoderCtx, nullptr);
-	while (avcodec_receive_frame(decoderCtx, frame.get()) == 0)
+	avcodec_send_packet(data.inputDecoderCtx, nullptr);
+	while (avcodec_receive_frame(data.inputDecoderCtx, frame.get()) == 0)
 	{
-		if (frame->format == decoderCtx->pix_fmt)
+		if (frame->format == data.inputDecoderCtx->pix_fmt)
 			processFrame(frame.get(), framesCount);
 	}
 	return framesCount;
 }
 
 // Embed watermark in a video frame
-void embedWatermarkFrame(af::array& inputFrame, af::array& watermarkedFrame, const int height, const int width, const int watermarkInterval, int& framesCount, AVFrame* frame, uint8_t* frameFlatPinned, FILE* ffmpegPipe, const Watermark& watermarkObj)
+void embedWatermarkFrame(const VideoProcessingContext& data, int& framesCount, AVFrame* frame, FILE* ffmpegPipe)
 {
 	float watermarkStrength;
-	const bool embedWatermark = framesCount % watermarkInterval == 0;
+	const bool embedWatermark = framesCount % data.watermarkInterval == 0;
 	//if there is row padding (for alignment), we must copy the data to a contiguous block!
-	if (frame->linesize[0] != width)
+	if (frame->linesize[0] != data.width)
 	{
 		if (embedWatermark)
 		{
-			for (int y = 0; y < height; y++)
-				memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
+			for (int y = 0; y < data.height; y++)
+				memcpy(data.frameFlatPinned + y * data.width, frame->data[0] + y * frame->linesize[0], data.width);
 			//embed the watermark and receive the watermarked data back to host
-			inputFrame = af::array(width, height, frameFlatPinned, afHost).T().as(f32);
-			watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
-			watermarkedFrame.host(frameFlatPinned);
+			const af::array inputFrame = af::array(data.width, data.height, data.frameFlatPinned, afHost).T().as(f32);
+			const af::array watermarkedFrame = data.watermarkObj->makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
+			watermarkedFrame.host(data.frameFlatPinned);
 			//write the watermarked image data
-			fwrite(frameFlatPinned, 1, width * frame->height, ffmpegPipe);
+			fwrite(data.frameFlatPinned, 1, data.width * frame->height, ffmpegPipe);
 		}
 		else
 		{
 			//write from frame buffer row-by-row the the valid image data (and not the alignment bytes)
-			for (int y = 0; y < height; y++)
-				fwrite(frame->data[0] + y * frame->linesize[0], 1, width, ffmpegPipe);
+			for (int y = 0; y < data.height; y++)
+				fwrite(frame->data[0] + y * frame->linesize[0], 1, data.width, ffmpegPipe);
 		}
 		//always write UI planes as-is
-		for (int y = 0; y < height / 2; y++)
-			fwrite(frame->data[1] + y * frame->linesize[1], 1, width / 2, ffmpegPipe);
-		for (int y = 0; y < height / 2; y++)
-			fwrite(frame->data[2] + y * frame->linesize[2], 1, width / 2, ffmpegPipe);
+		for (int y = 0; y < data.height / 2; y++)
+			fwrite(frame->data[1] + y * frame->linesize[1], 1, data.width / 2, ffmpegPipe);
+		for (int y = 0; y < data.height / 2; y++)
+			fwrite(frame->data[2] + y * frame->linesize[2], 1, data.width / 2, ffmpegPipe);
 
 	}
 	//no row padding, read and write data directly
@@ -372,34 +372,34 @@ void embedWatermarkFrame(af::array& inputFrame, af::array& watermarkedFrame, con
 	{
 		if (embedWatermark)
 		{
-			inputFrame = af::array(width, height, frame->data[0], afHost).T().as(f32);
-			watermarkedFrame = watermarkObj.makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
-			watermarkedFrame.host(frameFlatPinned);
+			const af::array inputFrame = af::array(data.width, data.height, frame->data[0], afHost).T().as(f32);
+			const af::array watermarkedFrame = data.watermarkObj->makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
+			watermarkedFrame.host(data.frameFlatPinned);
 		}
 		// Write original or modified frame to ffmpeg (pipe)
-		fwrite(embedWatermark ? frameFlatPinned : frame->data[0], 1, width * frame->height, ffmpegPipe);
-		fwrite(frame->data[1], 1, width * frame->height / 4, ffmpegPipe);
-		fwrite(frame->data[2], 1, width * frame->height / 4, ffmpegPipe);
+		fwrite(embedWatermark ? data.frameFlatPinned : frame->data[0], 1, data.width * frame->height, ffmpegPipe);
+		fwrite(frame->data[1], 1, data.width * frame->height / 4, ffmpegPipe);
+		fwrite(frame->data[2], 1, data.width * frame->height / 4, ffmpegPipe);
 	}
 	framesCount++;
 }
 
 // Detect the watermark for a video frame
-void detectFrameWatermark(af::array& inputFrame, const int height, const int width, const int watermarkInterval, int& framesCount, AVFrame* frame, uint8_t* frameFlatPinned, const Watermark& watermarkObj)
+void detectFrameWatermark(const VideoProcessingContext& data, int& framesCount, AVFrame* frame)
 {
 	//detect watermark after X frames
-	if (framesCount % watermarkInterval == 0)
+	if (framesCount % data.watermarkInterval == 0)
 	{
 		//if there is row padding (for alignment), we must copy the data to a contiguous block!
-		const bool rowPadding = frame->linesize[0] != width;
+		const bool rowPadding = frame->linesize[0] != data.width;
 		if (rowPadding)
 		{
-			for (int y = 0; y < height; y++)
-				memcpy(frameFlatPinned + y * width, frame->data[0] + y * frame->linesize[0], width);
+			for (int y = 0; y < data.height; y++)
+				memcpy(data.frameFlatPinned + y * data.width, frame->data[0] + y * frame->linesize[0], data.width);
 		}
 		//supply the input frame to the GPU and run the detection of the watermark
-		inputFrame = af::array(width, height, rowPadding ? frameFlatPinned : frame->data[0], afHost).T().as(f32);
-		float correlation = watermarkObj.detectWatermark(inputFrame, MASK_TYPE::ME);
+		const af::array inputFrame = af::array(data.width, data.height, rowPadding ? data.frameFlatPinned : frame->data[0], afHost).T().as(f32);
+		float correlation = data.watermarkObj->detectWatermark(inputFrame, MASK_TYPE::ME);
 		cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
 	}
 	framesCount++;
