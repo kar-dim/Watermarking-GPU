@@ -325,8 +325,8 @@ void embedWatermarkFrame(const VideoProcessingContext& data, int& framesCount, A
 	{
 		if (embedWatermark)
 		{
-			af::array inputFrame = af::array(data.width, data.height, frame->data[0], afHost).T().as(f32);
-			af::array watermarkedFrame = data.watermarkObj->makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
+			const af::array inputFrame = af::array(data.width, data.height, frame->data[0], afHost).T().as(f32);
+			const af::array watermarkedFrame = data.watermarkObj->makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
 			watermarkedFrame.host(data.frameFlatPinned);
 		}
 		// Write original or modified frame to ffmpeg (pipe)
@@ -351,7 +351,7 @@ void detectFrameWatermark(const VideoProcessingContext& data, int& framesCount, 
 				memcpy(data.frameFlatPinned + y * data.width, frame->data[0] + y * frame->linesize[0], data.width);
 		}
 		//supply the input frame to the GPU and run the detection of the watermark
-		af::array inputFrame = af::array(data.width, data.height, rowPadding ? data.frameFlatPinned : frame->data[0], afHost).T().as(f32);
+		const af::array inputFrame = af::array(data.width, data.height, rowPadding ? data.frameFlatPinned : frame->data[0], afHost).T().as(f32);
 		float correlation = data.watermarkObj->detectWatermark(inputFrame, MASK_TYPE::ME);
 		cout << "Correlation for frame: " << framesCount << ": " << correlation << "\n";
 	}
