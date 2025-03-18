@@ -39,6 +39,7 @@ using AVFramePtr = std::unique_ptr<AVFrame, std::function<void(AVFrame*)>>;
 using AVFormatContextPtr = std::unique_ptr<AVFormatContext, std::function<void(AVFormatContext*)>>;
 using AVCodecContextPtr = std::unique_ptr<AVCodecContext, std::function<void(AVCodecContext*)>>;
 using FILEPtr = std::unique_ptr<FILE, decltype(&_pclose)>;
+using PinnedMemoryPtr = std::unique_ptr<cl_uchar, std::function<void(cl_uchar*)>>;
 
 //helper lambda function that displays an error message and exits the program if an error condition is true
 auto checkError = [](auto criticalErrorCondition, const std::string& errorMessage) 
@@ -268,9 +269,10 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	const cl::CommandQueue queue(afcl::getQueue(false));
 	cl::Buffer pinnedBuff(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, width * height * sizeof(cl_uchar), nullptr, nullptr);
 	cl_uchar* frameFlatPinned = static_cast<cl_uchar*>(queue.enqueueMapBuffer(pinnedBuff, CL_TRUE, CL_MAP_WRITE, 0, width * height * sizeof(cl_uchar), nullptr, nullptr, nullptr));
-
+	PinnedMemoryPtr framePinned(frameFlatPinned, [&](cl_uchar* ptr) { queue.enqueueUnmapMemObject(pinnedBuff, ptr); });
+	
 	//group common video data for both embedding and detection
-	VideoProcessingContext videoData(inputFormatCtx.get(), inputDecoderCtx.get(), videoStreamIndex, &watermarkObj, height, width, watermarkInterval, frameFlatPinned);
+	VideoProcessingContext videoData(inputFormatCtx.get(), inputDecoderCtx.get(), videoStreamIndex, &watermarkObj, height, width, watermarkInterval, framePinned.get());
 
 	//realtime watermarking of raw video
 	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
@@ -305,9 +307,6 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 		cout << "\nWatermark detection total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 		cout << "\nWatermark detection average execution time per frame: " << executionTime(showFps, timer::elapsedSeconds() / framesCount) << "\n";
 	}
-
-	// Cleanup
-	queue.enqueueUnmapMemObject(pinnedBuff, frameFlatPinned);
 	return EXIT_SUCCESS;
 }
 
