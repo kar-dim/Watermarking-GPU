@@ -32,6 +32,9 @@
     <ClCompile Include="cuda_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="videoprocessingcontext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Watermark.cuh">
@@ -47,6 +50,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="main_utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="videoprocessingcontext.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
