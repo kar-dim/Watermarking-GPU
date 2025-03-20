@@ -5,6 +5,7 @@
 #include <concepts>
 #include <string>
 #include <utility>
+#include <vector>
 
 enum MASK_TYPE 
 {
