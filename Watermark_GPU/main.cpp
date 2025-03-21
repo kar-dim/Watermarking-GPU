@@ -225,7 +225,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	CudaPinnedPtr framePinned(frameFlatPinned, [](uint8_t* ptr) { if (ptr) cudaFreeHost(ptr); });
 
 	//group common video data for both embedding and detection
-	VideoProcessingContext videoData(inputFormatCtx.get(), inputDecoderCtx.get(), videoStreamIndex, &watermarkObj, height, width, watermarkInterval, framePinned.get());
+	const VideoProcessingContext videoData(inputFormatCtx.get(), inputDecoderCtx.get(), videoStreamIndex, &watermarkObj, height, width, watermarkInterval, framePinned.get());
 
 	//realtime watermarking of raw video
 	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
