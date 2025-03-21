@@ -272,7 +272,7 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 	PinnedMemoryPtr framePinned(frameFlatPinned, [&](cl_uchar* ptr) { queue.enqueueUnmapMemObject(pinnedBuff, ptr); });
 	
 	//group common video data for both embedding and detection
-	VideoProcessingContext videoData(inputFormatCtx.get(), inputDecoderCtx.get(), videoStreamIndex, &watermarkObj, height, width, watermarkInterval, framePinned.get());
+	const VideoProcessingContext videoData(inputFormatCtx.get(), inputDecoderCtx.get(), videoStreamIndex, &watermarkObj, height, width, watermarkInterval, framePinned.get());
 
 	//realtime watermarking of raw video
 	const string makeWatermarkVideoPath = inir.Get("parameters_video", "encode_watermark_file_path", "");
