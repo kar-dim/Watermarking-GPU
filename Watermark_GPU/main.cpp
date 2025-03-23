@@ -233,6 +233,7 @@ int testForImage(const cl::Device& device, const std::vector<cl::Program>& progr
 		cout << "\nSaving watermarked files to disk...\n";
 //#pragma omp parallel sections
 		//{
+//#pragma omp section
 			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_NVF").c_str(), watermarkNVF.as(u8));
 //#pragma omp section
 			af::saveImageNative(Utilities::addSuffixBeforeExtension(imageFile, "_W_ME").c_str(), watermarkME.as(u8));
