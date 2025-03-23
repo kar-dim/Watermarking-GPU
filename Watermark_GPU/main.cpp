@@ -25,7 +25,11 @@ extern "C" {
 #include <libavutil/log.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/codec.h>
+#include <libavutil/display.h>
 #include <libavutil/pixfmt.h>
+#include "libavutil/dict.h"
+#include "libavcodec/codec_par.h"
+#include "libavutil/rational.h"
 }
 
 using std::cout;
@@ -235,8 +239,10 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 		// Build the FFmpeg command
 		std::ostringstream ffmpegCmd;
 		ffmpegCmd << "ffmpeg -y -f rawvideo -pix_fmt yuv420p " << "-s " << width << "x" << height 
-			<< " -r 30 -i - -i " << videoFile << " " << ffmpegOptions
-			<< " -map 0:v -map 1:a -shortest " << makeWatermarkVideoPath;
+			<< getVideoRotation(inputFormatCtx.get(), videoStreamIndex)
+			<< " -r " << getVideoFrameRate(inputFormatCtx.get(), videoStreamIndex) << " -i - -i " << videoFile << " " << ffmpegOptions
+			<< " -c:s copy -c:a copy -map 1:s? -map 0:v -map 1:a? -max_interleave_delta 0 " << makeWatermarkVideoPath;
+		cout << "\nFFmpeg encode command: " << ffmpegCmd.str() << "\n\n";
 
 		// Open FFmpeg process
 		FILEPtr ffmpegPipe(_popen(ffmpegCmd.str().c_str(), "wb"), _pclose);
@@ -385,6 +391,30 @@ AVCodecContext* openDecoderContext(const AVCodecParameters* inputCodecParams)
 	return inputDecoderCtx;
 }
 
+// Check if rotation metadata exists in the input video, if yes add it to the FFmpeg command
+// This would keep the video in the correct orientation after watermarking (this is used by video players for displaying)
+string getVideoRotation(const AVFormatContext* inputFormatCtx, const int videoStreamIndex)
+{
+	int rotation = 0;
+	if (auto rotateEntry = av_dict_get(inputFormatCtx->streams[videoStreamIndex]->metadata, "rotate", nullptr, 0))
+		rotation = atoi(rotateEntry->value);
+	else if (auto rotateEntry = av_dict_get(inputFormatCtx->metadata, "rotate", nullptr, 0))
+		rotation = atoi(rotateEntry->value);
+	else if (auto sideData = av_packet_side_data_get(inputFormatCtx->streams[videoStreamIndex]->codecpar->coded_side_data, inputFormatCtx->streams[videoStreamIndex]->codecpar->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX))
+		rotation = static_cast<int>(av_display_rotation_get(reinterpret_cast<int32_t*>(sideData->data)));
+	// If rotation is found (non-zero), return the metadata command
+	if (rotation != 0)
+		return " -display_rotation " + std::to_string(rotation);
+	return "";
+}
+
+// Get the input video FPS (average)
+string getVideoFrameRate(const AVFormatContext* inputFormatCtx, const int videoStreamIndex)
+{
+	const AVRational frameRate = inputFormatCtx->streams[videoStreamIndex]->avg_frame_rate;
+	return std::format("{:.3f}", static_cast<float>(frameRate.num) / frameRate.den);
+}
+
 //supply a packet to the decoder and check if the received frame is valid by checking its format
 bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, AVFrame* frame, const int videoStreamIndex)
 {
@@ -397,7 +427,9 @@ bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, 
 	av_packet_unref(packet);
 	if (sendPacketResult != 0 || avcodec_receive_frame(inputDecoderCtx, frame) != 0)
 		return false;
-	return frame->format == AV_PIX_FMT_YUV420P;
+	const bool validFormat = frame->format == AV_PIX_FMT_YUV420P || frame->format == AV_PIX_FMT_YUVJ420P;
+	checkError(!validFormat, "Error: Video frame format not supported, aborting");
+	return validFormat;
 }
 
 string executionTime(const bool showFps, const double seconds) 
