@@ -1,7 +1,6 @@
 #include "videoprocessingcontext.hpp"
 #include "opencl_init.h"
 #include "Watermark.hpp"
-#include <cstdint>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
