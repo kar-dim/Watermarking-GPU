@@ -7,7 +7,6 @@
 #include "videoprocessingcontext.hpp"
 #include "Watermark.hpp"
 #include <af/opencl.h>
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -29,10 +28,8 @@ extern "C" {
 #include <libavutil/frame.h>
 #include <libavutil/log.h>
 #include <libavutil/avutil.h>
-#include <libavutil/display.h>
 #include <libavcodec/codec.h>
 #include <libavutil/pixfmt.h>
-#include "libavutil/dict.h"
 #include "libavcodec/codec_par.h"
 #include "libavutil/rational.h"
 }
@@ -287,7 +284,6 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 		// Build the FFmpeg command
 		std::ostringstream ffmpegCmd;
 		ffmpegCmd << "ffmpeg -y -f rawvideo -pix_fmt yuv420p " << "-s " << width << "x" << height
-			<< getVideoRotation(inputFormatCtx.get(), videoStreamIndex)
 			<< " -r " << getVideoFrameRate(inputFormatCtx.get(), videoStreamIndex) << " -i - -i " << videoFile << " " << ffmpegOptions
 			<< " -c:s copy -c:a copy -map 1:s? -map 0:v -map 1:a? -max_interleave_delta 0 " << makeWatermarkVideoPath;
 		cout << "\nFFmpeg encode command: " << ffmpegCmd.str() << "\n\n";
@@ -436,23 +432,6 @@ AVCodecContext* openDecoderContext(const AVCodecParameters* inputCodecParams)
 		inputDecoderCtx->thread_count = 1; //don't use multithreading
 	avcodec_open2(inputDecoderCtx, inputDecoder, nullptr);
 	return inputDecoderCtx;
-}
-
-// Check if rotation metadata exists in the input video, if yes add it to the FFmpeg command
-// This would keep the video in the correct orientation after watermarking (this is used by video players for displaying)
-string getVideoRotation(const AVFormatContext* inputFormatCtx, const int videoStreamIndex)
-{
-	int rotation = 0;
-	if (auto rotateEntry = av_dict_get(inputFormatCtx->streams[videoStreamIndex]->metadata, "rotate", nullptr, 0))
-		rotation = atoi(rotateEntry->value);
-	else if (auto rotateEntry = av_dict_get(inputFormatCtx->metadata, "rotate", nullptr, 0))
-		rotation = atoi(rotateEntry->value);
-	else if (auto sideData = av_packet_side_data_get(inputFormatCtx->streams[videoStreamIndex]->codecpar->coded_side_data, inputFormatCtx->streams[videoStreamIndex]->codecpar->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX))
-		rotation = static_cast<int>(av_display_rotation_get(reinterpret_cast<int32_t*>(sideData->data)));
-	// If rotation is found (non-zero), return the metadata command
-	if (rotation != 0)
-		return " -display_rotation " + std::to_string(rotation);
-	return "";
 }
 
 // Get the input video FPS (average)
