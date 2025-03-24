@@ -25,7 +25,6 @@ int testForVideo(const INIReader& inir, const std::string& videoFile, const cuda
 int findVideoStreamIndex(const AVFormatContext* inputFormatCtx);
 AVCodecContext* openDecoderContext(const AVCodecParameters* params);
 bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, AVFrame* frame, const int videoStreamIndex);
-std::string getVideoRotation(const AVFormatContext* inputFormatCtx, const int videoStreamIndex);
 std::string getVideoFrameRate(const AVFormatContext* inputFormatCtx, const int videoStreamIndex);
 void embedWatermarkFrame(const VideoProcessingContext& data, int& framesCount, AVFrame* frame, FILE* ffmpegPipe);
 void detectFrameWatermark(const VideoProcessingContext& data, int& framesCount, AVFrame* frame);
