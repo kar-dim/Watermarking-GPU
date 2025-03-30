@@ -40,7 +40,7 @@ using FILEPtr = std::unique_ptr<FILE, decltype(&_pclose)>;
 using CudaPinnedPtr = std::unique_ptr<uint8_t, std::function<void(uint8_t*)>>;
 
 //helper lambda function that displays an error message and exits the program if an error condition is true
-auto checkError = [](auto criticalErrorCondition, const std::string& errorMessage)
+auto checkError = [](auto criticalErrorCondition, const string& errorMessage)
 {
 	if (criticalErrorCondition)
 	{
