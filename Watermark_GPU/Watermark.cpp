@@ -97,19 +97,19 @@ af::array Watermark::computeCustomMask() const
 {
 	const af::array customMask(dims.rows, dims.cols);
 	const std::unique_ptr<cl_mem> outputMem(customMask.device<cl_mem>());
-	const int pad = p / 2;
+	const int localMemElements = (16 + p) * (16 + p);
 	//execute kernel
 	try {
 		cl::Buffer buff(*outputMem.get(), true);
 		queue.enqueueNDRangeKernel(
-			cl_utils::KernelBuilder(programs[0],"nvf").args(image2d, buff, cl::Local(sizeof(float) * ( (16 + (2 * pad)) * (16 + (2 * pad)) ) )).build(),
+			cl_utils::KernelBuilder(programs[0],"nvf").args(image2d, buff, cl::Local(sizeof(float) * localMemElements)).build(),
 			cl::NDRange(), cl::NDRange(texKernelDims.rows, texKernelDims.cols), cl::NDRange(16, 16));
 		queue.finish();
 		unlockArrays(customMask);
 		return customMask;
 	}
 	catch (const cl::Error& ex) {
-		throw std::runtime_error("ERROR in nvf: " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
+		throw std::runtime_error("ERROR in nvf: " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
 	}
 }
 
@@ -131,7 +131,7 @@ af::array Watermark::computeScaledNeighbors(const af::array& coefficients) const
 		return neighbors;
 	}
 	catch (const cl::Error& ex) {
-		throw std::runtime_error("ERROR in scaled_neighbors_p3: " + std::string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
+		throw std::runtime_error("ERROR in scaled_neighbors_p3: " + string(ex.what()) + " Error code: " + std::to_string(ex.err()) + "\n");
 	}
 }
 

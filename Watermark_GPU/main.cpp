@@ -44,11 +44,11 @@ using FILEPtr = std::unique_ptr<FILE, decltype(&_pclose)>;
 using PinnedMemoryPtr = std::unique_ptr<cl_uchar, std::function<void(cl_uchar*)>>;
 
 //helper lambda function that displays an error message and exits the program if an error condition is true
-auto checkError = [](auto criticalErrorCondition, const std::string& errorMessage) 
+auto checkError = [](auto criticalErrorCondition, const string& errorMessage) 
 {
 	if (criticalErrorCondition) 
 	{
-		std::cout << errorMessage << "\n";
+		cout << errorMessage << "\n";
 		exitProgram(EXIT_FAILURE);
 	}
 };
@@ -98,7 +98,7 @@ int main(void)
 	//compile opencl kernels
 	std::vector<cl::Program> programs(3);
 	try {
-		auto buildProgram = [&context, &device](auto& program, const std::string& kernelName, const std::string& buildOptions) 
+		auto buildProgram = [&context, &device](auto& program, const string& kernelName, const string& buildOptions) 
 		{
 			program = cl::Program(context, kernelName);
 			program.build(device, buildOptions.c_str());
@@ -459,7 +459,7 @@ bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, 
 }
 
 //helper method to calculate execution time in FPS or in seconds
-std::string executionTime(const bool showFps, const double seconds) 
+string executionTime(const bool showFps, const double seconds) 
 {
 	return showFps ? std::format("FPS: {:.2f} FPS", 1.0 / seconds) : std::format("{:.6f} seconds", seconds);
 }
