@@ -40,7 +40,7 @@ private:
 	const cl::Context context{ afcl::getContext(false) };
 	const cl::CommandQueue queue{ afcl::getQueue(false) };
 	const cl::Buffer RxMappingsBuff{ context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(int) * 64, (void*)RxMappings, NULL };
-	dim2 dims, meKernelDims, texKernelDims;
+	dim2 dims, texKernelDims, meKernelDims;
 	std::vector<cl::Program> programs;
 	int p;
 	float strengthFactor;
@@ -62,8 +62,8 @@ private:
 public:
 	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr, const std::vector<cl::Program>& programs);
 	Watermark(const Watermark& other);
-	Watermark(Watermark&& other) noexcept = default; //default move constructor is fine, will call std::move for all fields
-	Watermark& operator=(Watermark&& other) noexcept = default; //default move assignmet is fine
+	Watermark(Watermark&& other) noexcept = delete;
+	Watermark& operator=(Watermark&& other) noexcept = delete;
 	Watermark& operator=(const Watermark& other);
 	void reinitialize(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
 	af::array makeWatermark(const af::array& inputImage, const af::array& outputImage, float& watermarkStrength, MASK_TYPE maskType) const;
