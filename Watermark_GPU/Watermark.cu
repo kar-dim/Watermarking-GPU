@@ -130,7 +130,7 @@ void Watermark::loadRandomMatrix(const string& randomMatrixPath)
 }
 
 //deletes and re-initializes memory (texture, kernel arrays, random matrix array) for new image size
-void Watermark::reinitialize(const string randomMatrixPath, const dim_t rows, const dim_t cols)
+void Watermark::reinitialize(const string& randomMatrixPath, const dim_t rows, const dim_t cols)
 {
 	dims = { UINT(cols), UINT(rows) };
 	meKernelDims = { ALIGN_UP_64(cols), UINT(rows) };

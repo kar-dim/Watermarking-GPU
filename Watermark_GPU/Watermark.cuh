@@ -47,7 +47,7 @@ public:
 	Watermark& operator=(Watermark&& other) noexcept;
 	Watermark& operator=(const Watermark& other);
 	~Watermark();
-	void reinitialize(const std::string randomMatrixPath, const dim_t rows, const dim_t cols);
+	void reinitialize(const std::string& randomMatrixPath, const dim_t rows, const dim_t cols);
 	af::array makeWatermark(const af::array& inputImage, const af::array& outputImage, float& watermarkStrength, MASK_TYPE maskType) const;
 	float detectWatermark(const af::array& watermarkedImage, MASK_TYPE maskType) const;
 	static void displayArray(const af::array& array, const int width = 1600, const int height = 900);
