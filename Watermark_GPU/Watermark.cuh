@@ -28,7 +28,7 @@ private:
 	static cudaStream_t afStream;
 
 	void initializeMemory();
-	void loadRandomMatrix(const std::string randomMatrixPath);
+	void loadRandomMatrix(const std::string& randomMatrixPath);
 	std::pair<af::array, af::array> transformCorrelationArrays(const af::array& RxPartial, const af::array& rxPartial) const;
 	float computeCorrelation(const af::array& e_u, const af::array& e_z) const;
 	af::array computeCustomMask() const;
