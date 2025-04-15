@@ -41,7 +41,7 @@ private:
 	static void unlockArrays(const Args&... arrays) { (arrays.unlock(), ...); }
 
 public:
-	Watermark(const dim_t rows, const dim_t cols, const std::string randomMatrixPath, const int p, const float psnr);
+	Watermark(const dim_t rows, const dim_t cols, const std::string& randomMatrixPath, const int p, const float psnr);
 	Watermark(const Watermark& other);
 	Watermark(Watermark&& other) noexcept;
 	Watermark& operator=(Watermark&& other) noexcept;
