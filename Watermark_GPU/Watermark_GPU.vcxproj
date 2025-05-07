@@ -96,7 +96,6 @@ xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
   <ItemGroup>
     <ClCompile Include="opencl_utils.cpp" />
     <ClCompile Include="Utilities.cpp" />
-    <ClCompile Include="videoprocessingcontext.cpp" />
     <ClCompile Include="Watermark.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
