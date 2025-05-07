@@ -161,7 +161,6 @@ xcopy "$(ProjectDir)libs\ffmpeg\bin\ffmpeg.exe" "$(OutDir)" /y /D</Command>
     <ClCompile Include="cuda_utils.cpp" />
     <ClCompile Include="Utilities.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="videoprocessingcontext.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cuda_utils.hpp" />
