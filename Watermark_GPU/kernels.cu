@@ -117,50 +117,38 @@ __global__ void me_p3(cudaTextureObject_t texObj, float* __restrict__ Rx, float*
 
 __global__ void calculate_scaled_neighbors_p3(cudaTextureObject_t texObj, float* x_, const unsigned int width, const unsigned int height)
 {
+    constexpr int sharedSize = 16 + 2;
     const int x = blockIdx.y * blockDim.y + threadIdx.y;
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
-    const int shX = threadIdx.y + 1;
-    const int shY = threadIdx.x + 1;
+    const int localId = threadIdx.y * blockDim.x + threadIdx.x; // 0 to 255 for 16 x 16 block
 
-	__shared__ float region[16 + 2][16 + 2]; //hold the 18 x 18 region for this 16 x 16 block
+    __shared__ float region[sharedSize][sharedSize]; //hold the 18 x 18 region for this 16 x 16 block
 
-    //load current pixel value
-    region[shY][shX] = tex2D<float>(texObj, y, x);
-
-    // Load the padded regions (only edge threads)
-    if (threadIdx.x == 0)
-        region[shY - 1][shX] = tex2D<float>(texObj, y - 1, x);
-    if (threadIdx.x == 15)
-        region[shY + 1][shX] = tex2D<float>(texObj, y + 1, x);
-    if (threadIdx.y == 0)
-        region[shY][shX - 1] = tex2D<float>(texObj, y, x - 1);
-    if (threadIdx.y == 15)
-        region[shY][shX + 1] = tex2D<float>(texObj, y, x + 1);
-
-    // Load the corners of the padded region (only edge threads)
-    if (threadIdx.x == 0 && threadIdx.y == 0)
-        region[shY - 1][shX - 1] = tex2D<float>(texObj, y - 1, x - 1);
-    if (threadIdx.x == 15 && threadIdx.y == 15)
-        region[shY + 1][shX + 1] = tex2D<float>(texObj, y + 1, x + 1);
-    if (threadIdx.x == 0 && threadIdx.y == 15)
-        region[shY - 1][shX + 1] = tex2D<float>(texObj, y - 1, x + 1);
-    if (threadIdx.x == 15 && threadIdx.y == 0)
-        region[shY + 1][shX - 1] = tex2D<float>(texObj, y + 1, x - 1);
-
+    //load cooperatively the 18 x 18 region for this 16 x 16 block
+    for (int i = localId; i < 18 * 18; i += blockDim.x * blockDim.y)
+    {
+        const int tileRow = i / sharedSize;
+        const int tileCol = i % sharedSize;
+        const int globalX = blockIdx.y * blockDim.y + tileCol - 1;
+        const int globalY = blockIdx.x * blockDim.x + tileRow - 1;
+        region[tileRow][tileCol] = tex2D<float>(texObj, globalY, globalX);
+    }
     __syncthreads();
 
-     //calculate the dot product of the coefficients and the neighborhood for this pixel
+    //calculate the dot product of the coefficients and the neighborhood for this pixel
     if (x < width && y < height)
     {
+        const int centerCol = threadIdx.y + 1;
+        const int centerRow = threadIdx.x + 1;
         float dot = 0.0f;
-        dot += coeffs[0] * region[shY - 1][shX - 1];
-        dot += coeffs[1] * region[shY - 1][shX];
-        dot += coeffs[2] * region[shY - 1][shX + 1];
-        dot += coeffs[3] * region[shY][shX - 1];
-        dot += coeffs[4] * region[shY][shX + 1];
-        dot += coeffs[5] * region[shY + 1][shX - 1];
-        dot += coeffs[6] * region[shY + 1][shX];
-        dot += coeffs[7] * region[shY + 1][shX + 1];
+        dot += coeffs[0] * region[centerRow - 1][centerCol - 1];
+        dot += coeffs[1] * region[centerRow - 1][centerCol];
+        dot += coeffs[2] * region[centerRow - 1][centerCol + 1];
+        dot += coeffs[3] * region[centerRow][centerCol - 1];
+        dot += coeffs[4] * region[centerRow][centerCol + 1];
+        dot += coeffs[5] * region[centerRow + 1][centerCol - 1];
+        dot += coeffs[6] * region[centerRow + 1][centerCol];
+        dot += coeffs[7] * region[centerRow + 1][centerCol + 1];
         x_[(x * height + y)] = dot;
     }
 }

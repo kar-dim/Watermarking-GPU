@@ -21,83 +21,48 @@ __device__ void me_p3_RxCalculate(half8* RxLocalVec, const half& x_0, const half
 template<int p, int pSquared = p * p, int pad = p / 2>
 __global__ void nvf(cudaTextureObject_t texObj, float* nvf, const unsigned int width, const unsigned int height)
 {
+    constexpr int sharedSize = 16 + (2 * pad);
     const int x = blockIdx.y * blockDim.y + threadIdx.y;
     const int y = blockIdx.x * blockDim.x + threadIdx.x;
-    const int shX = threadIdx.y + pad;
-    const int shY = threadIdx.x + pad;
+    const int localId = threadIdx.y * blockDim.x + threadIdx.x; // 0 to 255 for 16 x 16 block
 
-    __shared__ float region[16 + (2 * pad)][16 + (2 * pad)]; //hold the region for this 16 x 16 block (16 + padding)
+    __shared__ float region[sharedSize][sharedSize]; //hold the region for this 16 x 16 block
 
-    //load current pixel value
-    region[shY][shX] = tex2D<float>(texObj, y, x);
-
-    // Load the padded regions (only edge threads)
-    if (threadIdx.x == 0)
+    //load cooperatively the padded region for this 16 x 16 block
+    for (int i = localId; i < sharedSize * sharedSize; i += blockDim.x * blockDim.y)
     {
-		for (int i = pad; i > 0; i--)
-			region[shY - i][shX] = tex2D<float>(texObj, y - i, x);
-    }
-    if (threadIdx.x == 15)
-    {
-        for (int i = pad; i > 0; i--)
-            region[shY + i][shX] = tex2D<float>(texObj, y + i, x);
-    }
-    if (threadIdx.y == 0)
-    {
-        for (int i = pad; i > 0; i--)
-            region[shY][shX - i] = tex2D<float>(texObj, y, x - i);
-    }
-    if (threadIdx.y == 15) 
-    {
-        for (int i = pad; i > 0; i--)
-            region[shY][shX + i] = tex2D<float>(texObj, y, x + i);
-    }
-
-    // Load the corners of the padded region (only edge threads)
-    if (threadIdx.x == 0 && threadIdx.y == 0)
-    {
-        for (int i = -1; i >= -pad; i--)
-            for (int j = -1; j >= -pad; j--)
-                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
-    }
-    if (threadIdx.x == 15 && threadIdx.y == 15)
-    {
-        for (int i = 1; i <= pad; i++)
-            for (int j = 1; j <= pad; j++)
-                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
-    }
-    if (threadIdx.x == 0 && threadIdx.y == 15)
-    {
-        for (int i = -1; i >= -pad; i--)
-            for (int j = 1; j <= pad; j++)
-                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
-    }
-    if (threadIdx.x == 15 && threadIdx.y == 0)
-    {
-        for (int i = 1; i <= pad; i++)
-            for (int j = -1; j >= -pad; j--)
-                region[shY + i][shX + j] = tex2D<float>(texObj, y + i, x + j);
+        const int tileRow = i / sharedSize;
+        const int tileCol = i % sharedSize;
+        const int globalX = blockIdx.y * blockDim.y + tileCol - pad;
+        const int globalY = blockIdx.x * blockDim.x + tileRow - pad;
+        region[tileRow][tileCol] = tex2D<float>(texObj, globalY, globalX);
     }
     __syncthreads();
 
-	if (x >= width || y >= height)
-		return;
+    // Bounds check
+    if (x >= width || y >= height)
+        return;
 
-	//load the neighbors to calculate the region's parameters for this pixel
-	float sum = 0.0f, sumSq = 0.0f;
-	for (int i = -pad; i <= pad; i++)
-	{
-		for (int j = -pad; j <= pad; j++)
-		{
-            float pixelValue = region[shY + i][shX + j];
-			sum += pixelValue;
-			sumSq += pixelValue * pixelValue;
-		}
-	}
-	float mean = sum / pSquared;
-	float variance = (sumSq / pSquared) - (mean * mean);
-	//calculate mask and write pixel value
-	nvf[(x * height) + y] = variance / (1 + variance);
+    // Local (shared memory) coordinates for center pixel
+    const int shX = threadIdx.y + pad;
+    const int shY = threadIdx.x + pad;
+
+    float sum = 0.0f, sumSq = 0.0f;
+    for (int i = -pad; i <= pad; i++)
+    {
+        for (int j = -pad; j <= pad; j++)
+        {
+            float val = region[shY + j][shX + i];
+            sum += val;
+            sumSq += val * val;
+        }
+    }
+
+    float mean = sum / pSquared;
+    float variance = (sumSq / pSquared) - (mean * mean);
+
+    // Store result
+    nvf[x * height + y] = variance / (1.0f + variance);
 }
 
 //main ME kernel, calculates ME values for each pixel in the image
