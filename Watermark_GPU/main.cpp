@@ -304,8 +304,8 @@ void embedWatermarkFrame(const VideoProcessingContext& data, int& framesCount, A
 			for (int y = 0; y < data.height; y++)
 				memcpy(data.frameFlatPinned + y * data.width, frame->data[0] + y * frame->linesize[0], data.width);
 			//embed the watermark and receive the watermarked data back to host
-			af::array inputFrame = af::array(data.width, data.height, data.frameFlatPinned, afHost).T().as(f32);
-			af::array watermarkedFrame = data.watermarkObj->makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
+			const af::array inputFrame = af::array(data.width, data.height, data.frameFlatPinned, afHost).T().as(f32);
+			const af::array watermarkedFrame = data.watermarkObj->makeWatermark(inputFrame, inputFrame, watermarkStrength, MASK_TYPE::ME).as(u8).T();
 			watermarkedFrame.host(data.frameFlatPinned);
 			//write the watermarked image data
 			fwrite(data.frameFlatPinned, 1, data.width * frame->height, ffmpegPipe);
