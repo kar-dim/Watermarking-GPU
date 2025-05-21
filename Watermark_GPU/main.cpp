@@ -44,7 +44,7 @@ auto checkError = [](auto criticalErrorCondition, const string& errorMessage)
 {
 	if (criticalErrorCondition)
 	{
-		std::cout << errorMessage << "\n";
+		cout << errorMessage << "\n";
 		exitProgram(EXIT_FAILURE);
 	}
 };
@@ -117,7 +117,7 @@ int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const 
 	checkError(cols > static_cast<dim_t>(properties.maxTexture2D[0]) || rows > static_cast<dim_t>(properties.maxTexture2D[1]), "Image dimensions too high for this GPU");
 
 	//initialize watermark functions class, including parameters, ME and custom (NVF in this example) kernels
-	Watermark watermarkObj(rows, cols, inir.Get("paths", "watermark", "w.txt"), p, psnr);
+	Watermark watermarkObj(rows, cols, inir.Get("paths", "watermark", ""), p, psnr);
 
 	float watermarkStrength;
 	//warmup for arrayfire
@@ -241,7 +241,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 			<< " -c:s copy -c:a copy -map 1:s? -map 0:v -map 1:a? -max_interleave_delta 0 " << makeWatermarkVideoPath;
 		cout << "\nFFmpeg encode command: " << ffmpegCmd.str() << "\n\n";
 
-		// Open FFmpeg process
+		// Open FFmpeg process (with pipe) for writing
 		FILEPtr ffmpegPipe(_popen(ffmpegCmd.str().c_str(), "wb"), _pclose);
 		checkError(!ffmpegPipe.get(), "Error: Could not open FFmpeg pipe");
 
@@ -254,7 +254,7 @@ int testForVideo(const INIReader& inir, const string& videoFile, const cudaDevic
 	}
 
 	//realtime watermarked video detection
-	else if (inir.GetBoolean("parameters_video", "watermark_detection", false)) 
+	else if (inir.GetBoolean("parameters_video", "watermark_detection", false))
 	{
 		timer::start();
 		//detect watermark on the video frames
@@ -412,11 +412,13 @@ bool receivedValidVideoFrame(AVCodecContext* inputDecoderCtx, AVPacket* packet, 
 	return validFormat;
 }
 
+//helper method to calculate execution time in FPS or in seconds
 string executionTime(const bool showFps, const double seconds) 
 {
 	return showFps ? std::format("FPS: {:.2f} FPS", 1.0 / seconds) : std::format("{:.6f} seconds", seconds);
 }
 
+//terminates the program
 void exitProgram(const int exitCode) 
 {
 	std::system("pause");
