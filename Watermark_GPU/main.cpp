@@ -136,6 +136,7 @@ int main(void)
 	exitProgram(EXIT_SUCCESS);
 }
 
+//embed watermark for static images
 int testForImage(const cl::Device& device, const std::vector<cl::Program>& programs, const INIReader& inir, const int p, const float psnr)
 {
 	constexpr float rPercent = 0.299f;
@@ -296,6 +297,7 @@ int testForVideo(const std::vector<cl::Program>& programs, const string& videoFi
 		//embed watermark on the video frames
 		processFrames(videoData, [&](AVFrame* frame, int& framesCount) { embedWatermarkFrame(videoData, framesCount, frame, ffmpegPipe.get()); });
 		timer::end();
+
 		cout << "\nWatermark embedding total execution time: " << executionTime(false, timer::elapsedSeconds()) << "\n";
 	}
 
