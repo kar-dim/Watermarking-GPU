@@ -92,7 +92,7 @@ int main(void)
 }
 
 //embed watermark for static images
-int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr) 
+int testForImage(const INIReader& inir, const cudaDeviceProp& properties, const int p, const float psnr)
 {
 	constexpr float rPercent = 0.299f;
 	constexpr float gPercent = 0.587f;
